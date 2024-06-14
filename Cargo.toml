@@ -1,0 +1,6 @@
+[package]
+name = "zoom_video_mover"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
