@@ -1,6 +1,6 @@
 use oauth2::{
     basic::BasicClient, AuthUrl, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge,
-    RedirectUrl, Scope, TokenUrl, AuthorizationCode, PkceCodeVerifier,
+    RedirectUrl, Scope, TokenUrl, AuthorizationCode, PkceCodeVerifier, TokenResponse,
 };
 use std::env;
 use std::io;
@@ -71,6 +71,13 @@ fn load_config() -> Result<Config, Box<dyn std::error::Error>> {
             if config.client_id == "your_zoom_client_id" || config.client_secret == "your_zoom_client_secret" {
                 return Err("Please update config.toml with your actual Zoom API credentials".into());
             }
+            
+            // Validate Client ID format (should start with specific characters for Zoom)
+            if config.client_id.is_empty() || config.client_secret.is_empty() {
+                return Err("Client ID and Client Secret cannot be empty".into());
+            }
+            
+            println!("Using Client ID: {}...", &config.client_id[..std::cmp::min(8, config.client_id.len())]);
             Ok(config)
         }
         Err(_) => {
@@ -99,6 +106,7 @@ async fn get_access_token() -> Result<String, Box<dyn std::error::Error>> {
     let (auth_url, _csrf_token) = oauth_client
         .authorize_url(CsrfToken::new_random)
         .add_scope(Scope::new("recording:read".to_string()))
+        .add_scope(Scope::new("user:read".to_string()))
         .set_pkce_challenge(pkce_challenge)
         .url();
 
@@ -108,6 +116,7 @@ async fn get_access_token() -> Result<String, Box<dyn std::error::Error>> {
     #[cfg(windows)]
     {
         println!("Opening URL in default browser...");
+        println!("If the browser doesn't open automatically, please copy and paste the URL above manually.");
         open_url_windows(&auth_url.to_string());
     }
     
@@ -123,7 +132,7 @@ async fn get_access_token() -> Result<String, Box<dyn std::error::Error>> {
         .request_async(oauth2::reqwest::async_http_client)
         .await?;
 
-    let access_token = token_result.access_token().secret().to_string();
+    let access_token = token_result.access_token().secret();
     
     println!("Access token obtained! You can set it as an environment variable:");
     if cfg!(windows) {
@@ -132,7 +141,7 @@ async fn get_access_token() -> Result<String, Box<dyn std::error::Error>> {
         println!("export ZOOM_ACCESS_TOKEN={}", access_token);
     }
     
-    Ok(access_token)
+    Ok(access_token.to_string())
 }
 
 fn get_default_downloads_dir() -> String {
@@ -149,7 +158,15 @@ fn get_default_downloads_dir() -> String {
 #[cfg(windows)]
 fn open_url_windows(url: &str) {
     use std::process::Command;
-    let _ = Command::new("cmd")
-        .args(&["/C", "start", url])
-        .spawn();
+    // Windows では URL にアンパサンド(&)が含まれるとコマンドが分割されるため、
+    // 引用符で囲んで実行する
+    let _ = Command::new("powershell")
+        .args(&["-Command", &format!("Start-Process '{}'", url)])
+        .spawn()
+        .or_else(|_| {
+            // PowerShell が失敗した場合は cmd を使用
+            Command::new("cmd")
+                .args(&["/C", "start", "\"\"", url])
+                .spawn()
+        });
 }

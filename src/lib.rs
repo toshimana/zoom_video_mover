@@ -96,10 +96,11 @@ impl ZoomRecordingDownloader {
     }
 
     pub async fn download_recording(&self, recording: &Recording, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
         let safe_filename = format!("{}_{}_{}.{}", 
-            recording.meeting_id.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_"), 
-            recording.recording_type.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_"),
-            recording.id.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_"),
+            recording.meeting_id.chars().map(|c| if invalid_chars.contains(&c) { '_' } else { c }).collect::<String>(),
+            recording.recording_type.chars().map(|c| if invalid_chars.contains(&c) { '_' } else { c }).collect::<String>(),
+            recording.id.chars().map(|c| if invalid_chars.contains(&c) { '_' } else { c }).collect::<String>(),
             recording.file_type.to_lowercase()
         );
         

@@ -5,22 +5,46 @@ ZoomクラウドレコーディングをローカルにダウンロードするR
 ## 必要なソフトウェア
 
 ### Windows 11
-1. **Rust** - https://rustup.rs/ からインストール
+1. **Rust** - https://rustup.rs/ からインストール（Cargo 1.87.0 対応）
 2. **Visual Studio Build Tools** - C++ build toolsが必要
    - Visual Studio Installer から "C++ によるデスクトップ開発" をインストール
    - または Visual Studio Community をインストール
+3. **Windows SDK** (通常Visual Studio Build Toolsに含まれる)
 
 ## セットアップ
 
 ### 1. Zoom OAuth アプリを作成
-1. https://marketplace.zoom.us/develop/create にアクセス
-2. "OAuth" アプリを選択
-3. アプリ情報を入力:
-   - App Name: 任意の名前
-   - Choose App Type: User-managed app
+
+**重要: 正しい手順で作成してください**
+
+1. **Zoom Marketplace にアクセス**
+   - https://marketplace.zoom.us/develop/create
+
+2. **アプリタイプを選択**
+   - "OAuth" を選択（Server-to-Server OAuthではない）
+
+3. **基本情報を入力**
+   - App Name: 任意の名前（例: "Recording Downloader"）
+   - Choose App Type: **User-managed app** を選択
+   - Would you like to publish this app?: **No** を選択
+
+4. **OAuth情報を設定**
    - Redirect URL: `http://localhost:8080/callback`
-4. Scopes で `recording:read` を追加
-5. Client ID と Client Secret を控える
+   - Allow users to install: チェックを入れる
+
+5. **Scopes (権限) を追加**
+   - `recording:read` スコープを追加
+   - `user:read` スコープを追加（必須）
+
+6. **認証情報を取得**
+   - **App Credentials** セクションから:
+     - Client ID をコピー
+     - Client Secret をコピー
+
+**注意事項:**
+- Client IDは通常、英数字とハイフンの組み合わせです
+- Server-to-Server OAuthアプリではなく、通常のOAuthアプリを作成してください
+- アプリが "Development" ステータスであることを確認してください
 
 ### 2. 設定ファイルの作成
 初回実行時に自動で `config.toml` が作成されます。以下の内容を編集してください:
@@ -80,11 +104,85 @@ cargo run --release
 Visual Studio Build Tools がインストールされていません。上記の必要なソフトウェアをインストールしてください。
 
 ### エラー: "failed to run custom build command for 'openssl-sys'"
-以下のコマンドでrust-opensslの代わりにnative-tlsを使用します（既に設定済み）:
+このプロジェクトはrustls-tlsを使用しているため、OpenSSLは不要です。それでもエラーが発生する場合:
 ```powershell
-$env:OPENSSL_NO_VENDOR="1"
-cargo build
+# 依存関係をクリーンアップ
+cargo clean
+cargo build --release
 ```
+
+### エラー: Cargo 1.87.0 での互換性問題
+```powershell
+# Rustツールチェーンを最新に更新
+rustup update
+cargo build --release
+```
+
+### エラー: "'client_id' は、内部コマンドまたは外部コマンド..."
+このエラーはWindowsのコマンドライン解析の問題です：
+
+**原因**: OAuth URLに含まれる `&` 文字がWindowsコマンドで別々のコマンドとして解釈される
+
+**対処法**: 
+1. ブラウザが自動で開かない場合は、表示されたURLを手動でコピー&ペーストしてください
+2. 修正済みのコードでは `\"\"` を追加してURL全体を適切にエスケープしています
+
+### エラー: "申し訳ございません。リクエストを完了できませんでした。(4,700)"
+このエラーはZoom OAuth設定の問題です。以下を順番に確認してください:
+
+#### 1. Zoom Marketplace でのアプリ設定を確認
+
+**App Type の確認:**
+- アプリタイプが "OAuth" であることを確認
+- "Server-to-Server OAuth" ではないことを確認
+
+**App Information:**
+- "Would you like to publish this app on Zoom Marketplace?" → **No** を選択
+- "Choose your app type" → **User-managed app** を選択
+
+**OAuth Information:**
+- Redirect URL: `http://localhost:8080/callback` （完全一致必須）
+- OAuth Allowlist: 空欄でOK
+
+**Scopes:**
+- `recording:read` を追加
+- `user:read` を追加（**必須**）
+
+#### 2. App Status を Activated にする方法
+
+**重要**: アプリを使用するには必ずActivatedステータスにする必要があります。
+
+**手順:**
+1. **Zoom Marketplace** (https://marketplace.zoom.us/develop/create) にアクセス
+2. 作成したOAuthアプリをクリック
+3. **左サイドバー** の "App Credentials" をクリック
+4. **"Activation" セクション** を確認:
+   - Status が "Development" と表示されている場合
+   - **"Activate your app"** ボタンまたは **"Activate"** ボタンをクリック
+5. 確認ダイアログが表示されたら **"Activate"** をクリック
+6. Status が **"Activated"** に変わることを確認
+
+**注意事項:**
+- アプリがActivatedステータスでないと OAuth認証が失敗します
+- Development ステータスでも一部テストは可能ですが、本格的な使用にはActivation が必要
+- 一度Activatedにすると、一部設定変更時に再Activationが必要な場合があります
+
+**トラブルシューティング:**
+- "Activate" ボタンが見つからない場合:
+  1. App Information の設定が完了していることを確認
+  2. 必要なScopes (`recording:read`, `user:read`) が追加されていることを確認
+  3. Redirect URL が正しく設定されていることを確認
+
+#### 3. Client ID/Secret の確認
+- config.tomlのclient_idが正しいかチェック
+- スペースや改行文字が含まれていないか確認
+- Client Secret も正確にコピーされているか確認
+
+#### 4. 一般的な解決方法
+1. Zoom Marketplace でアプリを一度削除
+2. 上記の設定で新しいOAuthアプリを作成
+3. 新しいClient ID/Secretをconfig.tomlに設定
+4. プログラムを再実行
 
 ### ダウンロードが失敗する
 - インターネット接続を確認
