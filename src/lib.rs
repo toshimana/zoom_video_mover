@@ -5,7 +5,7 @@ use oauth2::{
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -96,21 +96,21 @@ impl ZoomRecordingDownloader {
     }
 
     pub async fn download_recording(&self, recording: &Recording, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let filename = format!("{}_{}_{}.{}", 
-            recording.meeting_id, 
-            recording.recording_type,
-            recording.id,
+        let safe_filename = format!("{}_{}_{}.{}", 
+            recording.meeting_id.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_"), 
+            recording.recording_type.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_"),
+            recording.id.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_"),
             recording.file_type.to_lowercase()
         );
         
-        let output_path = Path::new(output_dir).join(&filename);
+        let output_path = Path::new(output_dir).join(&safe_filename);
         
         if output_path.exists() {
             println!("File already exists: {}", output_path.display());
             return Ok(output_path.to_string_lossy().to_string());
         }
 
-        println!("Downloading: {} ({:.2} MB)", filename, recording.file_size as f64 / 1024.0 / 1024.0);
+        println!("Downloading: {} ({:.2} MB)", safe_filename, recording.file_size as f64 / 1024.0 / 1024.0);
 
         let response = self
             .client

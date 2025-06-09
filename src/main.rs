@@ -4,6 +4,7 @@ use oauth2::{
 };
 use std::env;
 use std::io;
+use std::path::PathBuf;
 use zoom_video_mover_lib::{Config, ZoomRecordingDownloader};
 
 #[tokio::main]
@@ -36,16 +37,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut output_dir = String::new();
     io::stdin().read_line(&mut output_dir)?;
     let output_dir = if output_dir.trim().is_empty() {
-        "./downloads"
+        get_default_downloads_dir()
     } else {
-        output_dir.trim()
+        output_dir.trim().to_string()
     };
 
     let downloader = ZoomRecordingDownloader::new(access_token);
     
     println!("Fetching recordings from {} to {}...", from_date, to_date);
     
-    match downloader.download_all_recordings(&user_id, from_date, to_date, output_dir).await {
+    match downloader.download_all_recordings(&user_id, from_date, to_date, &output_dir).await {
         Ok(files) => {
             println!("\nDownload completed!");
             println!("Downloaded {} files to {}", files.len(), output_dir);
@@ -103,6 +104,13 @@ async fn get_access_token() -> Result<String, Box<dyn std::error::Error>> {
 
     println!("Please visit this URL to authorize the application:");
     println!("{}", auth_url);
+    
+    #[cfg(windows)]
+    {
+        println!("Opening URL in default browser...");
+        open_url_windows(&auth_url.to_string());
+    }
+    
     println!("\nAfter authorization, copy the authorization code from the URL:");
     
     let mut auth_code = String::new();
@@ -118,7 +126,30 @@ async fn get_access_token() -> Result<String, Box<dyn std::error::Error>> {
     let access_token = token_result.access_token().secret().to_string();
     
     println!("Access token obtained! You can set it as an environment variable:");
-    println!("export ZOOM_ACCESS_TOKEN={}", access_token);
+    if cfg!(windows) {
+        println!("set ZOOM_ACCESS_TOKEN={}", access_token);
+    } else {
+        println!("export ZOOM_ACCESS_TOKEN={}", access_token);
+    }
     
     Ok(access_token)
+}
+
+fn get_default_downloads_dir() -> String {
+    if cfg!(windows) {
+        match dirs::download_dir() {
+            Some(path) => path.join("ZoomRecordings").to_string_lossy().to_string(),
+            None => ".\\downloads".to_string(),
+        }
+    } else {
+        "./downloads".to_string()
+    }
+}
+
+#[cfg(windows)]
+fn open_url_windows(url: &str) {
+    use std::process::Command;
+    let _ = Command::new("cmd")
+        .args(&["/C", "start", url])
+        .spawn();
 }
