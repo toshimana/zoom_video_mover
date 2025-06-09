@@ -9,6 +9,33 @@ use std::path::Path;
 use tokio::io::AsyncWriteExt;
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Config {
+    pub client_id: String,
+    pub client_secret: String,
+    pub redirect_uri: Option<String>,
+}
+
+impl Config {
+    pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let content = fs::read_to_string(path)?;
+        let config: Config = toml::from_str(&content)?;
+        Ok(config)
+    }
+
+    pub fn create_sample_file(path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let sample_config = Config {
+            client_id: "your_zoom_client_id".to_string(),
+            client_secret: "your_zoom_client_secret".to_string(),
+            redirect_uri: Some("http://localhost:8080/callback".to_string()),
+        };
+        
+        let content = toml::to_string_pretty(&sample_config)?;
+        fs::write(path, content)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Recording {
     pub id: String,
     pub meeting_id: String,

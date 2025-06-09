@@ -4,7 +4,7 @@ use oauth2::{
 };
 use std::env;
 use std::io;
-use zoom_video_mover_lib::ZoomRecordingDownloader;
+use zoom_video_mover_lib::{Config, ZoomRecordingDownloader};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -62,17 +62,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn load_config() -> Result<Config, Box<dyn std::error::Error>> {
+    let config_path = "config.toml";
+    
+    match Config::load_from_file(config_path) {
+        Ok(config) => {
+            if config.client_id == "your_zoom_client_id" || config.client_secret == "your_zoom_client_secret" {
+                return Err("Please update config.toml with your actual Zoom API credentials".into());
+            }
+            Ok(config)
+        }
+        Err(_) => {
+            println!("Config file not found. Creating sample config.toml...");
+            Config::create_sample_file(config_path)?;
+            Err("Created sample config.toml. Please update it with your Zoom API credentials and run again.".into())
+        }
+    }
+}
+
 async fn get_access_token() -> Result<String, Box<dyn std::error::Error>> {
-    let client_id = env::var("ZOOM_CLIENT_ID").expect("ZOOM_CLIENT_ID must be set");
-    let client_secret = env::var("ZOOM_CLIENT_SECRET").expect("ZOOM_CLIENT_SECRET must be set");
+    let config = load_config()?;
+    
+    let redirect_uri = config.redirect_uri.unwrap_or_else(|| "http://localhost:8080/callback".to_string());
     
     let oauth_client = BasicClient::new(
-        ClientId::new(client_id),
-        Some(ClientSecret::new(client_secret)),
+        ClientId::new(config.client_id),
+        Some(ClientSecret::new(config.client_secret)),
         AuthUrl::new("https://zoom.us/oauth/authorize".to_string())?,
         Some(TokenUrl::new("https://zoom.us/oauth/token".to_string())?),
     )
-    .set_redirect_uri(RedirectUrl::new("http://localhost:8080/callback".to_string())?);
+    .set_redirect_uri(RedirectUrl::new(redirect_uri)?);
 
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
