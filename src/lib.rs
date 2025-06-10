@@ -103,9 +103,23 @@ impl ZoomRecordingDownloader {
 
     pub async fn download_recording(&self, recording: &Recording, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
         let invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
-        let safe_filename = format!("{}_{}_{}.{}", 
+        
+        // Create descriptive filename based on file type
+        let file_type_desc = match recording.file_type.to_lowercase().as_str() {
+            "mp4" => "video",
+            "m4a" => "audio", 
+            "txt" => "chat",
+            "vtt" => "transcript",
+            "cc.vtt" => "captions",
+            "csv" => "data",
+            "json" => "metadata",
+            _ => &recording.file_type.to_lowercase()
+        };
+        
+        let safe_filename = format!("{}_{}_{}_{}.{}", 
             recording.meeting_id.chars().map(|c| if invalid_chars.contains(&c) { '_' } else { c }).collect::<String>(),
             recording.recording_type.chars().map(|c| if invalid_chars.contains(&c) { '_' } else { c }).collect::<String>(),
+            file_type_desc,
             recording.id.chars().map(|c| if invalid_chars.contains(&c) { '_' } else { c }).collect::<String>(),
             recording.file_type.to_lowercase()
         );
@@ -113,11 +127,11 @@ impl ZoomRecordingDownloader {
         let output_path = Path::new(output_dir).join(&safe_filename);
         
         if output_path.exists() {
-            windows_console::println_japanese(&format!("ファイルは既に存在しています: {}", output_path.display()));
+            windows_console::println_japanese(&format!("File already exists: {}", output_path.display()));
             return Ok(output_path.to_string_lossy().to_string());
         }
 
-        windows_console::println_japanese(&format!("ダウンロード中: {} ({:.2} MB)", safe_filename, recording.file_size as f64 / 1024.0 / 1024.0));
+        windows_console::println_japanese(&format!("Downloading: {} ({:.2} MB)", safe_filename, recording.file_size as f64 / 1024.0 / 1024.0));
 
         let response = self
             .client
@@ -136,26 +150,66 @@ impl ZoomRecordingDownloader {
         let content = response.bytes().await?;
         file.write_all(&content).await?;
 
-        windows_console::println_japanese(&format!("ダウンロード完了: {}", output_path.display()));
+        windows_console::println_japanese(&format!("Download completed: {}", output_path.display()));
         Ok(output_path.to_string_lossy().to_string())
     }
 
     pub async fn download_all_recordings(&self, user_id: &str, from: &str, to: &str, output_dir: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
         let recordings = self.list_recordings(user_id, from, to).await?;
         let mut downloaded_files = Vec::new();
+        let mut file_type_counts = std::collections::HashMap::new();
 
-        windows_console::println_japanese(&format!("{}個の録画ミーティングが見つかりました", recordings.meetings.len()));
+        windows_console::println_japanese(&format!("Found {} recorded meetings", recordings.meetings.len()));
 
         for meeting in recordings.meetings {
-            windows_console::println_japanese(&format!("ミーティングを処理中: {} ({})", meeting.topic, meeting.start_time));
+            windows_console::println_japanese(&format!("Processing meeting: {} ({})", meeting.topic, meeting.start_time));
             
             for recording in meeting.recording_files {
-                if recording.file_type.to_lowercase() == "mp4" || recording.file_type.to_lowercase() == "m4a" {
+                // Download all file types: videos (MP4), audio (M4A), chat files (TXT), and other assets
+                let file_type = recording.file_type.to_lowercase();
+                let is_downloadable = match file_type.as_str() {
+                    "mp4" | "m4a" => true,  // Video and audio files
+                    "txt" => true,          // Chat files
+                    "vtt" => true,          // Transcript/subtitle files  
+                    "csv" => true,          // Poll results, participant lists
+                    "json" => true,         // Meeting metadata
+                    "cc.vtt" => true,       // Closed captions
+                    _ => {
+                        // Log unknown file types but attempt to download them
+                        windows_console::println_japanese(&format!("Unknown file type '{}' for recording {}, attempting download", file_type, recording.id));
+                        true
+                    }
+                };
+                
+                if is_downloadable {
+                    windows_console::println_japanese(&format!("Downloading {} file: {}", file_type.to_uppercase(), recording.id));
                     match self.download_recording(&recording, output_dir).await {
-                        Ok(path) => downloaded_files.push(path),
-                        Err(e) => windows_console::println_japanese(&format!("ダウンロード失敗 {}: {}", recording.id, e)),
+                        Ok(path) => {
+                            downloaded_files.push(path);
+                            *file_type_counts.entry(file_type.clone()).or_insert(0) += 1;
+                        },
+                        Err(e) => windows_console::println_japanese(&format!("Download failed {}: {}", recording.id, e)),
                     }
                 }
+            }
+        }
+
+        // Display download summary with file type breakdown
+        windows_console::println_japanese(&format!("Download completed: {} files total", downloaded_files.len()));
+        if !file_type_counts.is_empty() {
+            windows_console::println_japanese("File types downloaded:");
+            for (file_type, count) in file_type_counts {
+                let type_name = match file_type.as_str() {
+                    "mp4" => "Video files",
+                    "m4a" => "Audio files", 
+                    "txt" => "Chat files",
+                    "vtt" => "Transcript files",
+                    "cc.vtt" => "Caption files",
+                    "csv" => "Data files",
+                    "json" => "Metadata files",
+                    _ => "Other files"
+                };
+                windows_console::println_japanese(&format!("  {} ({}): {} files", type_name, file_type.to_uppercase(), count));
             }
         }
 
