@@ -19,7 +19,20 @@ url = "2.4"
 base64 = "0.21"
 toml = "0.8"
 dirs = "5.0"
+eframe = "0.28"
+egui = "0.28"
+egui_extras = { version = "0.28", features = ["all_loaders"] }
+chrono = { version = "0.4", features = ["serde"] }
+env_logger = "0.10"
+open = "5.0"
 
-# Windows dependencies removed to fix constant evaluation errors
-# [target.'cfg(windows)'.dependencies]
-# winapi = { version = "0.3", features = ["winuser", "shellapi"] }
+[[bin]]
+name = "zoom_video_mover"
+path = "src/main.rs"
+
+[[bin]]
+name = "zoom_video_mover_gui"
+path = "src/main_gui.rs"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = ["Win32_System_Console", "Win32_Foundation"] }

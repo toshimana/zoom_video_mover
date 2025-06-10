@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cargo check:*)"
+      "Bash(cargo check:*)",
+      "Bash(cargo build:*)",
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "Bash(cargo:*)",
+      "Bash(./target/debug/zoom_video_mover --help)",
+      "Bash(timeout:*)",
+      "Bash(./target/release/zoom_video_mover:*)"
     ],
     "deny": []
   }

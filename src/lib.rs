@@ -1,12 +1,12 @@
-use oauth2::{
-    basic::BasicClient, AuthUrl, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge,
-    RedirectUrl, Scope, TokenUrl, AccessToken, AuthorizationCode, PkceCodeVerifier,
-};
+// OAuth2関連のimportは現在使用されていませんが、
+// 今後の機能拡張のために残しておきます
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tokio::io::AsyncWriteExt;
+
+pub mod windows_console;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -30,6 +30,12 @@ impl Config {
         };
         
         let content = toml::to_string_pretty(&sample_config)?;
+        fs::write(path, content)?;
+        Ok(())
+    }
+
+    pub fn save_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let content = toml::to_string_pretty(self)?;
         fs::write(path, content)?;
         Ok(())
     }
@@ -107,11 +113,11 @@ impl ZoomRecordingDownloader {
         let output_path = Path::new(output_dir).join(&safe_filename);
         
         if output_path.exists() {
-            println!("File already exists: {}", output_path.display());
+            windows_console::println_japanese(&format!("ファイルは既に存在しています: {}", output_path.display()));
             return Ok(output_path.to_string_lossy().to_string());
         }
 
-        println!("Downloading: {} ({:.2} MB)", safe_filename, recording.file_size as f64 / 1024.0 / 1024.0);
+        windows_console::println_japanese(&format!("ダウンロード中: {} ({:.2} MB)", safe_filename, recording.file_size as f64 / 1024.0 / 1024.0));
 
         let response = self
             .client
@@ -130,7 +136,7 @@ impl ZoomRecordingDownloader {
         let content = response.bytes().await?;
         file.write_all(&content).await?;
 
-        println!("Downloaded: {}", output_path.display());
+        windows_console::println_japanese(&format!("ダウンロード完了: {}", output_path.display()));
         Ok(output_path.to_string_lossy().to_string())
     }
 
@@ -138,16 +144,16 @@ impl ZoomRecordingDownloader {
         let recordings = self.list_recordings(user_id, from, to).await?;
         let mut downloaded_files = Vec::new();
 
-        println!("Found {} meetings with recordings", recordings.meetings.len());
+        windows_console::println_japanese(&format!("{}個の録画ミーティングが見つかりました", recordings.meetings.len()));
 
         for meeting in recordings.meetings {
-            println!("Processing meeting: {} ({})", meeting.topic, meeting.start_time);
+            windows_console::println_japanese(&format!("ミーティングを処理中: {} ({})", meeting.topic, meeting.start_time));
             
             for recording in meeting.recording_files {
                 if recording.file_type.to_lowercase() == "mp4" || recording.file_type.to_lowercase() == "m4a" {
                     match self.download_recording(&recording, output_dir).await {
                         Ok(path) => downloaded_files.push(path),
-                        Err(e) => eprintln!("Failed to download {}: {}", recording.id, e),
+                        Err(e) => windows_console::println_japanese(&format!("ダウンロード失敗 {}: {}", recording.id, e)),
                     }
                 }
             }

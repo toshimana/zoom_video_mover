@@ -1,39 +1,41 @@
 use oauth2::{
     basic::BasicClient, AuthUrl, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge,
-    RedirectUrl, Scope, TokenUrl, AuthorizationCode, PkceCodeVerifier, TokenResponse,
+    RedirectUrl, Scope, TokenUrl, AuthorizationCode, TokenResponse,
 };
 use std::env;
 use std::io;
-use std::path::PathBuf;
-use zoom_video_mover_lib::{Config, ZoomRecordingDownloader};
+use zoom_video_mover_lib::{Config, ZoomRecordingDownloader, windows_console};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Zoom Cloud Recording Downloader");
-    println!("================================");
+    // Windows環境でのコンソール文字化け対策
+    windows_console::setup_console_encoding();
+    
+    windows_console::println_japanese("Zoom録画ダウンローダー");
+    windows_console::println_japanese("====================");
 
     let access_token = match env::var("ZOOM_ACCESS_TOKEN") {
         Ok(token) => token,
         Err(_) => {
-            println!("ZOOM_ACCESS_TOKEN not found. Starting OAuth flow...");
+            windows_console::println_japanese("ZOOM_ACCESS_TOKEN が見つかりません。OAuth認証を開始します...");
             get_access_token().await?
         }
     };
 
     let user_id = env::var("ZOOM_USER_ID").unwrap_or_else(|_| "me".to_string());
     
-    println!("Enter date range for recordings:");
-    print!("From date (YYYY-MM-DD): ");
+    windows_console::println_japanese("録画の日付範囲を入力してください:");
+    windows_console::print_japanese("開始日 (YYYY-MM-DD): ");
     let mut from_date = String::new();
     io::stdin().read_line(&mut from_date)?;
     let from_date = from_date.trim();
 
-    print!("To date (YYYY-MM-DD): ");
+    windows_console::print_japanese("終了日 (YYYY-MM-DD): ");
     let mut to_date = String::new();
     io::stdin().read_line(&mut to_date)?;
     let to_date = to_date.trim();
 
-    print!("Output directory (default: ./downloads): ");
+    windows_console::print_japanese("保存先ディレクトリ (デフォルト: ./downloads): ");
     let mut output_dir = String::new();
     io::stdin().read_line(&mut output_dir)?;
     let output_dir = if output_dir.trim().is_empty() {
@@ -44,18 +46,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let downloader = ZoomRecordingDownloader::new(access_token);
     
-    println!("Fetching recordings from {} to {}...", from_date, to_date);
+    windows_console::println_japanese(&format!("{}から{}までの録画を取得中...", from_date, to_date));
     
     match downloader.download_all_recordings(&user_id, from_date, to_date, &output_dir).await {
         Ok(files) => {
-            println!("\nDownload completed!");
-            println!("Downloaded {} files to {}", files.len(), output_dir);
+            windows_console::println_japanese("\nダウンロード完了!");
+            windows_console::println_japanese(&format!("{}個のファイルを{}にダウンロードしました", files.len(), output_dir));
             for file in files {
-                println!("  - {}", file);
+                windows_console::println_japanese(&format!("  - {}", file));
             }
         }
         Err(e) => {
-            eprintln!("Error: {}", e);
+            windows_console::println_japanese(&format!("エラー: {}", e));
             std::process::exit(1);
         }
     }
@@ -69,21 +71,21 @@ fn load_config() -> Result<Config, Box<dyn std::error::Error>> {
     match Config::load_from_file(config_path) {
         Ok(config) => {
             if config.client_id == "your_zoom_client_id" || config.client_secret == "your_zoom_client_secret" {
-                return Err("Please update config.toml with your actual Zoom API credentials".into());
+                return Err("config.tomlを実際のZoom API認証情報で更新してください".into());
             }
             
             // Validate Client ID format (should start with specific characters for Zoom)
             if config.client_id.is_empty() || config.client_secret.is_empty() {
-                return Err("Client ID and Client Secret cannot be empty".into());
+                return Err("Client IDとClient Secretは空にできません".into());
             }
             
-            println!("Using Client ID: {}...", &config.client_id[..std::cmp::min(8, config.client_id.len())]);
+            windows_console::println_japanese(&format!("使用するClient ID: {}...", &config.client_id[..std::cmp::min(8, config.client_id.len())]));
             Ok(config)
         }
         Err(_) => {
-            println!("Config file not found. Creating sample config.toml...");
+            windows_console::println_japanese("設定ファイルが見つかりません。サンプルconfig.tomlを作成しています...");
             Config::create_sample_file(config_path)?;
-            Err("Created sample config.toml. Please update it with your Zoom API credentials and run again.".into())
+            Err("サンプルconfig.tomlを作成しました。Zoom API認証情報を設定して再実行してください。".into())
         }
     }
 }
@@ -110,17 +112,17 @@ async fn get_access_token() -> Result<String, Box<dyn std::error::Error>> {
         .set_pkce_challenge(pkce_challenge)
         .url();
 
-    println!("Please visit this URL to authorize the application:");
-    println!("{}", auth_url);
+    windows_console::println_japanese("アプリケーションを認証するために以下のURLにアクセスしてください:");
+    windows_console::println_japanese(&auth_url.to_string());
     
     #[cfg(windows)]
     {
-        println!("Opening URL in default browser...");
-        println!("If the browser doesn't open automatically, please copy and paste the URL above manually.");
+        windows_console::println_japanese("デフォルトブラウザでURLを開いています...");
+        windows_console::println_japanese("ブラウザが自動で開かない場合は、上記URLを手動でコピーして貼り付けてください。");
         open_url_windows(&auth_url.to_string());
     }
     
-    println!("\nAfter authorization, copy the authorization code from the URL:");
+    windows_console::println_japanese("\n認証後、URLから認証コードをコピーしてください:");
     
     let mut auth_code = String::new();
     io::stdin().read_line(&mut auth_code)?;
@@ -134,11 +136,11 @@ async fn get_access_token() -> Result<String, Box<dyn std::error::Error>> {
 
     let access_token = token_result.access_token().secret();
     
-    println!("Access token obtained! You can set it as an environment variable:");
+    windows_console::println_japanese("アクセストークンを取得しました! 環境変数として設定できます:");
     if cfg!(windows) {
-        println!("set ZOOM_ACCESS_TOKEN={}", access_token);
+        windows_console::println_japanese(&format!("set ZOOM_ACCESS_TOKEN={}", access_token));
     } else {
-        println!("export ZOOM_ACCESS_TOKEN={}", access_token);
+        windows_console::println_japanese(&format!("export ZOOM_ACCESS_TOKEN={}", access_token));
     }
     
     Ok(access_token.to_string())
