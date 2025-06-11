@@ -67,6 +67,55 @@ pub struct MeetingRecording {
     pub recording_files: Vec<Recording>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AISummaryResponse {
+    #[serde(default)]
+    pub meeting_uuid: String,
+    #[serde(default)]
+    pub summary_start_time: String,
+    #[serde(default)]
+    pub summary_end_time: String,
+    #[serde(default)]
+    pub summary_created_time: String,
+    #[serde(default)]
+    pub summary_last_modified_time: String,
+    #[serde(default)]
+    pub summary_title: String,
+    #[serde(default)]
+    pub summary_overview: String,
+    #[serde(default)]
+    pub summary_details: Vec<SummaryDetail>,
+    #[serde(default)]
+    pub next_steps: Vec<String>,
+    #[serde(default)]
+    pub summary_keyword: Vec<String>,
+    
+    // Alternative field names that Zoom might use
+    #[serde(default, alias = "summary")]
+    pub summary: String,
+    #[serde(default, alias = "key_points")]
+    pub key_points: Vec<String>,
+    #[serde(default, alias = "action_items")]
+    pub action_items: Vec<String>,
+    #[serde(default, alias = "meeting_id")]
+    pub meeting_id: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SummaryDetail {
+    #[serde(default)]
+    pub summary_type: String,
+    #[serde(default)]
+    pub summary_content: String,
+}
+
+// Alternative structure for unknown AI summary formats
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GenericAISummary {
+    #[serde(flatten)]
+    pub data: serde_json::Map<String, serde_json::Value>,
+}
+
 pub struct ZoomRecordingDownloader {
     client: Client,
     access_token: String,
@@ -78,6 +127,37 @@ impl ZoomRecordingDownloader {
             client: Client::new(),
             access_token,
         }
+    }
+
+    // Diagnostic method to test API connectivity and permissions
+    pub async fn test_api_access(&self) -> Result<(), Box<dyn std::error::Error>> {
+        windows_console::println_japanese("=== Testing Zoom API Access ===");
+        
+        // Test basic user info API
+        let user_response = self
+            .client
+            .get("https://api.zoom.us/v2/users/me")
+            .bearer_auth(&self.access_token)
+            .send()
+            .await?;
+
+        windows_console::println_japanese(&format!("User API status: {}", user_response.status()));
+        
+        if user_response.status().is_success() {
+            if let Ok(user_data) = user_response.json::<serde_json::Value>().await {
+                if let Some(user_id) = user_data.get("id").and_then(|v| v.as_str()) {
+                    windows_console::println_japanese(&format!("✓ Connected as user: {}", user_id));
+                }
+                if let Some(account_id) = user_data.get("account_id").and_then(|v| v.as_str()) {
+                    windows_console::println_japanese(&format!("Account ID: {}", account_id));
+                }
+            }
+        } else {
+            windows_console::println_japanese(&format!("✗ User API failed: {}", user_response.status()));
+        }
+
+        windows_console::println_japanese("=== End API Test ===\n");
+        Ok(())
     }
 
     pub async fn list_recordings(&self, user_id: &str, from: &str, to: &str) -> Result<RecordingResponse, Box<dyn std::error::Error>> {
@@ -99,6 +179,311 @@ impl ZoomRecordingDownloader {
 
         let recordings: RecordingResponse = response.json().await?;
         Ok(recordings)
+    }
+
+    pub async fn get_ai_summary_by_meeting_id(&self, meeting_id: u64) -> Result<Option<AISummaryResponse>, Box<dyn std::error::Error>> {
+        windows_console::println_japanese(&format!("Requesting AI summary for Meeting ID: {}", meeting_id));
+        
+        // Try AI summary endpoints using meeting ID
+        let endpoints = vec![
+            format!("https://api.zoom.us/v2/meetings/{}/batch_summary", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/summary", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/ai_companion_summary", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/recording_summary", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/meeting_summary", meeting_id),
+            format!("https://api.zoom.us/v2/ai_companion/meetings/{}/summary", meeting_id),
+            format!("https://api.zoom.us/v2/ai_companion/summary/{}", meeting_id),
+        ];
+        
+        for (i, url) in endpoints.iter().enumerate() {
+            windows_console::println_japanese(&format!("Trying Meeting ID endpoint {}/{}: {}", i+1, endpoints.len(), url));
+
+            let response = self
+                .client
+                .get(url)
+                .bearer_auth(&self.access_token)
+                .send()
+                .await?;
+
+            match response.status().as_u16() {
+                200 => {
+                    windows_console::println_japanese("AI summary response received via Meeting ID!");
+                    let response_text = response.text().await?;
+                    windows_console::println_japanese(&format!("Response length: {} chars", response_text.len()));
+                    
+                    if let Ok(summary) = serde_json::from_str::<AISummaryResponse>(&response_text) {
+                        windows_console::println_japanese("Successfully parsed AI summary!");
+                        return Ok(Some(summary));
+                    } else if let Ok(generic_json) = serde_json::from_str::<serde_json::Value>(&response_text) {
+                        windows_console::println_japanese("Received valid JSON, converting to AI summary format");
+                        let converted_summary = self.convert_generic_to_ai_summary(generic_json, &meeting_id.to_string());
+                        return Ok(Some(converted_summary));
+                    } else {
+                        windows_console::println_japanese("Response is not valid JSON");
+                        continue;
+                    }
+                },
+                404 => {
+                    windows_console::println_japanese(&format!("Meeting ID endpoint {} returned 404 (not found)", i+1));
+                    continue;
+                },
+                401 => {
+                    windows_console::println_japanese(&format!("Meeting ID endpoint {} returned 401 (Unauthorized)", i+1));
+                    continue;
+                },
+                403 => {
+                    windows_console::println_japanese(&format!("Meeting ID endpoint {} returned 403 (Forbidden)", i+1));
+                    continue;
+                },
+                _ => {
+                    windows_console::println_japanese(&format!("Meeting ID endpoint {} returned {}", i+1, response.status()));
+                    continue;
+                }
+            }
+        }
+        
+        windows_console::println_japanese(&format!("No AI summary found via Meeting ID {}", meeting_id));
+        Ok(None)
+    }
+
+    pub async fn get_ai_summary(&self, meeting_uuid: &str) -> Result<Option<AISummaryResponse>, Box<dyn std::error::Error>> {
+        windows_console::println_japanese(&format!("Requesting AI summary for UUID: {}", meeting_uuid));
+        
+        // Implement proper double URL encoding as required by Zoom API research
+        let single_encoded = urlencoding::encode(meeting_uuid);
+        let double_encoded = urlencoding::encode(&single_encoded);
+        windows_console::println_japanese(&format!("Single encoded UUID: {}", single_encoded));
+        windows_console::println_japanese(&format!("Double encoded UUID: {}", double_encoded));
+        
+        // Try different UUID formats based on Zoom API research
+        let uuid_variants = vec![
+            double_encoded.to_string(),  // Research shows double encoding is often required
+            single_encoded.to_string(),
+            meeting_uuid.to_string(),
+            meeting_uuid.replace("/", "%2F").replace("=", "%3D"),
+        ];
+        
+        for (variant_idx, uuid_variant) in uuid_variants.iter().enumerate() {
+            windows_console::println_japanese(&format!("Trying UUID variant {}/{}: {}", variant_idx+1, uuid_variants.len(), uuid_variant));
+            
+            // Focus on the documented working endpoints from research
+            let endpoints = vec![
+                // Primary endpoint - meeting_summary (documented as working)
+                format!("https://api.zoom.us/v2/meetings/{}/meeting_summary", uuid_variant),
+                // Check for summary files in recordings
+                format!("https://api.zoom.us/v2/meetings/{}/recordings", uuid_variant),
+                // Legacy endpoints for compatibility
+                format!("https://api.zoom.us/v2/meetings/{}/summary", uuid_variant),
+                format!("https://api.zoom.us/v2/meetings/{}/batch_summary", uuid_variant),
+            ];
+        
+            for (i, url) in endpoints.iter().enumerate() {
+                windows_console::println_japanese(&format!("Trying endpoint {}/{}: {}", i+1, endpoints.len(), url));
+
+                let response = self
+                    .client
+                    .get(url)
+                    .bearer_auth(&self.access_token)
+                    .send()
+                    .await?;
+
+                match response.status().as_u16() {
+                    200 => {
+                        windows_console::println_japanese("✓ Received 200 response!");
+                        let response_text = response.text().await?;
+                        windows_console::println_japanese(&format!("Response length: {} chars", response_text.len()));
+                        
+                        // Check if this is a recordings endpoint response
+                        if url.contains("/recordings") {
+                            if let Ok(recordings_data) = serde_json::from_str::<serde_json::Value>(&response_text) {
+                                // Look for SUMMARY file type in recording files
+                                if let Some(recording_files) = recordings_data.get("recording_files").and_then(|v| v.as_array()) {
+                                    for file in recording_files {
+                                        if let Some(file_type) = file.get("file_type").and_then(|v| v.as_str()) {
+                                            if file_type == "SUMMARY" {
+                                                windows_console::println_japanese("✓ Found SUMMARY file in recordings!");
+                                                // Extract summary content if available
+                                                let converted_summary = self.convert_generic_to_ai_summary(file.clone(), meeting_uuid);
+                                                return Ok(Some(converted_summary));
+                                            }
+                                        }
+                                    }
+                                }
+                                windows_console::println_japanese("No SUMMARY file found in recordings");
+                                continue;
+                            }
+                        } else {
+                            // Try to parse as meeting summary response
+                            if let Ok(summary) = serde_json::from_str::<AISummaryResponse>(&response_text) {
+                                windows_console::println_japanese("✓ Successfully parsed AI summary!");
+                                return Ok(Some(summary));
+                            } else if let Ok(generic_json) = serde_json::from_str::<serde_json::Value>(&response_text) {
+                                windows_console::println_japanese("✓ Received valid JSON, converting to AI summary format");
+                                let converted_summary = self.convert_generic_to_ai_summary(generic_json, meeting_uuid);
+                                return Ok(Some(converted_summary));
+                            } else {
+                                windows_console::println_japanese("Response is not valid JSON");
+                                windows_console::println_japanese(&format!("Response preview: {}", 
+                                    if response_text.len() > 200 { 
+                                        format!("{}...", &response_text[..200]) 
+                                    } else { 
+                                        response_text.clone() 
+                                    }
+                                ));
+                                continue;
+                            }
+                        }
+                    },
+                    404 => {
+                        windows_console::println_japanese(&format!("Endpoint {} returned 404 (not found)", i+1));
+                        continue;
+                    },
+                    401 => {
+                        windows_console::println_japanese(&format!("Endpoint {} returned 401 (Unauthorized)", i+1));
+                        windows_console::println_japanese("ℹ Ensure access token is valid and has not expired");
+                        continue;
+                    },
+                    403 => {
+                        windows_console::println_japanese(&format!("Endpoint {} returned 403 (Forbidden)", i+1));
+                        windows_console::println_japanese("ℹ Required scopes: meeting:read, recording:read, user:read");
+                        windows_console::println_japanese("ℹ Note: You may need to be the meeting host to access summaries");
+                        continue;
+                    },
+                    429 => {
+                        windows_console::println_japanese(&format!("Endpoint {} returned 429 (Rate limit exceeded)", i+1));
+                        // Add delay for rate limiting
+                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                        continue;
+                    },
+                    422 => {
+                        windows_console::println_japanese(&format!("Endpoint {} returned 422 (Unprocessable Entity)", i+1));
+                        windows_console::println_japanese("ℹ This may indicate the summary is still being processed");
+                        continue;
+                    },
+                    500..=599 => {
+                        windows_console::println_japanese(&format!("Endpoint {} returned {} (Server error)", i+1, response.status()));
+                        continue;
+                    },
+                    _ => {
+                        windows_console::println_japanese(&format!("Endpoint {} returned {} (Unknown error)", i+1, response.status()));
+                        if let Ok(error_text) = response.text().await {
+                            if !error_text.is_empty() {
+                                windows_console::println_japanese(&format!("Error details: {}", 
+                                    if error_text.len() > 300 { 
+                                        format!("{}...", &error_text[..300]) 
+                                    } else { 
+                                        error_text 
+                                    }
+                                ));
+                            }
+                        }
+                        continue;
+                    }
+                }
+            }
+        }
+        
+        // No AI summary found from any endpoint
+        windows_console::println_japanese(&format!("ℹ No AI summary available for meeting {} (this is normal if AI Companion was not enabled)", meeting_uuid));
+        windows_console::println_japanese("ℹ AI summaries require: 1) AI Companion enabled, 2) Meeting host access, 3) Processing time (up to 24h)");
+        Ok(None)
+    }
+
+    fn convert_generic_to_ai_summary(&self, json: serde_json::Value, meeting_uuid: &str) -> AISummaryResponse {
+        // Extract common fields that might exist in various formats
+        let summary_text = json.get("summary")
+            .or_else(|| json.get("overview"))
+            .or_else(|| json.get("content"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let key_points = json.get("key_points")
+            .or_else(|| json.get("highlights"))
+            .or_else(|| json.get("main_points"))
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+
+        let action_items = json.get("action_items")
+            .or_else(|| json.get("next_steps"))
+            .or_else(|| json.get("todos"))
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+
+        AISummaryResponse {
+            meeting_uuid: meeting_uuid.to_string(),
+            summary_start_time: json.get("start_time").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            summary_end_time: json.get("end_time").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            summary_created_time: json.get("created_time").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            summary_last_modified_time: json.get("modified_time").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            summary_title: json.get("title").and_then(|v| v.as_str()).unwrap_or("AI Generated Summary").to_string(),
+            summary_overview: summary_text.clone(),
+            summary_details: vec![], // Will be populated if structured details exist
+            next_steps: action_items,
+            summary_keyword: json.get("keywords")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                .unwrap_or_default(),
+            summary: summary_text,
+            key_points: key_points,
+            action_items: json.get("action_items")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                .unwrap_or_default(),
+            meeting_id: json.get("meeting_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        }
+    }
+
+    pub async fn save_ai_summary(&self, summary: &AISummaryResponse, meeting_id: &str, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
+        
+        // Create AI summary filename
+        let safe_meeting_id = meeting_id.chars().map(|c| if invalid_chars.contains(&c) { '_' } else { c }).collect::<String>();
+        let summary_filename = format!("{}_ai_summary.json", safe_meeting_id);
+        let output_path = Path::new(output_dir).join(&summary_filename);
+        
+        if output_path.exists() {
+            windows_console::println_japanese(&format!("AI summary file already exists: {}", output_path.display()));
+            return Ok(output_path.to_string_lossy().to_string());
+        }
+
+        // Create comprehensive summary with structured format
+        let comprehensive_summary = serde_json::json!({
+            "meeting_uuid": summary.meeting_uuid,
+            "meeting_id": meeting_id,
+            "summary_metadata": {
+                "title": summary.summary_title,
+                "start_time": summary.summary_start_time,
+                "end_time": summary.summary_end_time,
+                "created_time": summary.summary_created_time,
+                "last_modified_time": summary.summary_last_modified_time
+            },
+            "overview": if !summary.summary_overview.is_empty() { 
+                summary.summary_overview.clone() 
+            } else { 
+                summary.summary.clone() 
+            },
+            "summary_details": summary.summary_details,
+            "next_steps": if !summary.next_steps.is_empty() { 
+                summary.next_steps.clone() 
+            } else { 
+                summary.action_items.clone() 
+            },
+            "keywords": summary.summary_keyword,
+            "key_points": summary.key_points,
+            "generated_by": "Zoom AI Companion",
+            "download_timestamp": chrono::Utc::now().to_rfc3339()
+        });
+
+        fs::create_dir_all(output_dir)?;
+        
+        let json_content = serde_json::to_string_pretty(&comprehensive_summary)?;
+        fs::write(&output_path, json_content)?;
+
+        windows_console::println_japanese(&format!("AI summary saved: {}", output_path.display()));
+        Ok(output_path.to_string_lossy().to_string())
     }
 
     pub async fn download_recording(&self, recording: &Recording, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
@@ -155,6 +540,11 @@ impl ZoomRecordingDownloader {
     }
 
     pub async fn download_all_recordings(&self, user_id: &str, from: &str, to: &str, output_dir: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        // Test API access first
+        if let Err(e) = self.test_api_access().await {
+            windows_console::println_japanese(&format!("API test failed: {}", e));
+        }
+
         let recordings = self.list_recordings(user_id, from, to).await?;
         let mut downloaded_files = Vec::new();
         let mut file_type_counts = std::collections::HashMap::new();
@@ -163,6 +553,66 @@ impl ZoomRecordingDownloader {
 
         for meeting in recordings.meetings {
             windows_console::println_japanese(&format!("Processing meeting: {} ({})", meeting.topic, meeting.start_time));
+            
+            // Try to download AI summary for this meeting
+            windows_console::println_japanese(&format!("=== Checking AI Companion summary for meeting {} ===", meeting.id));
+            windows_console::println_japanese(&format!("Meeting UUID: {}", meeting.uuid));
+            windows_console::println_japanese(&format!("Meeting topic: {}", meeting.topic));
+            windows_console::println_japanese(&format!("Meeting start time: {}", meeting.start_time));
+            
+            // Try both UUID and Meeting ID approaches
+            let mut summary_found = false;
+            
+            // First try with Meeting ID (more likely to work)
+            match self.get_ai_summary_by_meeting_id(meeting.id).await {
+                Ok(Some(summary)) => {
+                    windows_console::println_japanese("✓ AI summary found via Meeting ID, saving to file...");
+                    match self.save_ai_summary(&summary, &meeting.id.to_string(), output_dir).await {
+                        Ok(path) => {
+                            windows_console::println_japanese(&format!("✓ AI summary saved: {}", path));
+                            downloaded_files.push(path);
+                            *file_type_counts.entry("ai_summary".to_string()).or_insert(0) += 1;
+                            summary_found = true;
+                        },
+                        Err(e) => windows_console::println_japanese(&format!("✗ Failed to save AI summary: {}", e)),
+                    }
+                },
+                Ok(None) => {
+                    windows_console::println_japanese("ℹ No AI summary found via Meeting ID");
+                },
+                Err(e) => {
+                    windows_console::println_japanese(&format!("✗ Error checking AI summary via Meeting ID: {}", e));
+                }
+            }
+            
+            // If not found via Meeting ID, try with UUID
+            if !summary_found {
+                match self.get_ai_summary(&meeting.uuid).await {
+                    Ok(Some(summary)) => {
+                        windows_console::println_japanese("✓ AI summary found via UUID, saving to file...");
+                        match self.save_ai_summary(&summary, &meeting.id.to_string(), output_dir).await {
+                            Ok(path) => {
+                                windows_console::println_japanese(&format!("✓ AI summary saved: {}", path));
+                                downloaded_files.push(path);
+                                *file_type_counts.entry("ai_summary".to_string()).or_insert(0) += 1;
+                                summary_found = true;
+                            },
+                            Err(e) => windows_console::println_japanese(&format!("✗ Failed to save AI summary: {}", e)),
+                        }
+                    },
+                    Ok(None) => {
+                        windows_console::println_japanese("ℹ No AI summary found via UUID");
+                    },
+                    Err(e) => {
+                        windows_console::println_japanese(&format!("✗ Error checking AI summary via UUID: {}", e));
+                    }
+                }
+            }
+            
+            if !summary_found {
+                windows_console::println_japanese("ℹ No AI summary available (this is normal for meetings without AI Companion enabled)");
+            }
+            windows_console::println_japanese("=== End AI summary check ===\n");
             
             for recording in meeting.recording_files {
                 // Download all file types: videos (MP4), audio (M4A), chat files (TXT), and other assets
@@ -207,6 +657,7 @@ impl ZoomRecordingDownloader {
                     "cc.vtt" => "Caption files",
                     "csv" => "Data files",
                     "json" => "Metadata files",
+                    "ai_summary" => "AI Companion summaries",
                     _ => "Other files"
                 };
                 windows_console::println_japanese(&format!("  {} ({}): {} files", type_name, file_type.to_uppercase(), count));
