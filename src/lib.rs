@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use tokio::io::AsyncWriteExt;
+use chrono::{FixedOffset, Utc};
 
 pub mod windows_console;
 
@@ -99,6 +100,12 @@ pub struct AISummaryResponse {
     pub action_items: Vec<String>,
     #[serde(default, alias = "meeting_id")]
     pub meeting_id: String,
+    
+    // Additional structured content fields
+    #[serde(default, alias = "topic_summaries")]
+    pub topic_summaries: Vec<TopicSummary>,
+    #[serde(default, alias = "detailed_sections")]
+    pub detailed_sections: Vec<DetailedSection>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -107,6 +114,22 @@ pub struct SummaryDetail {
     pub summary_type: String,
     #[serde(default)]
     pub summary_content: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TopicSummary {
+    #[serde(default)]
+    pub topic_title: String,
+    #[serde(default)]
+    pub topic_content: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DetailedSection {
+    #[serde(default)]
+    pub section_title: String,
+    #[serde(default)]
+    pub section_content: String,
 }
 
 // Alternative structure for unknown AI summary formats
@@ -433,23 +456,190 @@ impl ZoomRecordingDownloader {
                 .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
                 .unwrap_or_default(),
             meeting_id: json.get("meeting_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            topic_summaries: vec![], // Will be populated if topic summaries exist
+            detailed_sections: vec![], // Will be populated if detailed sections exist
         }
     }
 
-    pub async fn save_ai_summary(&self, summary: &AISummaryResponse, meeting_id: &str, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
+    fn create_recording_date_folder(&self, base_output_dir: &str, recording_start: &str) -> Result<String, Box<dyn std::error::Error>> {
+        // Parse the recording start time (ISO 8601 format)
+        let recording_datetime = chrono::DateTime::parse_from_rfc3339(recording_start)
+            .map_err(|e| format!("Failed to parse recording start time '{}': {}", recording_start, e))?;
+        
+        // Convert to JST timezone (+09:00)
+        let jst_offset = FixedOffset::east_opt(9 * 3600).unwrap();
+        let recording_jst = recording_datetime.with_timezone(&jst_offset);
+        
+        // Format as YYYY-MM-DD for folder name
+        let date_folder = recording_jst.format("%Y-%m-%d").to_string();
+        
+        // Create the date-based folder path
+        let date_folder_path = Path::new(base_output_dir).join(&date_folder);
+        fs::create_dir_all(&date_folder_path)?;
+        
+        Ok(date_folder_path.to_string_lossy().to_string())
+    }
+
+    pub async fn save_ai_summary_txt(&self, summary: &AISummaryResponse, meeting_id: &str, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
         let invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
         
-        // Create AI summary filename
+        // Create date folder based on AI summary creation time
+        // Priority: summary_created_time > summary_start_time > current time
+        let creation_time = if !summary.summary_created_time.is_empty() {
+            &summary.summary_created_time
+        } else if !summary.summary_start_time.is_empty() {
+            &summary.summary_start_time
+        } else {
+            // Fallback to current time if neither is available
+            &Utc::now().to_rfc3339()
+        };
+        let date_folder_path = self.create_recording_date_folder(output_dir, creation_time)?;
+        
+        // Create AI summary filename (.txt)
         let safe_meeting_id = meeting_id.chars().map(|c| if invalid_chars.contains(&c) { '_' } else { c }).collect::<String>();
-        let summary_filename = format!("{}_ai_summary.json", safe_meeting_id);
-        let output_path = Path::new(output_dir).join(&summary_filename);
+        let summary_filename = format!("{}_ai_summary.txt", safe_meeting_id);
+        let output_path = Path::new(&date_folder_path).join(&summary_filename);
         
         if output_path.exists() {
             windows_console::println_japanese(&format!("AI summary file already exists: {}", output_path.display()));
             return Ok(output_path.to_string_lossy().to_string());
         }
 
-        // Create comprehensive summary with structured format
+        // Create readable text format
+        let mut content = String::new();
+        
+        // Header
+        content.push_str("=".repeat(80).as_str());
+        content.push_str("\n");
+        content.push_str(&format!("AI要約 - ミーティングID: {}\n", meeting_id));
+        if !summary.summary_title.is_empty() {
+            content.push_str(&format!("タイトル: {}\n", summary.summary_title));
+        }
+        if !summary.summary_created_time.is_empty() {
+            content.push_str(&format!("作成日時: {}\n", summary.summary_created_time));
+        }
+        content.push_str("=".repeat(80).as_str());
+        content.push_str("\n\n");
+
+        // Brief summary
+        content.push_str("【簡単な要約】\n");
+        let brief_summary = if !summary.summary_overview.is_empty() { 
+            &summary.summary_overview
+        } else { 
+            &summary.summary 
+        };
+        if !brief_summary.is_empty() {
+            content.push_str(brief_summary);
+            content.push_str("\n");
+        } else {
+            content.push_str("要約情報がありません。\n");
+        }
+        content.push_str("\n");
+
+        // Next steps
+        content.push_str("【次のステップ】\n");
+        let next_steps = if !summary.next_steps.is_empty() { 
+            &summary.next_steps
+        } else { 
+            &summary.action_items 
+        };
+        if !next_steps.is_empty() {
+            for (i, step) in next_steps.iter().enumerate() {
+                content.push_str(&format!("{}. {}\n", i + 1, step));
+            }
+        } else {
+            content.push_str("次のステップはありません。\n");
+        }
+        content.push_str("\n");
+
+        // Detailed sections
+        if !summary.topic_summaries.is_empty() {
+            content.push_str("【詳細セクション】\n");
+            for topic in &summary.topic_summaries {
+                if !topic.topic_title.is_empty() {
+                    content.push_str(&format!("■ {}\n", topic.topic_title));
+                }
+                if !topic.topic_content.is_empty() {
+                    content.push_str(&format!("{}\n\n", topic.topic_content));
+                }
+            }
+        } else if !summary.detailed_sections.is_empty() {
+            content.push_str("【詳細セクション】\n");
+            for section in &summary.detailed_sections {
+                if !section.section_title.is_empty() {
+                    content.push_str(&format!("■ {}\n", section.section_title));
+                }
+                if !section.section_content.is_empty() {
+                    content.push_str(&format!("{}\n\n", section.section_content));
+                }
+            }
+        } else if !summary.summary_details.is_empty() {
+            content.push_str("【詳細情報】\n");
+            for detail in &summary.summary_details {
+                if !detail.summary_type.is_empty() {
+                    content.push_str(&format!("■ {}\n", detail.summary_type));
+                }
+                if !detail.summary_content.is_empty() {
+                    content.push_str(&format!("{}\n\n", detail.summary_content));
+                }
+            }
+        }
+
+        // Keywords
+        if !summary.summary_keyword.is_empty() {
+            content.push_str("【キーワード】\n");
+            content.push_str(&summary.summary_keyword.join(", "));
+            content.push_str("\n\n");
+        }
+
+        // Key points
+        if !summary.key_points.is_empty() {
+            content.push_str("【重要ポイント】\n");
+            for (i, point) in summary.key_points.iter().enumerate() {
+                content.push_str(&format!("{}. {}\n", i + 1, point));
+            }
+            content.push_str("\n");
+        }
+
+        // Footer
+        content.push_str("-".repeat(80).as_str());
+        content.push_str("\n");
+        content.push_str("Generated by: Zoom AI Companion\n");
+        content.push_str(&format!("Download timestamp: {}\n", Utc::now().to_rfc3339()));
+
+        fs::create_dir_all(&date_folder_path)?;
+        fs::write(&output_path, content)?;
+
+        windows_console::println_japanese(&format!("AI summary saved: {}", output_path.display()));
+        Ok(output_path.to_string_lossy().to_string())
+    }
+
+    pub async fn save_ai_summary(&self, summary: &AISummaryResponse, meeting_id: &str, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
+        
+        // Create date folder based on AI summary creation time
+        // Priority: summary_created_time > summary_start_time > current time
+        let creation_time = if !summary.summary_created_time.is_empty() {
+            &summary.summary_created_time
+        } else if !summary.summary_start_time.is_empty() {
+            &summary.summary_start_time
+        } else {
+            // Fallback to current time if neither is available
+            &Utc::now().to_rfc3339()
+        };
+        let date_folder_path = self.create_recording_date_folder(output_dir, creation_time)?;
+        
+        // Create AI summary filename
+        let safe_meeting_id = meeting_id.chars().map(|c| if invalid_chars.contains(&c) { '_' } else { c }).collect::<String>();
+        let summary_filename = format!("{}_ai_summary.json", safe_meeting_id);
+        let output_path = Path::new(&date_folder_path).join(&summary_filename);
+        
+        if output_path.exists() {
+            windows_console::println_japanese(&format!("AI summary file already exists: {}", output_path.display()));
+            return Ok(output_path.to_string_lossy().to_string());
+        }
+
+        // Create comprehensive summary with structured format similar to reference example
         let comprehensive_summary = serde_json::json!({
             "meeting_uuid": summary.meeting_uuid,
             "meeting_id": meeting_id,
@@ -460,24 +650,41 @@ impl ZoomRecordingDownloader {
                 "created_time": summary.summary_created_time,
                 "last_modified_time": summary.summary_last_modified_time
             },
-            "overview": if !summary.summary_overview.is_empty() { 
+            "brief_summary": if !summary.summary_overview.is_empty() { 
                 summary.summary_overview.clone() 
             } else { 
                 summary.summary.clone() 
             },
-            "summary_details": summary.summary_details,
             "next_steps": if !summary.next_steps.is_empty() { 
                 summary.next_steps.clone() 
             } else { 
                 summary.action_items.clone() 
             },
+            "detailed_sections": if !summary.topic_summaries.is_empty() {
+                summary.topic_summaries.iter().map(|t| serde_json::json!({
+                    "title": t.topic_title,
+                    "content": t.topic_content
+                })).collect::<Vec<_>>()
+            } else if !summary.detailed_sections.is_empty() {
+                summary.detailed_sections.iter().map(|s| serde_json::json!({
+                    "title": s.section_title,
+                    "content": s.section_content
+                })).collect::<Vec<_>>()
+            } else if !summary.summary_details.is_empty() {
+                summary.summary_details.iter().map(|d| serde_json::json!({
+                    "title": d.summary_type,
+                    "content": d.summary_content
+                })).collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            },
             "keywords": summary.summary_keyword,
             "key_points": summary.key_points,
             "generated_by": "Zoom AI Companion",
-            "download_timestamp": chrono::Utc::now().to_rfc3339()
+            "download_timestamp": Utc::now().to_rfc3339()
         });
 
-        fs::create_dir_all(output_dir)?;
+        fs::create_dir_all(&date_folder_path)?;
         
         let json_content = serde_json::to_string_pretty(&comprehensive_summary)?;
         fs::write(&output_path, json_content)?;
@@ -488,6 +695,9 @@ impl ZoomRecordingDownloader {
 
     pub async fn download_recording(&self, recording: &Recording, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
         let invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
+        
+        // Create date folder based on recording start time
+        let date_folder_path = self.create_recording_date_folder(output_dir, &recording.recording_start)?;
         
         // Create descriptive filename based on file type
         let file_type_desc = match recording.file_type.to_lowercase().as_str() {
@@ -509,7 +719,7 @@ impl ZoomRecordingDownloader {
             recording.file_type.to_lowercase()
         );
         
-        let output_path = Path::new(output_dir).join(&safe_filename);
+        let output_path = Path::new(&date_folder_path).join(&safe_filename);
         
         if output_path.exists() {
             windows_console::println_japanese(&format!("File already exists: {}", output_path.display()));
@@ -529,7 +739,7 @@ impl ZoomRecordingDownloader {
             return Err(format!("Download failed: {}", response.status()).into());
         }
 
-        fs::create_dir_all(output_dir)?;
+        fs::create_dir_all(&date_folder_path)?;
         
         let mut file = tokio::fs::File::create(&output_path).await?;
         let content = response.bytes().await?;
@@ -567,7 +777,7 @@ impl ZoomRecordingDownloader {
             match self.get_ai_summary_by_meeting_id(meeting.id).await {
                 Ok(Some(summary)) => {
                     windows_console::println_japanese("✓ AI summary found via Meeting ID, saving to file...");
-                    match self.save_ai_summary(&summary, &meeting.id.to_string(), output_dir).await {
+                    match self.save_ai_summary_txt(&summary, &meeting.id.to_string(), output_dir).await {
                         Ok(path) => {
                             windows_console::println_japanese(&format!("✓ AI summary saved: {}", path));
                             downloaded_files.push(path);
@@ -590,7 +800,7 @@ impl ZoomRecordingDownloader {
                 match self.get_ai_summary(&meeting.uuid).await {
                     Ok(Some(summary)) => {
                         windows_console::println_japanese("✓ AI summary found via UUID, saving to file...");
-                        match self.save_ai_summary(&summary, &meeting.id.to_string(), output_dir).await {
+                        match self.save_ai_summary_txt(&summary, &meeting.id.to_string(), output_dir).await {
                             Ok(path) => {
                                 windows_console::println_japanese(&format!("✓ AI summary saved: {}", path));
                                 downloaded_files.push(path);
