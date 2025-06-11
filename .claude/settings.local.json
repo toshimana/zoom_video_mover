@@ -10,7 +10,8 @@
       "Bash(timeout:*)",
       "Bash(./target/release/zoom_video_mover:*)",
       "Bash(rg:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

@@ -29,10 +29,6 @@ urlencoding = "2.1"
 
 [[bin]]
 name = "zoom_video_mover"
-path = "src/main.rs"
-
-[[bin]]
-name = "zoom_video_mover_gui"
 path = "src/main_gui.rs"
 
 [target.'cfg(windows)'.dependencies]
