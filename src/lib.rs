@@ -740,6 +740,48 @@ impl ZoomRecordingDownloader {
         details
     }
     
+    fn filter_duplicate_sections(&self, summary_content: &str, next_steps: &[String]) -> String {
+        let mut result = summary_content.to_string();
+        
+        // Convert markdown to readable text format
+        result = result
+            .replace("## ", "◆ ")
+            .replace("### ", "● ")
+            .replace("- ", "  - ");
+        
+        // Remove "次のステップ" section if it exists in summary_content
+        // since we already have a dedicated next steps section
+        if !next_steps.is_empty() {
+            // Look for next steps section in various forms
+            let next_step_patterns = [
+                "◆ 次のステップです。",
+                "◆ 次のステップ",
+                "● 次のステップ",
+                "◆ Next Steps",
+                "◆ Action Items",
+                "◆ アクションアイテム"
+            ];
+            
+            for pattern in &next_step_patterns {
+                if let Some(start) = result.find(pattern) {
+                    // Find the end of this section (next ◆ or end of text)
+                    let section_end = result[start..]
+                        .find("\n◆ ")
+                        .map(|pos| start + pos)
+                        .unwrap_or(result.len());
+                    
+                    // Remove this section
+                    result.replace_range(start..section_end, "");
+                    break;
+                }
+            }
+        }
+        
+        // Clean up extra whitespace
+        result = result.replace("\n\n\n", "\n\n");
+        result.trim().to_string()
+    }
+    
     fn process_markdown_links(&self, text: &str) -> String {
         // Convert markdown links [text](url) to "text (URL: url)" format using simple string processing
         let mut result = text.to_string();
@@ -977,65 +1019,59 @@ impl ZoomRecordingDownloader {
         content.push_str("\n");
 
         // Add detailed summary content (markdown format) if available
+        // But exclude sections that are already shown separately
         if !summary.summary_content.is_empty() {
             content.push_str("【詳細要約（Zoom AI生成）】\n");
-            // Convert markdown to readable text format
-            let formatted_content = summary.summary_content
-                .replace("## ", "◆ ")
-                .replace("### ", "● ")
-                .replace("- ", "  - ");
-            content.push_str(&formatted_content);
-            content.push_str("\n\n");
+            // Convert markdown to readable text format and filter out duplicated sections
+            let formatted_content = self.filter_duplicate_sections(&summary.summary_content, &summary.next_steps);
+            if !formatted_content.trim().is_empty() {
+                content.push_str(&formatted_content);
+                content.push_str("\n\n");
+            } else {
+                content.push_str("（次のステップ以外の詳細要約情報はありません）\n\n");
+            }
         }
 
-        // Enhanced detailed sections with better organization
-        let has_detailed_content = !summary.topic_summaries.is_empty() || 
-                                  !summary.detailed_sections.is_empty() || 
-                                  !summary.summary_details.is_empty();
+        // Show most detailed content available, avoiding duplication
+        let has_summary_details = !summary.summary_details.is_empty();
+        let has_detailed_sections = !summary.detailed_sections.is_empty();
+        let has_topic_summaries = !summary.topic_summaries.is_empty();
         
-        if has_detailed_content {
-            content.push_str("【概要】\n");
-            
-            // First show topic summaries (main discussion points)
-            if !summary.topic_summaries.is_empty() {
-                for (i, topic) in summary.topic_summaries.iter().enumerate() {
-                    if !topic.topic_title.is_empty() {
-                        content.push_str(&format!("{}. {}\n", i + 1, topic.topic_title));
-                        if !topic.topic_content.is_empty() {
-                            content.push_str(&format!("{}\n\n", topic.topic_content));
-                        }
+        // Prioritize summary_details as most detailed, then detailed_sections, then topic_summaries
+        if has_summary_details {
+            content.push_str("【詳細要約内容】\n");
+            for detail in &summary.summary_details {
+                if !detail.label.is_empty() {
+                    content.push_str(&format!("■ {}\n", detail.label));
+                    if !detail.summary.is_empty() {
+                        content.push_str(&format!("{}\n\n", detail.summary));
                     }
                 }
             }
-            
-            // Then show detailed sections if available
-            if !summary.detailed_sections.is_empty() {
-                for section in &summary.detailed_sections {
-                    if !section.section_title.is_empty() {
-                        content.push_str(&format!("■ {}\n", section.section_title));
-                        if !section.section_content.is_empty() {
-                            content.push_str(&format!("{}\n\n", section.section_content));
-                        }
+        } else if has_detailed_sections {
+            content.push_str("【詳細セクション】\n");
+            for section in &summary.detailed_sections {
+                if !section.section_title.is_empty() {
+                    content.push_str(&format!("■ {}\n", section.section_title));
+                    if !section.section_content.is_empty() {
+                        content.push_str(&format!("{}\n\n", section.section_content));
                     }
                 }
             }
-            
-            // Finally show summary details if available  
-            if !summary.summary_details.is_empty() {
-                content.push_str("【詳細要約内容】\n");
-                for detail in &summary.summary_details {
-                    if !detail.label.is_empty() {
-                        content.push_str(&format!("■ {}\n", detail.label));
-                        if !detail.summary.is_empty() {
-                            content.push_str(&format!("{}\n\n", detail.summary));
-                        }
+        } else if has_topic_summaries {
+            content.push_str("【トピック要約】\n");
+            for (i, topic) in summary.topic_summaries.iter().enumerate() {
+                if !topic.topic_title.is_empty() {
+                    content.push_str(&format!("{}. {}\n", i + 1, topic.topic_title));
+                    if !topic.topic_content.is_empty() {
+                        content.push_str(&format!("{}\n\n", topic.topic_content));
                     }
                 }
             }
         } else {
-            // If no detailed sections, show what we can from other fields
-            content.push_str("【詳細セクション】\n");
-            content.push_str("■ meeting_topic\n");
+            // If no detailed content available
+            content.push_str("【ミーティング情報】\n");
+            content.push_str("■ ミーティングタイトル\n");
             if !summary.summary_title.is_empty() && summary.summary_title != "AI Generated Summary" {
                 content.push_str(&format!("{}\n\n", summary.summary_title));
             } else {
