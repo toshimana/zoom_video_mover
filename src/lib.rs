@@ -33,8 +33,17 @@ impl Config {
     /// - ファイルシステムの状態は変更されない
     /// - 入力パラメータは変更されない
     pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        // 事前条件のassertion
+        assert!(!path.is_empty(), "path must not be empty");
+        debug_assert!(path.len() > 0, "path should have reasonable length");
+        
         let content = fs::read_to_string(path)?;
         let config: Config = toml::from_str(&content)?;
+        
+        // 事後条件のassertion
+        debug_assert!(!config.client_id.is_empty(), "loaded config must have valid client_id");
+        debug_assert!(!config.client_secret.is_empty(), "loaded config must have valid client_secret");
+        
         Ok(config)
     }
 
@@ -57,6 +66,10 @@ impl Config {
     /// - 関数実行中にサンプル設定の内容は一定
     /// - 入力パラメータは変更されない
     pub fn create_sample_file(path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // 事前条件のassertion
+        assert!(!path.is_empty(), "path must not be empty");
+        debug_assert!(path.len() > 0, "path should have reasonable length");
+        
         let sample_config = Config {
             client_id: "your_zoom_client_id".to_string(),
             client_secret: "your_zoom_client_secret".to_string(),
@@ -64,7 +77,16 @@ impl Config {
         };
         
         let content = toml::to_string_pretty(&sample_config)?;
+        
+        // 事後条件のassertion（書き込み前にコンテンツの妥当性確認）
+        debug_assert!(!content.is_empty(), "generated TOML content must not be empty");
+        debug_assert!(content.contains("client_id"), "TOML must contain client_id field");
+        
         fs::write(path, content)?;
+        
+        // 事後条件のassertion（ファイル作成確認）
+        debug_assert!(std::path::Path::new(path).exists(), "file should be created successfully");
+        
         Ok(())
     }
 
@@ -87,8 +109,22 @@ impl Config {
     /// - self の内容は変更されない
     /// - 入力パラメータは変更されない
     pub fn save_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // 事前条件のassertion
+        assert!(!path.is_empty(), "path must not be empty");
+        assert!(!self.client_id.is_empty(), "client_id must not be empty");
+        assert!(!self.client_secret.is_empty(), "client_secret must not be empty");
+        
         let content = toml::to_string_pretty(self)?;
+        
+        // 事後条件のassertion（書き込み前にコンテンツの妥当性確認）
+        debug_assert!(!content.is_empty(), "generated TOML content must not be empty");
+        debug_assert!(content.contains(&self.client_id), "TOML must contain the client_id");
+        
         fs::write(path, content)?;
+        
+        // 事後条件のassertion（ファイル作成確認）
+        debug_assert!(std::path::Path::new(path).exists(), "file should be created successfully");
+        
         Ok(())
     }
 }
@@ -213,10 +249,19 @@ impl ZoomRecordingDownloader {
     /// - access_tokenは構造体の生存期間中不変
     /// - HTTP clientの設定は変更されない
     pub fn new(access_token: String) -> Self {
-        Self {
+        // 事前条件のassertion
+        assert!(!access_token.is_empty(), "access_token must not be empty");
+        debug_assert!(access_token.len() > 10, "access_token should be reasonable length");
+        
+        let instance = Self {
             client: Client::new(),
             access_token,
-        }
+        };
+        
+        // 事後条件のassertion
+        debug_assert!(!instance.access_token.is_empty(), "instance should have valid access_token");
+        
+        instance
     }
 
     /// Zoom API への接続とアクセス権限をテストする（副作用なし版）
@@ -235,6 +280,10 @@ impl ZoomRecordingDownloader {
     /// - グローバル状態の変更なし
     /// - self の状態は変更されない
     pub async fn test_api_access_pure(&self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        // 事前条件のassertion
+        assert!(!self.access_token.is_empty(), "access_token must be valid");
+        debug_assert!(self.access_token.len() > 10, "access_token should be reasonable length");
+        
         let mut messages = Vec::new();
         messages.push("=== Testing Zoom API Access ===".to_string());
         
@@ -262,6 +311,12 @@ impl ZoomRecordingDownloader {
         }
 
         messages.push("=== End API Test ===\n".to_string());
+        
+        // 事後条件のassertion
+        debug_assert!(!messages.is_empty(), "messages should not be empty");
+        debug_assert!(messages.len() >= 2, "messages should contain at least start and end");
+        debug_assert!(messages[0].contains("Testing Zoom API Access"), "first message should be test start");
+        
         Ok(messages)
     }
 
@@ -308,6 +363,14 @@ impl ZoomRecordingDownloader {
     /// - self の状態は変更されない
     /// - 入力パラメータは変更されない
     pub async fn list_recordings(&self, user_id: &str, from: &str, to: &str) -> Result<RecordingResponse, Box<dyn std::error::Error>> {
+        // 事前条件のassertion
+        assert!(!user_id.is_empty(), "user_id must not be empty");
+        assert!(!from.is_empty(), "from date must not be empty");
+        assert!(!to.is_empty(), "to date must not be empty");
+        debug_assert!(from.len() == 10, "from date should be YYYY-MM-DD format");
+        debug_assert!(to.len() == 10, "to date should be YYYY-MM-DD format");
+        debug_assert!(from <= to, "from date should be earlier than or equal to to date");
+        
         let url = format!(
             "https://api.zoom.us/v2/users/{}/recordings?from={}&to={}",
             user_id, from, to
@@ -325,6 +388,15 @@ impl ZoomRecordingDownloader {
         }
 
         let recordings: RecordingResponse = response.json().await?;
+        
+        // 事後条件のassertion
+        debug_assert!(recordings.meetings.len() >= 0, "recordings should have valid meetings array");
+        // 各レコーディングの妥当性チェック
+        for meeting in &recordings.meetings {
+            debug_assert!(!meeting.uuid.is_empty(), "meeting UUID should not be empty");
+            debug_assert!(meeting.id > 0, "meeting ID should be positive");
+        }
+        
         Ok(recordings)
     }
 
