@@ -35,6 +35,8 @@ quickcheck = "1.0"
 quickcheck_macros = "1.0"
 # Arbitrary value generation for proptest
 proptest-derive = "0.4"
+# Temporary file/directory for testing
+tempfile = "3.8"
 
 [[bin]]
 name = "zoom_video_mover"

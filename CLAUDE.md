@@ -187,6 +187,63 @@ async fn authenticate_user(client_id: &str, client_secret: &str) -> Result<AuthT
 4. **境界条件**: エッジケースでの適切な動作
 5. **冪等性**: 同じ操作を複数回実行しても結果が変わらない
 
+#### 関数単位でのProperty-basedテスト設計
+各関数の**事前条件・事後条件・不変条件**を基にテストケースを作成：
+
+##### 1. 事前条件のProperty検証
+```rust
+proptest! {
+    #[test]
+    fn function_preconditions(input in arb_valid_input()) {
+        // 事前条件: 入力パラメータの妥当性
+        prop_assert!(!input.is_empty());
+        prop_assert!(input.len() >= MIN_LENGTH);
+        
+        // 関数実行は事前条件が満たされた場合のみ
+        let result = function_under_test(input);
+        // ...
+    }
+}
+```
+
+##### 2. 事後条件のProperty検証
+```rust
+proptest! {
+    #[test]
+    fn function_postconditions(input in arb_input()) {
+        let result = function_under_test(input).unwrap();
+        
+        // 事後条件: 結果の妥当性
+        prop_assert!(!result.is_empty());
+        prop_assert!(result.contains_expected_format());
+        
+        // 結果の一貫性
+        let result2 = function_under_test(input.clone()).unwrap();
+        prop_assert_eq!(result, result2); // 冪等性
+    }
+}
+```
+
+##### 3. 不変条件のProperty検証
+```rust
+proptest! {
+    #[test]
+    fn function_invariants(input in arb_input()) {
+        let original_input = input.clone();
+        let system_state_before = capture_system_state();
+        
+        let result = function_under_test(input);
+        
+        // 不変条件: 入力が変更されない
+        prop_assert_eq!(input, original_input);
+        
+        // 不変条件: システム状態の一貫性
+        let system_state_after = capture_system_state();
+        prop_assert_eq!(system_state_before, system_state_after);
+    }
+}
+```
+
 #### Property-basedテストの書き方
 ```rust
 use proptest::prelude::*;
