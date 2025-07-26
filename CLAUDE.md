@@ -36,7 +36,14 @@ cargo build --release
 
 ### テスト
 ```bash
+# 全テスト実行
 cargo test
+
+# Property-basedテスト実行
+cargo test property_tests
+
+# 通常のテスト実行
+cargo test tests
 ```
 
 ### リント・フォーマット・型チェック
@@ -161,6 +168,64 @@ async fn authenticate_user(client_id: &str, client_secret: &str) -> Result<AuthT
     
     Ok(token)
 }
+```
+
+## テスト戦略
+
+### Property-Based Testing（プロパティベーステスト）
+関数の性質（プロパティ）を定義し、多数のランダム入力で検証する手法：
+
+#### 使用フレームワーク
+- **`proptest`**: Rust標準のproperty-basedテストフレームワーク
+- **`quickcheck`**: QuickCheck-style testing
+- **`proptest-derive`**: 任意値生成の自動導出
+
+#### テスト対象プロパティ
+1. **ラウンドトリップ性質**: シリアライゼーション→デシリアライゼーションの可逆性
+2. **不変条件**: データ構造の整合性が常に保たれる
+3. **入力範囲**: 有効な入力範囲での動作保証
+4. **境界条件**: エッジケースでの適切な動作
+5. **冪等性**: 同じ操作を複数回実行しても結果が変わらない
+
+#### Property-basedテストの書き方
+```rust
+use proptest::prelude::*;
+
+// 任意値生成器の定義
+prop_compose! {
+    fn arb_config()
+        (client_id in "[a-zA-Z0-9]{10,50}",
+         client_secret in "[a-zA-Z0-9]{20,100}")
+        -> Config
+    {
+        Config { client_id, client_secret, redirect_uri: None }
+    }
+}
+
+proptest! {
+    /// Property: ConfigのTOMLラウンドトリップ
+    #[test]
+    fn config_toml_roundtrip(config in arb_config()) {
+        let toml_str = toml::to_string(&config)?;
+        let parsed: Config = toml::from_str(&toml_str)?;
+        prop_assert_eq!(config, parsed);
+    }
+}
+```
+
+#### テスト実行とデバッグ
+```bash
+# Property-basedテストのみ実行（統合テスト）
+cargo test --test property_tests
+
+# ライブラリのテストのみ実行
+cargo test --lib
+
+# 失敗ケースの最小化表示
+PROPTEST_VERBOSE=1 cargo test --test property_tests
+
+# 特定のテスト数で実行
+PROPTEST_CASES=1000 cargo test --test property_tests
 ```
 
 ## デバッグ・ログ

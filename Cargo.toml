@@ -27,6 +27,15 @@ env_logger = "0.10"
 open = "5.0"
 urlencoding = "2.1"
 
+[dev-dependencies]
+# Property-based testing framework
+proptest = "1.4"
+# QuickCheck-style testing
+quickcheck = "1.0"
+quickcheck_macros = "1.0"
+# Arbitrary value generation for proptest
+proptest-derive = "0.4"
+
 [[bin]]
 name = "zoom_video_mover"
 path = "src/main_gui.rs"
