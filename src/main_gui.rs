@@ -6,6 +6,15 @@ use gui::ZoomDownloaderApp;
 
 
 /// 日本語文字表示のためのフォント設定
+/// 
+/// 事前条件:
+/// - ctx は有効なegui::Contextである
+/// - windows_console::setup_console_encoding() が事前に呼び出されている
+/// 
+/// 事後条件:
+/// - GUIのフォントサイズとスペーシングが読みやすく調整される
+/// - フォントサイズが最小14ptに設定される
+/// - 既存のフォント設定を保持し、サイズのみ調整される
 fn setup_gui_fonts(ctx: &egui::Context) {
     windows_console::println_japanese("GUI font setup starting...");
     
@@ -31,6 +40,16 @@ fn setup_gui_fonts(ctx: &egui::Context) {
     windows_console::println_japanese("GUI display optimization completed");
 }
 
+/// GUIアプリケーションのエントリーポイント
+/// 
+/// 事前条件:
+/// - eframe ライブラリが正常にリンクされている
+/// - GUI環境が利用可能である
+/// 
+/// 事後条件:
+/// - 成功時: Zoom録画ダウンローダーGUIアプリケーションが起動される
+/// - Windows環境では日本語コンソール出力が適切に設定される
+/// - 失敗時: 適切なエラーを返す
 fn main() -> Result<(), eframe::Error> {
     // Windows環境でのコンソール文字化け対策
     windows_console::setup_console_encoding();

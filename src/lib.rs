@@ -19,15 +19,19 @@ pub struct Config {
 impl Config {
     /// 設定ファイルから設定を読み込む
     /// 
-    /// 事前条件:
+    /// # 事前条件
     /// - path は有効なファイルパスを指す
     /// - ファイルが存在し、読み取り可能である
     /// - ファイルの内容は有効な TOML 形式である
     /// 
-    /// 事後条件:
+    /// # 事後条件
     /// - 成功時: 有効な Config インスタンスを返す
     /// - client_id および client_secret は空でない
     /// - 失敗時: 適切なエラーを返す
+    /// 
+    /// # 不変条件
+    /// - ファイルシステムの状態は変更されない
+    /// - 入力パラメータは変更されない
     pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let content = fs::read_to_string(path)?;
         let config: Config = toml::from_str(&content)?;
@@ -39,15 +43,19 @@ impl Config {
     /// # 副作用
     /// - ファイルシステムへの書き込み（指定されたパスにファイルを作成）
     /// 
-    /// 事前条件:
+    /// # 事前条件
     /// - path は有効なファイルパスを指す
     /// - ファイルの親ディレクトリが存在するか作成可能である
     /// - ファイルへの書き込み権限がある
     /// 
-    /// 事後条件:
+    /// # 事後条件
     /// - 成功時: サンプル設定ファイルが作成される
     /// - ファイルは有効な TOML 形式で保存される
     /// - 失敗時: 適切なエラーを返す
+    /// 
+    /// # 不変条件
+    /// - 関数実行中にサンプル設定の内容は一定
+    /// - 入力パラメータは変更されない
     pub fn create_sample_file(path: &str) -> Result<(), Box<dyn std::error::Error>> {
         let sample_config = Config {
             client_id: "your_zoom_client_id".to_string(),
@@ -65,15 +73,19 @@ impl Config {
     /// # 副作用
     /// - ファイルシステムへの書き込み（指定されたパスにファイルを保存）
     /// 
-    /// 事前条件:
+    /// # 事前条件
     /// - self は有効な Config インスタンスである
     /// - path は有効なファイルパスを指す
     /// - ファイルの親ディレクトリが存在するか作成可能である
     /// - ファイルへの書き込み権限がある
     /// 
-    /// 事後条件:
+    /// # 事後条件
     /// - 成功時: 設定が TOML 形式でファイルに保存される
     /// - 失敗時: 適切なエラーを返す
+    /// 
+    /// # 不変条件
+    /// - self の内容は変更されない
+    /// - 入力パラメータは変更されない
     pub fn save_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
         let content = toml::to_string_pretty(self)?;
         fs::write(path, content)?;
@@ -188,14 +200,18 @@ pub struct ZoomRecordingDownloader {
 impl ZoomRecordingDownloader {
     /// 新しいZoomRecordingDownloaderインスタンスを作成する
     /// 
-    /// 事前条件:
+    /// # 事前条件
     /// - access_token は有効なOAuth2アクセストークンである
     /// - access_token は空でない
     /// 
-    /// 事後条件:
+    /// # 事後条件
     /// - 新しいZoomRecordingDownloaderインスタンスが作成される
     /// - HTTP clientが正常に初期化される
     /// - access_tokenが内部に保存される
+    /// 
+    /// # 不変条件
+    /// - access_tokenは構造体の生存期間中不変
+    /// - HTTP clientの設定は変更されない
     pub fn new(access_token: String) -> Self {
         Self {
             client: Client::new(),
@@ -205,18 +221,19 @@ impl ZoomRecordingDownloader {
 
     /// Zoom API への接続とアクセス権限をテストする（副作用なし版）
     /// 
-    /// 事前条件:
+    /// # 事前条件
     /// - self.access_token は有効なOAuth2アクセストークンである
     /// - インターネット接続が利用可能である
     /// - Zoom API サーバーが稼働中である
     /// 
-    /// 事後条件:
+    /// # 事後条件
     /// - 成功時: API接続テスト結果とメッセージリストを返す
     /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
     /// 
-    /// 不変条件:
+    /// # 不変条件
     /// - コンソール出力の副作用なし
     /// - グローバル状態の変更なし
+    /// - self の状態は変更されない
     pub async fn test_api_access_pure(&self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
         let mut messages = Vec::new();
         messages.push("=== Testing Zoom API Access ===".to_string());
@@ -273,16 +290,23 @@ impl ZoomRecordingDownloader {
 
     /// 指定した期間のレコーディング一覧を取得する
     /// 
-    /// 事前条件:
+    /// # 副作用
+    /// - HTTPリクエストの送信
+    /// 
+    /// # 事前条件
     /// - user_id は有効なZoomユーザーIDである
     /// - from は有効な日付形式（YYYY-MM-DD）である
     /// - to は有効な日付形式（YYYY-MM-DD）である
     /// - from <= to である
     /// - アクセストークンが有効である
     /// 
-    /// 事後条件:
+    /// # 事後条件
     /// - 成功時: 指定期間のレコーディング情報を含むRecordingResponseを返す
     /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    /// 
+    /// # 不変条件
+    /// - self の状態は変更されない
+    /// - 入力パラメータは変更されない
     pub async fn list_recordings(&self, user_id: &str, from: &str, to: &str) -> Result<RecordingResponse, Box<dyn std::error::Error>> {
         let url = format!(
             "https://api.zoom.us/v2/users/{}/recordings?from={}&to={}",

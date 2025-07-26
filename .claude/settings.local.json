@@ -11,7 +11,8 @@
       "Bash(./target/release/zoom_video_mover:*)",
       "Bash(rg:*)",
       "Bash(grep:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
