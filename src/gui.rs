@@ -39,6 +39,15 @@ pub struct ZoomDownloaderApp {
 }
 
 impl Default for ZoomDownloaderApp {
+    /// ZoomDownloaderAppの新しいインスタンスを作成する
+    /// 
+    /// 事前条件:
+    /// - mpsc::channel() が正常に動作する
+    /// 
+    /// 事後条件:
+    /// - 初期状態のZoomDownloaderAppインスタンスが作成される
+    /// - 全てのフィールドが適切なデフォルト値で初期化される
+    /// - 内部通信チャンネルが正常に設定される
     fn default() -> Self {
         let (sender, receiver) = mpsc::channel();
         
@@ -62,9 +71,19 @@ impl Default for ZoomDownloaderApp {
     }
 }
 
-impl eframe::App for ZoomDownloaderApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Process messages
+impl ZoomDownloaderApp {
+    /// メッセージを処理する（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - self は有効なZoomDownloaderAppインスタンスである
+    /// 
+    /// 事後条件:
+    /// - 受信した全てのメッセージが処理される
+    /// - アプリの状態が適切に更新される
+    /// 
+    /// 不変条件:
+    /// - メッセージ処理中にアプリの状態が一貫性を保つ
+    fn process_messages(&mut self) {
         while let Ok(msg) = self.receiver.try_recv() {
             match msg {
                 AppMessage::AuthUrlGenerated(url) => {
@@ -93,157 +112,273 @@ impl eframe::App for ZoomDownloaderApp {
                 }
             }
         }
+    }
+
+    /// 設定セクションをレンダリングする（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - ui は有効なegui::Uiである
+    /// 
+    /// 事後条件:
+    /// - 設定セクションが描画される
+    /// - ユーザーの操作が適切に処理される
+    /// 
+    /// 不変条件:
+    /// - UI の状態が一貫性を保つ
+    fn render_config_section(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Configuration");
+        
+        if !self.config_loaded {
+            if ui.button("Load Configuration").clicked() {
+                self.load_config();
+            }
+        } else {
+            ui.horizontal(|ui| {
+                ui.label("Client ID:");
+                ui.text_edit_singleline(&mut self.client_id);
+            });
+            
+            ui.horizontal(|ui| {
+                ui.label("Client Secret:");
+                ui.add(egui::TextEdit::singleline(&mut self.client_secret).password(true));
+            });
+            
+            if ui.button("Save Configuration").clicked() {
+                self.save_config();
+            }
+        }
+        
+        ui.separator();
+    }
+
+    /// 日付範囲セクションをレンダリングする（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - ui は有効なegui::Uiである
+    /// 
+    /// 事後条件:
+    /// - 日付範囲セクションが描画される
+    /// - デフォルト日付が設定される
+    /// - ユーザーの操作が適切に処理される
+    /// 
+    /// 不変条件:
+    /// - 日付形式が一貫している
+    fn render_date_section(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Download Period");
+        
+        // Set default dates if empty
+        if self.from_date.is_empty() {
+            let today = Local::now().date_naive();
+            let month_start = today.with_day(1).unwrap();
+            self.from_date = month_start.format("%Y-%m-%d").to_string();
+            self.to_date = today.format("%Y-%m-%d").to_string();
+        }
+        
+        ui.horizontal(|ui| {
+            ui.label("Start Date (YYYY-MM-DD):");
+            ui.text_edit_singleline(&mut self.from_date);
+            if ui.button("This Month Start").clicked() {
+                let today = Local::now().date_naive();
+                self.from_date = today.with_day(1).unwrap().format("%Y-%m-%d").to_string();
+            }
+        });
+        
+        ui.horizontal(|ui| {
+            ui.label("End Date (YYYY-MM-DD):");
+            ui.text_edit_singleline(&mut self.to_date);
+            if ui.button("Today").clicked() {
+                self.to_date = Local::now().date_naive().format("%Y-%m-%d").to_string();
+            }
+        });
+        
+        ui.separator();
+    }
+
+    /// 出力ディレクトリセクションをレンダリングする（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - ui は有効なegui::Uiである
+    /// 
+    /// 事後条件:
+    /// - 出力ディレクトリセクションが描画される
+    /// - デフォルトディレクトリが設定される
+    /// 
+    /// 不変条件:
+    /// - ディレクトリパスが有効である
+    fn render_output_directory_section(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Output Directory");
+        
+        if self.output_dir.is_empty() {
+            self.output_dir = self.get_default_downloads_dir();
+        }
+        
+        ui.horizontal(|ui| {
+            ui.label("Output Folder:");
+            ui.text_edit_singleline(&mut self.output_dir);
+        });
+        
+        ui.separator();
+    }
+
+    /// 認証セクションをレンダリングする（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - ui は有効なegui::Uiである
+    /// 
+    /// 事後条件:
+    /// - 認証セクションが描画される
+    /// - 認証状態に応じた適切なUIが表示される
+    /// 
+    /// 不変条件:
+    /// - 認証状態が一貫している
+    fn render_authentication_section(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Authentication");
+        
+        if self.access_token.is_none() {
+            if !self.is_authenticating {
+                if ui.button("Start OAuth Authentication").clicked() {
+                    self.start_authentication();
+                }
+            } else {
+                self.render_authentication_in_progress(ui);
+            }
+        } else {
+            ui.colored_label(egui::Color32::GREEN, "✓ Authenticated");
+            if ui.button("Reset Authentication").clicked() {
+                self.access_token = None;
+                self.auth_url = None;
+                self.auth_code.clear();
+            }
+        }
+        
+        ui.separator();
+    }
+
+    /// 認証進行中のUIをレンダリングする（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - ui は有効なegui::Uiである
+    /// - 認証が進行中である
+    /// 
+    /// 事後条件:
+    /// - 認証URL と認証コード入力UIが描画される
+    /// 
+    /// 不変条件:
+    /// - 認証フローが適切に処理される
+    fn render_authentication_in_progress(&mut self, ui: &mut egui::Ui) {
+        if let Some(url) = &self.auth_url {
+            ui.label("Please open the following URL in your browser and complete authentication:");
+            ui.text_edit_multiline(&mut url.clone());
+            
+            if ui.button("Copy URL to Clipboard").clicked() {
+                ui.output_mut(|o| o.copied_text = url.clone());
+            }
+            
+            if ui.button("Open in Browser").clicked() {
+                let _ = open::that(url);
+            }
+            
+            ui.separator();
+            
+            ui.label("After authentication, please enter the authorization code:");
+            ui.horizontal(|ui| {
+                ui.text_edit_singleline(&mut self.auth_code);
+                if ui.button("Submit Authorization Code").clicked() && !self.auth_code.is_empty() {
+                    self.complete_authentication();
+                }
+            });
+        }
+    }
+
+    /// ダウンロードセクションをレンダリングする（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - ui は有効なegui::Uiである
+    /// 
+    /// 事後条件:
+    /// - ダウンロードセクションが描画される
+    /// - ダウンロード可能性が適切に制御される
+    /// 
+    /// 不変条件:
+    /// - ダウンロード状態が一貫している
+    fn render_download_section(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Download");
+        
+        let can_download = self.access_token.is_some() 
+            && !self.from_date.is_empty() 
+            && !self.to_date.is_empty() 
+            && !self.is_downloading;
+        
+        ui.add_enabled_ui(can_download, |ui| {
+            if ui.button("Start Download").clicked() {
+                self.start_download();
+            }
+        });
+        
+        if self.is_downloading {
+            ui.spinner();
+            ui.label("Downloading...");
+        }
+        
+        ui.separator();
+    }
+
+    /// ステータスセクションをレンダリングする（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - ui は有効なegui::Uiである
+    /// 
+    /// 事後条件:
+    /// - ステータスと進行状況が描画される
+    /// 
+    /// 不変条件:
+    /// - ステータス情報が適切に表示される
+    fn render_status_section(&self, ui: &mut egui::Ui) {
+        ui.heading("Status");
+        ui.label(&self.status_message);
+        
+        if !self.download_progress.is_empty() {
+            ui.separator();
+            ui.heading("Progress");
+            egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                for msg in &self.download_progress {
+                    ui.label(msg);
+                }
+            });
+        }
+    }
+}
+
+impl eframe::App for ZoomDownloaderApp {
+    /// GUI の更新処理を実行する（リファクタリング版・複雑度削減）
+    /// 
+    /// 事前条件:
+    /// - ctx は有効なegui::Contextである
+    /// - _frame は有効なeframe::Frameである
+    /// 
+    /// 事後条件:
+    /// - 受信したメッセージが全て処理される
+    /// - GUI の状態が適切に更新される
+    /// - UI コンポーネントが描画される
+    /// 
+    /// 不変条件:
+    /// - この関数は毎フレーム呼び出される
+    /// - 処理中にGUIの状態が一貫性を保つ
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Process incoming messages
+        self.process_messages();
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Zoom Recording Downloader");
             ui.separator();
 
-            // Config section
-            ui.heading("Configuration");
-            
-            if !self.config_loaded {
-                if ui.button("Load Configuration").clicked() {
-                    self.load_config();
-                }
-            } else {
-                ui.horizontal(|ui| {
-                    ui.label("Client ID:");
-                    ui.text_edit_singleline(&mut self.client_id);
-                });
-                
-                ui.horizontal(|ui| {
-                    ui.label("Client Secret:");
-                    ui.add(egui::TextEdit::singleline(&mut self.client_secret).password(true));
-                });
-                
-                if ui.button("Save Configuration").clicked() {
-                    self.save_config();
-                }
-            }
-            
-            ui.separator();
-
-            // Date range section
-            ui.heading("Download Period");
-            
-            // Set default dates if empty
-            if self.from_date.is_empty() {
-                let today = Local::now().date_naive();
-                let month_start = today.with_day(1).unwrap();
-                self.from_date = month_start.format("%Y-%m-%d").to_string();
-                self.to_date = today.format("%Y-%m-%d").to_string();
-            }
-            
-            ui.horizontal(|ui| {
-                ui.label("Start Date (YYYY-MM-DD):");
-                ui.text_edit_singleline(&mut self.from_date);
-                if ui.button("This Month Start").clicked() {
-                    let today = Local::now().date_naive();
-                    self.from_date = today.with_day(1).unwrap().format("%Y-%m-%d").to_string();
-                }
-            });
-            
-            ui.horizontal(|ui| {
-                ui.label("End Date (YYYY-MM-DD):");
-                ui.text_edit_singleline(&mut self.to_date);
-                if ui.button("Today").clicked() {
-                    self.to_date = Local::now().date_naive().format("%Y-%m-%d").to_string();
-                }
-            });
-            
-            ui.separator();
-
-            // Output directory section
-            ui.heading("Output Directory");
-            
-            if self.output_dir.is_empty() {
-                self.output_dir = self.get_default_downloads_dir();
-            }
-            
-            ui.horizontal(|ui| {
-                ui.label("Output Folder:");
-                ui.text_edit_singleline(&mut self.output_dir);
-            });
-            
-            ui.separator();
-
-            // Authentication section
-            ui.heading("Authentication");
-            
-            if self.access_token.is_none() {
-                if !self.is_authenticating {
-                    if ui.button("Start OAuth Authentication").clicked() {
-                        self.start_authentication();
-                    }
-                } else {
-                    if let Some(url) = &self.auth_url {
-                        ui.label("Please open the following URL in your browser and complete authentication:");
-                        ui.text_edit_multiline(&mut url.clone());
-                        
-                        if ui.button("Copy URL to Clipboard").clicked() {
-                            ui.output_mut(|o| o.copied_text = url.clone());
-                        }
-                        
-                        if ui.button("Open in Browser").clicked() {
-                            let _ = open::that(url);
-                        }
-                        
-                        ui.separator();
-                        
-                        ui.label("After authentication, please enter the authorization code:");
-                        ui.horizontal(|ui| {
-                            ui.text_edit_singleline(&mut self.auth_code);
-                            if ui.button("Submit Authorization Code").clicked() && !self.auth_code.is_empty() {
-                                self.complete_authentication();
-                            }
-                        });
-                    }
-                }
-            } else {
-                ui.colored_label(egui::Color32::GREEN, "✓ Authenticated");
-                if ui.button("Reset Authentication").clicked() {
-                    self.access_token = None;
-                    self.auth_url = None;
-                    self.auth_code.clear();
-                }
-            }
-            
-            ui.separator();
-
-            // Download section
-            ui.heading("Download");
-            
-            let can_download = self.access_token.is_some() 
-                && !self.from_date.is_empty() 
-                && !self.to_date.is_empty() 
-                && !self.is_downloading;
-            
-            ui.add_enabled_ui(can_download, |ui| {
-                if ui.button("Start Download").clicked() {
-                    self.start_download();
-                }
-            });
-            
-            if self.is_downloading {
-                ui.spinner();
-                ui.label("Downloading...");
-            }
-            
-            ui.separator();
-
-            // Status section
-            ui.heading("Status");
-            ui.label(&self.status_message);
-            
-            if !self.download_progress.is_empty() {
-                ui.separator();
-                ui.heading("Progress");
-                egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-                    for msg in &self.download_progress {
-                        ui.label(msg);
-                    }
-                });
-            }
+            // Render each section using separate functions
+            self.render_config_section(ui);
+            self.render_date_section(ui);
+            self.render_output_directory_section(ui);
+            self.render_authentication_section(ui);
+            self.render_download_section(ui);
+            self.render_status_section(ui);
         });
         
         // Request repaint for real-time updates
@@ -252,6 +387,12 @@ impl eframe::App for ZoomDownloaderApp {
 }
 
 impl ZoomDownloaderApp {
+    /// 設定ファイルを読み込み、GUI状態を更新する
+    /// 
+    /// # 副作用
+    /// - ファイルシステムからの読み込み
+    /// - ファイルが存在しない場合はサンプルファイルを作成
+    /// - GUI内部状態の変更
     fn load_config(&mut self) {
         match Config::load_from_file("config.toml") {
             Ok(config) => {
@@ -268,6 +409,11 @@ impl ZoomDownloaderApp {
         }
     }
     
+    /// 現在のGUI設定をファイルに保存する
+    /// 
+    /// # 副作用
+    /// - ファイルシステムへの書き込み
+    /// - GUI内部状態の変更（ステータスメッセージの更新）
     fn save_config(&mut self) {
         let config = Config {
             client_id: self.client_id.clone(),

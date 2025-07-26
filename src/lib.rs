@@ -17,12 +17,37 @@ pub struct Config {
 }
 
 impl Config {
+    /// 設定ファイルから設定を読み込む
+    /// 
+    /// 事前条件:
+    /// - path は有効なファイルパスを指す
+    /// - ファイルが存在し、読み取り可能である
+    /// - ファイルの内容は有効な TOML 形式である
+    /// 
+    /// 事後条件:
+    /// - 成功時: 有効な Config インスタンスを返す
+    /// - client_id および client_secret は空でない
+    /// - 失敗時: 適切なエラーを返す
     pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let content = fs::read_to_string(path)?;
         let config: Config = toml::from_str(&content)?;
         Ok(config)
     }
 
+    /// サンプル設定ファイルを作成する
+    /// 
+    /// # 副作用
+    /// - ファイルシステムへの書き込み（指定されたパスにファイルを作成）
+    /// 
+    /// 事前条件:
+    /// - path は有効なファイルパスを指す
+    /// - ファイルの親ディレクトリが存在するか作成可能である
+    /// - ファイルへの書き込み権限がある
+    /// 
+    /// 事後条件:
+    /// - 成功時: サンプル設定ファイルが作成される
+    /// - ファイルは有効な TOML 形式で保存される
+    /// - 失敗時: 適切なエラーを返す
     pub fn create_sample_file(path: &str) -> Result<(), Box<dyn std::error::Error>> {
         let sample_config = Config {
             client_id: "your_zoom_client_id".to_string(),
@@ -35,6 +60,20 @@ impl Config {
         Ok(())
     }
 
+    /// 設定をファイルに保存する
+    /// 
+    /// # 副作用
+    /// - ファイルシステムへの書き込み（指定されたパスにファイルを保存）
+    /// 
+    /// 事前条件:
+    /// - self は有効な Config インスタンスである
+    /// - path は有効なファイルパスを指す
+    /// - ファイルの親ディレクトリが存在するか作成可能である
+    /// - ファイルへの書き込み権限がある
+    /// 
+    /// 事後条件:
+    /// - 成功時: 設定が TOML 形式でファイルに保存される
+    /// - 失敗時: 適切なエラーを返す
     pub fn save_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
         let content = toml::to_string_pretty(self)?;
         fs::write(path, content)?;
@@ -147,6 +186,16 @@ pub struct ZoomRecordingDownloader {
 }
 
 impl ZoomRecordingDownloader {
+    /// 新しいZoomRecordingDownloaderインスタンスを作成する
+    /// 
+    /// 事前条件:
+    /// - access_token は有効なOAuth2アクセストークンである
+    /// - access_token は空でない
+    /// 
+    /// 事後条件:
+    /// - 新しいZoomRecordingDownloaderインスタンスが作成される
+    /// - HTTP clientが正常に初期化される
+    /// - access_tokenが内部に保存される
     pub fn new(access_token: String) -> Self {
         Self {
             client: Client::new(),
@@ -154,9 +203,23 @@ impl ZoomRecordingDownloader {
         }
     }
 
-    // Diagnostic method to test API connectivity and permissions
-    pub async fn test_api_access(&self) -> Result<(), Box<dyn std::error::Error>> {
-        windows_console::println_japanese("=== Testing Zoom API Access ===");
+    /// Zoom API への接続とアクセス権限をテストする（副作用なし版）
+    /// 
+    /// 事前条件:
+    /// - self.access_token は有効なOAuth2アクセストークンである
+    /// - インターネット接続が利用可能である
+    /// - Zoom API サーバーが稼働中である
+    /// 
+    /// 事後条件:
+    /// - 成功時: API接続テスト結果とメッセージリストを返す
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    /// 
+    /// 不変条件:
+    /// - コンソール出力の副作用なし
+    /// - グローバル状態の変更なし
+    pub async fn test_api_access_pure(&self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        let mut messages = Vec::new();
+        messages.push("=== Testing Zoom API Access ===".to_string());
         
         // Test basic user info API
         let user_response = self
@@ -166,25 +229,60 @@ impl ZoomRecordingDownloader {
             .send()
             .await?;
 
-        windows_console::println_japanese(&format!("User API status: {}", user_response.status()));
+        messages.push(format!("User API status: {}", user_response.status()));
         
         if user_response.status().is_success() {
             if let Ok(user_data) = user_response.json::<serde_json::Value>().await {
                 if let Some(user_id) = user_data.get("id").and_then(|v| v.as_str()) {
-                    windows_console::println_japanese(&format!("✓ Connected as user: {}", user_id));
+                    messages.push(format!("✓ Connected as user: {}", user_id));
                 }
                 if let Some(account_id) = user_data.get("account_id").and_then(|v| v.as_str()) {
-                    windows_console::println_japanese(&format!("Account ID: {}", account_id));
+                    messages.push(format!("Account ID: {}", account_id));
                 }
             }
         } else {
-            windows_console::println_japanese(&format!("✗ User API failed: {}", user_response.status()));
+            messages.push(format!("✗ User API failed: {}", user_response.status()));
         }
 
-        windows_console::println_japanese("=== End API Test ===\n");
+        messages.push("=== End API Test ===\n".to_string());
+        Ok(messages)
+    }
+
+    /// Zoom API への接続とアクセス権限をテストする（副作用あり版）
+    /// 
+    /// 事前条件:
+    /// - self.access_token は有効なOAuth2アクセストークンである
+    /// - インターネット接続が利用可能である
+    /// - Zoom API サーバーが稼働中である
+    /// 
+    /// 事後条件:
+    /// - 成功時: API接続が確認され、ユーザー情報が出力される
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    /// API アクセスをテストし、結果を標準出力に表示する
+    /// 
+    /// # 副作用
+    /// - HTTPリクエストの送信
+    /// - 標準出力へのメッセージ表示
+    pub async fn test_api_access(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let messages = self.test_api_access_pure().await?;
+        for message in messages {
+            windows_console::println_japanese(&message);
+        }
         Ok(())
     }
 
+    /// 指定した期間のレコーディング一覧を取得する
+    /// 
+    /// 事前条件:
+    /// - user_id は有効なZoomユーザーIDである
+    /// - from は有効な日付形式（YYYY-MM-DD）である
+    /// - to は有効な日付形式（YYYY-MM-DD）である
+    /// - from <= to である
+    /// - アクセストークンが有効である
+    /// 
+    /// 事後条件:
+    /// - 成功時: 指定期間のレコーディング情報を含むRecordingResponseを返す
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
     pub async fn list_recordings(&self, user_id: &str, from: &str, to: &str) -> Result<RecordingResponse, Box<dyn std::error::Error>> {
         let url = format!(
             "https://api.zoom.us/v2/users/{}/recordings?from={}&to={}",
@@ -206,6 +304,17 @@ impl ZoomRecordingDownloader {
         Ok(recordings)
     }
 
+    /// ミーティングIDを使用してAI要約を取得する
+    /// 
+    /// 事前条件:
+    /// - meeting_id は有効なZoomミーティングIDである
+    /// - アクセストークンが有効である
+    /// - 必要なスコープ（meeting:read）が許可されている
+    /// 
+    /// 事後条件:
+    /// - 成功時: AI要約が利用可能な場合は Some(AISummaryResponse) を返す
+    /// - AI要約が利用不可の場合は None を返す
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
     pub async fn get_ai_summary_by_meeting_id(&self, meeting_id: u64) -> Result<Option<AISummaryResponse>, Box<dyn std::error::Error>> {
         windows_console::println_japanese(&format!("Requesting AI summary for Meeting ID: {}", meeting_id));
         
@@ -284,155 +393,215 @@ impl ZoomRecordingDownloader {
         Ok(None)
     }
 
-    pub async fn get_ai_summary(&self, meeting_uuid: &str) -> Result<Option<AISummaryResponse>, Box<dyn std::error::Error>> {
-        windows_console::println_japanese(&format!("Requesting AI summary for UUID: {}", meeting_uuid));
-        
-        // Implement proper double URL encoding as required by Zoom API research
+    /// UUID形式のバリエーションを生成する（純粋関数）
+    /// 
+    /// 事前条件:
+    /// - meeting_uuid は空でない文字列である
+    /// 
+    /// 事後条件:
+    /// - UUID形式のバリエーションリストを返す
+    /// - 副作用なし
+    /// 
+    /// 不変条件:
+    /// - 入力パラメータを変更しない
+    fn generate_uuid_variants(&self, meeting_uuid: &str) -> Vec<String> {
         let single_encoded = urlencoding::encode(meeting_uuid);
         let double_encoded = urlencoding::encode(&single_encoded);
-        windows_console::println_japanese(&format!("Single encoded UUID: {}", single_encoded));
-        windows_console::println_japanese(&format!("Double encoded UUID: {}", double_encoded));
         
-        // Try different UUID formats based on Zoom API research
-        let uuid_variants = vec![
+        vec![
             double_encoded.to_string(),  // Research shows double encoding is often required
             single_encoded.to_string(),
             meeting_uuid.to_string(),
             meeting_uuid.replace("/", "%2F").replace("=", "%3D"),
-        ];
+        ]
+    }
+
+    /// AI要約エンドポイントのリストを生成する（純粋関数）
+    /// 
+    /// 事前条件:
+    /// - uuid_variant は空でない文字列である
+    /// 
+    /// 事後条件:
+    /// - エンドポイントURLのリストを返す
+    /// - 副作用なし
+    /// 
+    /// 不変条件:
+    /// - 入力パラメータを変更しない
+    fn generate_ai_summary_endpoints(&self, uuid_variant: &str) -> Vec<String> {
+        vec![
+            // Primary endpoints
+            format!("https://api.zoom.us/v2/meetings/{}/meeting_summary", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/recordings", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/summary", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/batch_summary", uuid_variant),
+            // Extended AI endpoints
+            format!("https://api.zoom.us/v2/meetings/{}/ai_companion_summary", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/ai_summary", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/detailed_summary", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/content_summary", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/companion_summary", uuid_variant),
+            format!("https://api.zoom.us/v2/ai_companion/meetings/{}/summary", uuid_variant),
+            format!("https://api.zoom.us/v2/ai_companion/summary/{}", uuid_variant),
+            format!("https://api.zoom.us/v2/ai/meetings/{}/summary", uuid_variant),
+            format!("https://api.zoom.us/v2/ai/summary/meetings/{}", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/analysis", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/insights", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/recording_summary", uuid_variant),
+        ]
+    }
+
+    /// HTTPレスポンスからAI要約を抽出する（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - response_text は有効なHTTPレスポンステキストである
+    /// - url は有効なURLである
+    /// - meeting_uuid は空でない文字列である
+    /// 
+    /// 事後条件:
+    /// - 成功時: AISummaryResponseを返す
+    /// - 失敗時: None を返す
+    /// 
+    /// 不変条件:
+    /// - 入力パラメータを変更しない
+    async fn extract_ai_summary_from_response(&self, response_text: &str, url: &str, meeting_uuid: &str) -> Option<AISummaryResponse> {
+        // Check if this is a recordings endpoint response
+        if url.contains("/recordings") {
+            if let Ok(recordings_data) = serde_json::from_str::<serde_json::Value>(response_text) {
+                // Look for SUMMARY file type in recording files
+                if let Some(recording_files) = recordings_data.get("recording_files").and_then(|v| v.as_array()) {
+                    for file in recording_files {
+                        if let Some(file_type) = file.get("file_type").and_then(|v| v.as_str()) {
+                            if file_type == "SUMMARY" {
+                                windows_console::println_japanese("✓ Found SUMMARY file in recordings!");
+                                let converted_summary = self.convert_generic_to_ai_summary(file.clone(), meeting_uuid);
+                                return Some(converted_summary);
+                            }
+                        }
+                    }
+                }
+                windows_console::println_japanese("No SUMMARY file found in recordings");
+                return None;
+            }
+        } else {
+            // Try to parse as meeting summary response
+            if let Ok(summary) = serde_json::from_str::<AISummaryResponse>(response_text) {
+                windows_console::println_japanese("✓ Successfully parsed AI summary!");
+                return Some(summary);
+            } else if let Ok(generic_json) = serde_json::from_str::<serde_json::Value>(response_text) {
+                windows_console::println_japanese("✓ Received valid JSON, converting to AI summary format");
+                let converted_summary = self.convert_generic_to_ai_summary(generic_json, meeting_uuid);
+                return Some(converted_summary);
+            } else {
+                windows_console::println_japanese("Response is not valid JSON");
+                return None;
+            }
+        }
+        None
+    }
+
+    /// 単一のエンドポイントでAI要約を試行する（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - url は有効なURLである
+    /// - meeting_uuid は空でない文字列である
+    /// - variant_idx と endpoint_idx は有効なインデックスである
+    /// 
+    /// 事後条件:
+    /// - 成功時: AISummaryResponseを返す
+    /// - 失敗時: None を返す
+    /// 
+    /// 不変条件:
+    /// - ネットワークエラーは上位に伝播される
+    async fn try_single_endpoint(&self, url: &str, meeting_uuid: &str, variant_idx: usize, endpoint_idx: usize) -> Result<Option<AISummaryResponse>, Box<dyn std::error::Error>> {
+        windows_console::println_japanese(&format!("Trying endpoint {}: {}", endpoint_idx + 1, url));
+
+        let response = self
+            .client
+            .get(url)
+            .bearer_auth(&self.access_token)
+            .send()
+            .await?;
+
+        match response.status().as_u16() {
+            200 => {
+                windows_console::println_japanese("✓ Received 200 response!");
+                let response_text = response.text().await?;
+                windows_console::println_japanese(&format!("Response length: {} chars", response_text.len()));
+                
+                // Save debug response
+                self.save_debug_response(&response_text, &format!("uuid_{}_variant_{}_endpoint_{}", meeting_uuid.replace("/", "_").replace("=", "_"), variant_idx + 1, endpoint_idx + 1)).await;
+                
+                return Ok(self.extract_ai_summary_from_response(&response_text, url, meeting_uuid).await);
+            },
+            404 => {
+                windows_console::println_japanese(&format!("Endpoint {} returned 404 (not found)", endpoint_idx + 1));
+            },
+            401 => {
+                windows_console::println_japanese(&format!("Endpoint {} returned 401 (Unauthorized)", endpoint_idx + 1));
+                windows_console::println_japanese("ℹ Ensure access token is valid and has not expired");
+            },
+            403 => {
+                windows_console::println_japanese(&format!("Endpoint {} returned 403 (Forbidden)", endpoint_idx + 1));
+                windows_console::println_japanese("ℹ Required scopes: meeting:read, recording:read, user:read");
+                windows_console::println_japanese("ℹ Note: You may need to be the meeting host to access summaries");
+            },
+            429 => {
+                windows_console::println_japanese(&format!("Endpoint {} returned 429 (Rate limit exceeded)", endpoint_idx + 1));
+                // Add delay for rate limiting
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            },
+            422 => {
+                windows_console::println_japanese(&format!("Endpoint {} returned 422 (Unprocessable Entity)", endpoint_idx + 1));
+                windows_console::println_japanese("ℹ This may indicate the summary is still being processed");
+            },
+            500..=599 => {
+                windows_console::println_japanese(&format!("Endpoint {} returned {} (Server error)", endpoint_idx + 1, response.status()));
+            },
+            _ => {
+                windows_console::println_japanese(&format!("Endpoint {} returned {} (Unknown error)", endpoint_idx + 1, response.status()));
+                if let Ok(error_text) = response.text().await {
+                    if !error_text.is_empty() {
+                        windows_console::println_japanese(&format!("Error details: {}", 
+                            if error_text.len() > 300 { 
+                                format!("{}...", &error_text[..300]) 
+                            } else { 
+                                error_text 
+                            }
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// ミーティングUUIDを使用してAI要約を取得する（リファクタリング版・複雑度削減）
+    /// 
+    /// 事前条件:
+    /// - meeting_uuid は有効なZoomミーティングUUIDである
+    /// - アクセストークンが有効である
+    /// - 必要なスコープ（meeting:read）が許可されている
+    /// 
+    /// 事後条件:
+    /// - 成功時: AI要約が利用可能な場合は Some(AISummaryResponse) を返す
+    /// - AI要約が利用不可の場合は None を返す
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    pub async fn get_ai_summary(&self, meeting_uuid: &str) -> Result<Option<AISummaryResponse>, Box<dyn std::error::Error>> {
+        windows_console::println_japanese(&format!("Requesting AI summary for UUID: {}", meeting_uuid));
+        
+        let uuid_variants = self.generate_uuid_variants(meeting_uuid);
+        
+        windows_console::println_japanese(&format!("Single encoded UUID: {}", urlencoding::encode(meeting_uuid)));
+        windows_console::println_japanese(&format!("Double encoded UUID: {}", urlencoding::encode(&urlencoding::encode(meeting_uuid))));
         
         for (variant_idx, uuid_variant) in uuid_variants.iter().enumerate() {
-            windows_console::println_japanese(&format!("Trying UUID variant {}/{}: {}", variant_idx+1, uuid_variants.len(), uuid_variant));
+            windows_console::println_japanese(&format!("Trying UUID variant {}/{}: {}", variant_idx + 1, uuid_variants.len(), uuid_variant));
             
-            // Comprehensive AI summary endpoints for UUID - expanded list
-            let endpoints = vec![
-                // Primary endpoints
-                format!("https://api.zoom.us/v2/meetings/{}/meeting_summary", uuid_variant),
-                format!("https://api.zoom.us/v2/meetings/{}/recordings", uuid_variant),
-                format!("https://api.zoom.us/v2/meetings/{}/summary", uuid_variant),
-                format!("https://api.zoom.us/v2/meetings/{}/batch_summary", uuid_variant),
-                // Extended AI endpoints
-                format!("https://api.zoom.us/v2/meetings/{}/ai_companion_summary", uuid_variant),
-                format!("https://api.zoom.us/v2/meetings/{}/ai_summary", uuid_variant),
-                format!("https://api.zoom.us/v2/meetings/{}/detailed_summary", uuid_variant),
-                format!("https://api.zoom.us/v2/meetings/{}/content_summary", uuid_variant),
-                format!("https://api.zoom.us/v2/meetings/{}/companion_summary", uuid_variant),
-                format!("https://api.zoom.us/v2/ai_companion/meetings/{}/summary", uuid_variant),
-                format!("https://api.zoom.us/v2/ai_companion/summary/{}", uuid_variant),
-                format!("https://api.zoom.us/v2/ai/meetings/{}/summary", uuid_variant),
-                format!("https://api.zoom.us/v2/ai/summary/meetings/{}", uuid_variant),
-                format!("https://api.zoom.us/v2/meetings/{}/analysis", uuid_variant),
-                format!("https://api.zoom.us/v2/meetings/{}/insights", uuid_variant),
-                format!("https://api.zoom.us/v2/meetings/{}/recording_summary", uuid_variant),
-            ];
-        
-            for (i, url) in endpoints.iter().enumerate() {
-                windows_console::println_japanese(&format!("Trying endpoint {}/{}: {}", i+1, endpoints.len(), url));
-
-                let response = self
-                    .client
-                    .get(url)
-                    .bearer_auth(&self.access_token)
-                    .send()
-                    .await?;
-
-                match response.status().as_u16() {
-                    200 => {
-                        windows_console::println_japanese("✓ Received 200 response!");
-                        let response_text = response.text().await?;
-                        windows_console::println_japanese(&format!("Response length: {} chars", response_text.len()));
-                        
-                        // Save debug response
-                        self.save_debug_response(&response_text, &format!("uuid_{}_variant_{}_endpoint_{}", meeting_uuid.replace("/", "_").replace("=", "_"), variant_idx+1, i+1)).await;
-                        
-                        // Check if this is a recordings endpoint response
-                        if url.contains("/recordings") {
-                            if let Ok(recordings_data) = serde_json::from_str::<serde_json::Value>(&response_text) {
-                                // Look for SUMMARY file type in recording files
-                                if let Some(recording_files) = recordings_data.get("recording_files").and_then(|v| v.as_array()) {
-                                    for file in recording_files {
-                                        if let Some(file_type) = file.get("file_type").and_then(|v| v.as_str()) {
-                                            if file_type == "SUMMARY" {
-                                                windows_console::println_japanese("✓ Found SUMMARY file in recordings!");
-                                                // Extract summary content if available
-                                                let converted_summary = self.convert_generic_to_ai_summary(file.clone(), meeting_uuid);
-                                                return Ok(Some(converted_summary));
-                                            }
-                                        }
-                                    }
-                                }
-                                windows_console::println_japanese("No SUMMARY file found in recordings");
-                                continue;
-                            }
-                        } else {
-                            // Try to parse as meeting summary response
-                            if let Ok(summary) = serde_json::from_str::<AISummaryResponse>(&response_text) {
-                                windows_console::println_japanese("✓ Successfully parsed AI summary!");
-                                return Ok(Some(summary));
-                            } else if let Ok(generic_json) = serde_json::from_str::<serde_json::Value>(&response_text) {
-                                windows_console::println_japanese("✓ Received valid JSON, converting to AI summary format");
-                                let converted_summary = self.convert_generic_to_ai_summary(generic_json, meeting_uuid);
-                                return Ok(Some(converted_summary));
-                            } else {
-                                windows_console::println_japanese("Response is not valid JSON");
-                                // Save invalid response for debugging
-                                self.save_debug_response(&response_text, &format!("uuid_{}_variant_{}_endpoint_{}_invalid", meeting_uuid.replace("/", "_").replace("=", "_"), variant_idx+1, i+1)).await;
-                                windows_console::println_japanese(&format!("Response preview: {}", 
-                                    if response_text.len() > 200 { 
-                                        format!("{}...", &response_text[..200]) 
-                                    } else { 
-                                        response_text.clone() 
-                                    }
-                                ));
-                                continue;
-                            }
-                        }
-                    },
-                    404 => {
-                        windows_console::println_japanese(&format!("Endpoint {} returned 404 (not found)", i+1));
-                        continue;
-                    },
-                    401 => {
-                        windows_console::println_japanese(&format!("Endpoint {} returned 401 (Unauthorized)", i+1));
-                        windows_console::println_japanese("ℹ Ensure access token is valid and has not expired");
-                        continue;
-                    },
-                    403 => {
-                        windows_console::println_japanese(&format!("Endpoint {} returned 403 (Forbidden)", i+1));
-                        windows_console::println_japanese("ℹ Required scopes: meeting:read, recording:read, user:read");
-                        windows_console::println_japanese("ℹ Note: You may need to be the meeting host to access summaries");
-                        continue;
-                    },
-                    429 => {
-                        windows_console::println_japanese(&format!("Endpoint {} returned 429 (Rate limit exceeded)", i+1));
-                        // Add delay for rate limiting
-                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                        continue;
-                    },
-                    422 => {
-                        windows_console::println_japanese(&format!("Endpoint {} returned 422 (Unprocessable Entity)", i+1));
-                        windows_console::println_japanese("ℹ This may indicate the summary is still being processed");
-                        continue;
-                    },
-                    500..=599 => {
-                        windows_console::println_japanese(&format!("Endpoint {} returned {} (Server error)", i+1, response.status()));
-                        continue;
-                    },
-                    _ => {
-                        windows_console::println_japanese(&format!("Endpoint {} returned {} (Unknown error)", i+1, response.status()));
-                        if let Ok(error_text) = response.text().await {
-                            if !error_text.is_empty() {
-                                windows_console::println_japanese(&format!("Error details: {}", 
-                                    if error_text.len() > 300 { 
-                                        format!("{}...", &error_text[..300]) 
-                                    } else { 
-                                        error_text 
-                                    }
-                                ));
-                            }
-                        }
-                        continue;
-                    }
+            let endpoints = self.generate_ai_summary_endpoints(uuid_variant);
+            
+            for (endpoint_idx, url) in endpoints.iter().enumerate() {
+                if let Some(summary) = self.try_single_endpoint(url, meeting_uuid, variant_idx, endpoint_idx).await? {
+                    return Ok(Some(summary));
                 }
             }
         }
@@ -443,6 +612,15 @@ impl ZoomRecordingDownloader {
         Ok(None)
     }
 
+    /// 汎用JSON形式をAISummaryResponseに変換する
+    /// 
+    /// 事前条件:
+    /// - json は有効なJSON Valueである
+    /// - meeting_uuid は空でない文字列である
+    /// 
+    /// 事後条件:
+    /// - 常に有効なAISummaryResponseを返す
+    /// - 不明なフィールドは適切なデフォルト値で初期化される
     fn convert_generic_to_ai_summary(&self, json: serde_json::Value, meeting_uuid: &str) -> AISummaryResponse {
         // Extract common fields that might exist in various formats
         let summary_text = json.get("summary")
@@ -740,6 +918,329 @@ impl ZoomRecordingDownloader {
         details
     }
     
+    fn extract_brief_summary_only(&self, formatted_content: &str) -> String {
+        // Extract only the brief summary part, typically the first paragraph or section
+        let lines: Vec<&str> = formatted_content.lines().collect();
+        let mut result = String::new();
+        let mut found_content = false;
+        
+        for line in lines {
+            let trimmed = line.trim();
+            
+            // Skip empty lines at the start
+            if !found_content && trimmed.is_empty() {
+                continue;
+            }
+            
+            // Stop if we hit a detailed section marker (starts with ◆ or ■ or #)
+            if found_content && (trimmed.starts_with("◆") || trimmed.starts_with("■") || trimmed.starts_with("#")) {
+                break;
+            }
+            
+            found_content = true;
+            result.push_str(line);
+            result.push('\n');
+            
+            // If we have a good amount of summary text, stop here
+            if result.len() > 200 && trimmed.is_empty() {
+                break;
+            }
+        }
+        
+        result.trim().to_string()
+    }
+    
+    /// AI要約ヘッダーを生成する（純粋関数）
+    /// 
+    /// 事前条件:
+    /// - summary は有効なAISummaryResponseである
+    /// - meeting_id は空でない文字列である
+    /// 
+    /// 事後条件:
+    /// - ヘッダー部分のテキストを返す
+    /// - 副作用なし
+    /// 
+    /// 不変条件:
+    /// - 入力パラメータを変更しない
+    fn generate_ai_summary_header(&self, summary: &AISummaryResponse, meeting_id: &str) -> String {
+        let mut content = String::new();
+        content.push_str("=".repeat(80).as_str());
+        content.push_str("\n");
+        content.push_str(&format!("AI要約 - ミーティングID: {}\n", meeting_id));
+        if !summary.summary_title.is_empty() {
+            content.push_str(&format!("タイトル: {}\n", summary.summary_title));
+        }
+        if !summary.summary_created_time.is_empty() {
+            content.push_str(&format!("作成日時: {}\n", summary.summary_created_time));
+        }
+        content.push_str("=".repeat(80).as_str());
+        content.push_str("\n\n");
+        content
+    }
+
+    /// AI要約の簡単な要約部分を生成する（純粋関数）
+    /// 
+    /// 事前条件:
+    /// - summary は有効なAISummaryResponseである
+    /// 
+    /// 事後条件:
+    /// - 簡単な要約部分のテキストを返す
+    /// - 副作用なし
+    /// 
+    /// 不変条件:
+    /// - 入力パラメータを変更しない
+    fn generate_brief_summary_section(&self, summary: &AISummaryResponse) -> String {
+        let mut content = String::new();
+        content.push_str("【簡単な要約】\n");
+        
+        let brief_summary = if !summary.summary_overview.is_empty() { 
+            &summary.summary_overview
+        } else if !summary.summary.is_empty() {
+            &summary.summary
+        } else if !summary.topic_summaries.is_empty() {
+            // Generate summary from topic summaries if no direct summary available
+            let combined_summary: String = summary.topic_summaries.iter()
+                .map(|t| format!("{}について議論され", t.topic_title))
+                .collect::<Vec<_>>()
+                .join("、");
+            content.push_str(&format!("この会議では、{}。", combined_summary));
+            content.push_str("\n");
+            content.push_str("\n");
+            return content;
+        } else {
+            ""
+        };
+        
+        if !brief_summary.is_empty() {
+            content.push_str(brief_summary);
+            content.push_str("\n");
+        } else if summary.topic_summaries.is_empty() {
+            content.push_str("要約情報がありません。\n");
+        }
+        content.push_str("\n");
+        content
+    }
+
+    /// AI要約の次のステップ部分を生成する（純粋関数）
+    /// 
+    /// 事前条件:
+    /// - summary は有効なAISummaryResponseである
+    /// 
+    /// 事後条件:
+    /// - 次のステップ部分のテキストを返す
+    /// - 副作用なし
+    /// 
+    /// 不変条件:
+    /// - 入力パラメータを変更しない
+    fn generate_next_steps_section(&self, summary: &AISummaryResponse) -> String {
+        let mut content = String::new();
+        content.push_str("【次のステップ】\n");
+        
+        let next_steps = if !summary.next_steps.is_empty() { 
+            &summary.next_steps
+        } else { 
+            &summary.action_items 
+        };
+        
+        if !next_steps.is_empty() {
+            for (i, step) in next_steps.iter().enumerate() {
+                // Process markdown links in the step text
+                let processed_step = self.process_markdown_links(step);
+                content.push_str(&format!("{}. {}\n", i + 1, processed_step));
+            }
+        } else {
+            content.push_str("次のステップはありません。\n");
+        }
+        content.push_str("\n");
+        content
+    }
+
+    /// AI要約の詳細コンテンツ部分を生成する（純粋関数）
+    /// 
+    /// 事前条件:
+    /// - summary は有効なAISummaryResponseである
+    /// 
+    /// 事後条件:
+    /// - 詳細コンテンツ部分のテキストを返す
+    /// - 副作用なし
+    /// 
+    /// 不変条件:
+    /// - 入力パラメータを変更しない
+    fn generate_detailed_content_section(&self, summary: &AISummaryResponse) -> String {
+        let mut content = String::new();
+        
+        // Add detailed summary content (markdown format) if available
+        if !summary.summary_content.is_empty() {
+            let formatted_content = self.filter_duplicate_sections(&summary.summary_content, &summary.next_steps);
+            if !formatted_content.trim().is_empty() {
+                // Check if we have detailed content that would be redundant
+                let has_detailed_content_elsewhere = !summary.summary_details.is_empty() || 
+                                                   !summary.detailed_sections.is_empty() || 
+                                                   !summary.topic_summaries.is_empty();
+                
+                if has_detailed_content_elsewhere {
+                    // Only show a brief summary from the AI content, not the full details
+                    let brief_summary_only = self.extract_brief_summary_only(&formatted_content);
+                    if !brief_summary_only.trim().is_empty() && brief_summary_only.len() > 50 {
+                        content.push_str("【AI要約（概要のみ）】\n");
+                        content.push_str(&brief_summary_only);
+                        content.push_str("\n\n");
+                    }
+                } else {
+                    // Show full content if no other detailed sections available
+                    content.push_str("【詳細要約（Zoom AI生成）】\n");
+                    content.push_str(&formatted_content);
+                    content.push_str("\n\n");
+                }
+            }
+        }
+        content
+    }
+
+    /// AI要約の詳細セクション部分を生成する（純粋関数）
+    /// 
+    /// 事前条件:
+    /// - summary は有効なAISummaryResponseである
+    /// 
+    /// 事後条件:
+    /// - 詳細セクション部分のテキストを返す
+    /// - 副作用なし
+    /// 
+    /// 不変条件:
+    /// - 入力パラメータを変更しない
+    fn generate_detailed_sections(&self, summary: &AISummaryResponse) -> String {
+        let mut content = String::new();
+        
+        // Show most detailed content available, avoiding duplication
+        let has_summary_details = !summary.summary_details.is_empty();
+        let has_detailed_sections = !summary.detailed_sections.is_empty();
+        let has_topic_summaries = !summary.topic_summaries.is_empty();
+        
+        // Prioritize summary_details as most detailed, then detailed_sections, then topic_summaries
+        if has_summary_details {
+            content.push_str("【詳細要約内容】\n");
+            for detail in &summary.summary_details {
+                if !detail.label.is_empty() {
+                    content.push_str(&format!("■ {}\n", detail.label));
+                    if !detail.summary.is_empty() {
+                        content.push_str(&format!("{}\n\n", detail.summary));
+                    }
+                }
+            }
+        } else if has_detailed_sections {
+            content.push_str("【詳細セクション】\n");
+            for section in &summary.detailed_sections {
+                if !section.section_title.is_empty() {
+                    content.push_str(&format!("■ {}\n", section.section_title));
+                    if !section.section_content.is_empty() {
+                        content.push_str(&format!("{}\n\n", section.section_content));
+                    }
+                }
+            }
+        } else if has_topic_summaries {
+            content.push_str("【トピック要約】\n");
+            for (i, topic) in summary.topic_summaries.iter().enumerate() {
+                if !topic.topic_title.is_empty() {
+                    content.push_str(&format!("{}. {}\n", i + 1, topic.topic_title));
+                    if !topic.topic_content.is_empty() {
+                        content.push_str(&format!("{}\n\n", topic.topic_content));
+                    }
+                }
+            }
+        } else {
+            // If no detailed content available
+            content.push_str("【ミーティング情報】\n");
+            content.push_str("■ ミーティングタイトル\n");
+            if !summary.summary_title.is_empty() && summary.summary_title != "AI Generated Summary" {
+                content.push_str(&format!("{}\n\n", summary.summary_title));
+            } else {
+                content.push_str("詳細な要約情報は利用できません。\n\n");
+            }
+        }
+        content
+    }
+
+    /// AI要約のキーワードとポイント部分を生成する（純粋関数）
+    /// 
+    /// 事前条件:
+    /// - summary は有効なAISummaryResponseである
+    /// 
+    /// 事後条件:
+    /// - キーワードとポイント部分のテキストを返す
+    /// - 副作用なし
+    /// 
+    /// 不変条件:
+    /// - 入力パラメータを変更しない
+    fn generate_keywords_and_points_section(&self, summary: &AISummaryResponse) -> String {
+        let mut content = String::new();
+        
+        // Keywords
+        if !summary.summary_keyword.is_empty() {
+            content.push_str("【キーワード】\n");
+            content.push_str(&summary.summary_keyword.join(", "));
+            content.push_str("\n\n");
+        }
+
+        // Key points
+        if !summary.key_points.is_empty() {
+            content.push_str("【重要ポイント】\n");
+            for (i, point) in summary.key_points.iter().enumerate() {
+                content.push_str(&format!("{}. {}\n", i + 1, point));
+            }
+            content.push_str("\n");
+        }
+        content
+    }
+
+    /// AI要約フッターを生成する（純粋関数）
+    /// 
+    /// 事前条件:
+    /// - なし
+    /// 
+    /// 事後条件:
+    /// - フッター部分のテキストを返す
+    /// - 副作用なし
+    /// 
+    /// 不変条件:
+    /// - グローバル状態を変更しない
+    fn generate_ai_summary_footer(&self) -> String {
+        let mut content = String::new();
+        content.push_str("-".repeat(80).as_str());
+        content.push_str("\n");
+        content.push_str("Generated by: Zoom AI Companion\n");
+        content.push_str(&format!("Download timestamp: {}\n", Utc::now().to_rfc3339()));
+        content
+    }
+
+    /// AI要約のテキストコンテンツを生成する（リファクタリング版・複雑度削減）
+    /// 
+    /// 事前条件:
+    /// - summary は有効なAISummaryResponseである
+    /// - meeting_id は空でない文字列である
+    /// 
+    /// 事後条件:
+    /// - 成功時: 読みやすい形式のテキストコンテンツを返す
+    /// - 副作用なし: ファイルは作成されない
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    /// 
+    /// 不変条件:
+    /// - ファイルシステムの状態を変更しない
+    /// - 入力パラメータを変更しない
+    fn generate_ai_summary_text_content(&self, summary: &AISummaryResponse, meeting_id: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let mut content = String::new();
+        
+        // Build content by composing smaller functions
+        content.push_str(&self.generate_ai_summary_header(summary, meeting_id));
+        content.push_str(&self.generate_brief_summary_section(summary));
+        content.push_str(&self.generate_next_steps_section(summary));
+        content.push_str(&self.generate_detailed_content_section(summary));
+        content.push_str(&self.generate_detailed_sections(summary));
+        content.push_str(&self.generate_keywords_and_points_section(summary));
+        content.push_str(&self.generate_ai_summary_footer());
+
+        Ok(content)
+    }
+
     fn filter_duplicate_sections(&self, summary_content: &str, next_steps: &[String]) -> String {
         let mut result = summary_content.to_string();
         
@@ -774,6 +1275,23 @@ impl ZoomRecordingDownloader {
                     result.replace_range(start..section_end, "");
                     break;
                 }
+            }
+        }
+        
+        // Remove "概要" section and everything after it since it duplicates with detailed content
+        let overview_patterns = [
+            "◆ 概要",
+            "● 概要",
+            "◆ Overview",
+            "◆ 詳細",
+            "◆ Details"
+        ];
+        
+        for pattern in &overview_patterns {
+            if let Some(start) = result.find(pattern) {
+                // Remove everything from this point onwards
+                result.truncate(start);
+                break;
             }
         }
         
@@ -905,7 +1423,21 @@ impl ZoomRecordingDownloader {
         action_items
     }
 
-    fn create_meeting_date_folder(&self, base_output_dir: &str, meeting_start_time: &str) -> Result<String, Box<dyn std::error::Error>> {
+    /// ミーティング開始時刻を基にしたフォルダーパスを生成する（副作用なし版）
+    /// 
+    /// 事前条件:
+    /// - base_output_dir は有効なディレクトリパスである
+    /// - meeting_start_time は有効なISO 8601形式の日時文字列である
+    /// 
+    /// 事後条件:
+    /// - 成功時: YYYY-MM-DD形式のフォルダーパスを返す
+    /// - 副作用なし: ディレクトリは作成されない
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    /// 
+    /// 不変条件:
+    /// - ファイルシステムの状態を変更しない
+    /// - 入力パラメータを変更しない
+    fn calculate_meeting_date_folder(&self, base_output_dir: &str, meeting_start_time: &str) -> Result<String, Box<dyn std::error::Error>> {
         // Parse the meeting start time (ISO 8601 format)
         let meeting_datetime = chrono::DateTime::parse_from_rfc3339(meeting_start_time)
             .map_err(|e| format!("Failed to parse meeting start time '{}': {}", meeting_start_time, e))?;
@@ -917,20 +1449,46 @@ impl ZoomRecordingDownloader {
         // Format as YYYY-MM-DD for folder name
         let date_folder = meeting_jst.format("%Y-%m-%d").to_string();
         
-        // Create the date-based folder path
+        // Create the date-based folder path (but don't create the directory)
         let date_folder_path = Path::new(base_output_dir).join(&date_folder);
-        fs::create_dir_all(&date_folder_path)?;
         
         Ok(date_folder_path.to_string_lossy().to_string())
     }
 
-    pub async fn save_ai_summary_txt(&self, summary: &AISummaryResponse, meeting_id: &str, meeting_start_time: &str, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
+    /// ミーティング開始時刻を基にしたフォルダーを作成する（副作用あり版）
+    /// 
+    /// 事前条件:
+    /// - base_output_dir は有効なディレクトリパスである
+    /// - meeting_start_time は有効なISO 8601形式の日時文字列である
+    /// - ディレクトリへの書き込み権限がある
+    /// 
+    /// 事後条件:
+    /// - 成功時: YYYY-MM-DD形式のフォルダーが作成される
+    /// - 作成されたフォルダーパスを返す
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    fn create_meeting_date_folder(&self, base_output_dir: &str, meeting_start_time: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let date_folder_path = self.calculate_meeting_date_folder(base_output_dir, meeting_start_time)?;
+        fs::create_dir_all(&date_folder_path)?;
+        Ok(date_folder_path)
+    }
+
+    /// AI要約ファイル名を生成する（副作用なし版）
+    /// 
+    /// 事前条件:
+    /// - summary は有効なAISummaryResponseである
+    /// - meeting_id は空でない文字列である
+    /// - extension は有効なファイル拡張子である
+    /// 
+    /// 事後条件:
+    /// - 成功時: 適切なファイル名を返す
+    /// - 副作用なし: ファイルは作成されない
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    /// 
+    /// 不変条件:
+    /// - ファイルシステムの状態を変更しない
+    /// - 入力パラメータを変更しない
+    fn generate_ai_summary_filename(&self, summary: &AISummaryResponse, meeting_id: &str, extension: &str) -> Result<String, Box<dyn std::error::Error>> {
         let invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
-        
-        // Create date folder based on meeting start time (not AI summary creation time)
-        let date_folder_path = self.create_meeting_date_folder(output_dir, meeting_start_time)?;
-        
-        // Create AI summary filename with timestamp to handle multiple versions (.txt)
         let safe_meeting_id = meeting_id.chars().map(|c| if invalid_chars.contains(&c) { '_' } else { c }).collect::<String>();
         
         // Generate timestamp suffix from creation time
@@ -942,9 +1500,8 @@ impl ZoomRecordingDownloader {
                     format!("_{}", utc_dt.format("%Y%m%d_%H%M%S"))
                 },
                 Err(_) => {
-                    // If parsing fails, use a simple counter approach
-                    let base_filename = format!("{}_ai_summary", safe_meeting_id);
-                    self.get_next_available_suffix(&date_folder_path, &base_filename, "txt")?
+                    // If parsing fails, use current timestamp
+                    format!("_{}", Utc::now().format("%Y%m%d_%H%M%S"))
                 }
             }
         } else {
@@ -952,155 +1509,36 @@ impl ZoomRecordingDownloader {
             format!("_{}", Utc::now().format("%Y%m%d_%H%M%S"))
         };
         
-        let summary_filename = format!("{}_ai_summary{}.txt", safe_meeting_id, timestamp_suffix);
+        let filename = format!("{}_ai_summary{}.{}", safe_meeting_id, timestamp_suffix, extension);
+        Ok(filename)
+    }
+
+
+    /// AI要約をテキストファイルとして保存する
+    /// 
+    /// 事前条件:
+    /// - summary は有効なAISummaryResponseである
+    /// - meeting_id は空でない文字列である
+    /// - meeting_start_time は有効なISO 8601形式の日時文字列である
+    /// - output_dir は有効なディレクトリパスである
+    /// - ディレクトリへの書き込み権限がある
+    /// 
+    /// 事後条件:
+    /// - 成功時: AI要約がテキストファイルとして保存される
+    /// - 保存されたファイルパスを返す
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    pub async fn save_ai_summary_txt(&self, summary: &AISummaryResponse, meeting_id: &str, meeting_start_time: &str, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
+        // Create date folder based on meeting start time (not AI summary creation time)
+        let date_folder_path = self.create_meeting_date_folder(output_dir, meeting_start_time)?;
+        
+        // Generate filename using pure function
+        let summary_filename = self.generate_ai_summary_filename(summary, meeting_id, "txt")?;
         let output_path = Path::new(&date_folder_path).join(&summary_filename);
         
-        // Note: We now allow multiple versions with different timestamps
-        
-        // Create readable text format
-        let mut content = String::new();
-        
-        // Header
-        content.push_str("=".repeat(80).as_str());
-        content.push_str("\n");
-        content.push_str(&format!("AI要約 - ミーティングID: {}\n", meeting_id));
-        if !summary.summary_title.is_empty() {
-            content.push_str(&format!("タイトル: {}\n", summary.summary_title));
-        }
-        if !summary.summary_created_time.is_empty() {
-            content.push_str(&format!("作成日時: {}\n", summary.summary_created_time));
-        }
-        content.push_str("=".repeat(80).as_str());
-        content.push_str("\n\n");
+        // Generate content using pure function
+        let content = self.generate_ai_summary_text_content(summary, meeting_id)?;
 
-        // Brief summary - try multiple sources for better coverage
-        content.push_str("【簡単な要約】\n");
-        let brief_summary = if !summary.summary_overview.is_empty() { 
-            &summary.summary_overview
-        } else if !summary.summary.is_empty() {
-            &summary.summary
-        } else if !summary.topic_summaries.is_empty() {
-            // Generate summary from topic summaries if no direct summary available
-            let combined_summary: String = summary.topic_summaries.iter()
-                .map(|t| format!("{}について議論され", t.topic_title))
-                .collect::<Vec<_>>()
-                .join("、");
-            content.push_str(&format!("この会議では、{}。", combined_summary));
-            content.push_str("\n");
-            ""
-        } else {
-            ""
-        };
-        
-        if !brief_summary.is_empty() {
-            content.push_str(brief_summary);
-            content.push_str("\n");
-        } else if summary.topic_summaries.is_empty() {
-            content.push_str("要約情報がありません。\n");
-        }
-        content.push_str("\n");
-
-        // Next steps
-        content.push_str("【次のステップ】\n");
-        let next_steps = if !summary.next_steps.is_empty() { 
-            &summary.next_steps
-        } else { 
-            &summary.action_items 
-        };
-        if !next_steps.is_empty() {
-            for (i, step) in next_steps.iter().enumerate() {
-                // Process markdown links in the step text
-                let processed_step = self.process_markdown_links(step);
-                content.push_str(&format!("{}. {}\n", i + 1, processed_step));
-            }
-        } else {
-            content.push_str("次のステップはありません。\n");
-        }
-        content.push_str("\n");
-
-        // Add detailed summary content (markdown format) if available
-        // But exclude sections that are already shown separately
-        if !summary.summary_content.is_empty() {
-            content.push_str("【詳細要約（Zoom AI生成）】\n");
-            // Convert markdown to readable text format and filter out duplicated sections
-            let formatted_content = self.filter_duplicate_sections(&summary.summary_content, &summary.next_steps);
-            if !formatted_content.trim().is_empty() {
-                content.push_str(&formatted_content);
-                content.push_str("\n\n");
-            } else {
-                content.push_str("（次のステップ以外の詳細要約情報はありません）\n\n");
-            }
-        }
-
-        // Show most detailed content available, avoiding duplication
-        let has_summary_details = !summary.summary_details.is_empty();
-        let has_detailed_sections = !summary.detailed_sections.is_empty();
-        let has_topic_summaries = !summary.topic_summaries.is_empty();
-        
-        // Prioritize summary_details as most detailed, then detailed_sections, then topic_summaries
-        if has_summary_details {
-            content.push_str("【詳細要約内容】\n");
-            for detail in &summary.summary_details {
-                if !detail.label.is_empty() {
-                    content.push_str(&format!("■ {}\n", detail.label));
-                    if !detail.summary.is_empty() {
-                        content.push_str(&format!("{}\n\n", detail.summary));
-                    }
-                }
-            }
-        } else if has_detailed_sections {
-            content.push_str("【詳細セクション】\n");
-            for section in &summary.detailed_sections {
-                if !section.section_title.is_empty() {
-                    content.push_str(&format!("■ {}\n", section.section_title));
-                    if !section.section_content.is_empty() {
-                        content.push_str(&format!("{}\n\n", section.section_content));
-                    }
-                }
-            }
-        } else if has_topic_summaries {
-            content.push_str("【トピック要約】\n");
-            for (i, topic) in summary.topic_summaries.iter().enumerate() {
-                if !topic.topic_title.is_empty() {
-                    content.push_str(&format!("{}. {}\n", i + 1, topic.topic_title));
-                    if !topic.topic_content.is_empty() {
-                        content.push_str(&format!("{}\n\n", topic.topic_content));
-                    }
-                }
-            }
-        } else {
-            // If no detailed content available
-            content.push_str("【ミーティング情報】\n");
-            content.push_str("■ ミーティングタイトル\n");
-            if !summary.summary_title.is_empty() && summary.summary_title != "AI Generated Summary" {
-                content.push_str(&format!("{}\n\n", summary.summary_title));
-            } else {
-                content.push_str("詳細な要約情報は利用できません。\n\n");
-            }
-        }
-
-        // Keywords
-        if !summary.summary_keyword.is_empty() {
-            content.push_str("【キーワード】\n");
-            content.push_str(&summary.summary_keyword.join(", "));
-            content.push_str("\n\n");
-        }
-
-        // Key points
-        if !summary.key_points.is_empty() {
-            content.push_str("【重要ポイント】\n");
-            for (i, point) in summary.key_points.iter().enumerate() {
-                content.push_str(&format!("{}. {}\n", i + 1, point));
-            }
-            content.push_str("\n");
-        }
-
-        // Footer
-        content.push_str("-".repeat(80).as_str());
-        content.push_str("\n");
-        content.push_str("Generated by: Zoom AI Companion\n");
-        content.push_str(&format!("Download timestamp: {}\n", Utc::now().to_rfc3339()));
-
+        // Perform I/O operations
         fs::create_dir_all(&date_folder_path)?;
         fs::write(&output_path, content)?;
 
@@ -1108,39 +1546,21 @@ impl ZoomRecordingDownloader {
         Ok(output_path.to_string_lossy().to_string())
     }
 
-    pub async fn save_ai_summary(&self, summary: &AISummaryResponse, meeting_id: &str, meeting_start_time: &str, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
-        
-        // Create date folder based on meeting start time (not AI summary creation time)
-        let date_folder_path = self.create_meeting_date_folder(output_dir, meeting_start_time)?;
-        
-        // Create AI summary filename with timestamp to handle multiple versions
-        let safe_meeting_id = meeting_id.chars().map(|c| if invalid_chars.contains(&c) { '_' } else { c }).collect::<String>();
-        
-        // Generate timestamp suffix from creation time
-        let timestamp_suffix = if !summary.summary_created_time.is_empty() {
-            // Parse and format the creation time for filename
-            match chrono::DateTime::parse_from_rfc3339(&summary.summary_created_time) {
-                Ok(dt) => {
-                    let utc_dt = dt.with_timezone(&chrono::Utc);
-                    format!("_{}", utc_dt.format("%Y%m%d_%H%M%S"))
-                },
-                Err(_) => {
-                    // If parsing fails, use a simple counter approach
-                    let base_filename = format!("{}_ai_summary", safe_meeting_id);
-                    self.get_next_available_suffix(&date_folder_path, &base_filename, "json")?
-                }
-            }
-        } else {
-            // Use current timestamp if no creation time available
-            format!("_{}", Utc::now().format("%Y%m%d_%H%M%S"))
-        };
-        
-        let summary_filename = format!("{}_ai_summary{}.json", safe_meeting_id, timestamp_suffix);
-        let output_path = Path::new(&date_folder_path).join(&summary_filename);
-        
-        // Note: We now allow multiple versions with different timestamps
-        
+    /// AI要約のJSONコンテンツを生成する（副作用なし版）
+    /// 
+    /// 事前条件:
+    /// - summary は有効なAISummaryResponseである
+    /// - meeting_id は空でない文字列である
+    /// 
+    /// 事後条件:
+    /// - 成功時: 構造化されたJSON形式のコンテンツを返す
+    /// - 副作用なし: ファイルは作成されない
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    /// 
+    /// 不変条件:
+    /// - ファイルシステムの状態を変更しない
+    /// - 入力パラメータを変更しない
+    fn generate_ai_summary_json_content(&self, summary: &AISummaryResponse, meeting_id: &str) -> Result<String, Box<dyn std::error::Error>> {
         // Create comprehensive summary with structured format similar to reference example
         let comprehensive_summary = serde_json::json!({
             "meeting_uuid": summary.meeting_uuid,
@@ -1191,9 +1611,40 @@ impl ZoomRecordingDownloader {
             "download_timestamp": Utc::now().to_rfc3339()
         });
 
-        fs::create_dir_all(&date_folder_path)?;
-        
         let json_content = serde_json::to_string_pretty(&comprehensive_summary)?;
+        Ok(json_content)
+    }
+
+    /// AI要約をJSONファイルとして保存する
+    /// 
+    /// # 副作用
+    /// - ディレクトリの作成
+    /// - ファイルシステムへの書き込み（JSONファイルの保存）
+    /// 
+    /// 事前条件:
+    /// - summary は有効なAISummaryResponseである
+    /// - meeting_id は空でない文字列である
+    /// - meeting_start_time は有効なISO 8601形式の日時文字列である
+    /// - output_dir は有効なディレクトリパスである
+    /// - ディレクトリへの書き込み権限がある
+    /// 
+    /// 事後条件:
+    /// - 成功時: AI要約がJSONファイルとして保存される
+    /// - 保存されたファイルパスを返す
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    pub async fn save_ai_summary(&self, summary: &AISummaryResponse, meeting_id: &str, meeting_start_time: &str, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
+        // Create date folder based on meeting start time (not AI summary creation time)
+        let date_folder_path = self.create_meeting_date_folder(output_dir, meeting_start_time)?;
+        
+        // Generate filename using pure function
+        let summary_filename = self.generate_ai_summary_filename(summary, meeting_id, "json")?;
+        let output_path = Path::new(&date_folder_path).join(&summary_filename);
+        
+        // Generate content using pure function
+        let json_content = self.generate_ai_summary_json_content(summary, meeting_id)?;
+
+        // Perform I/O operations
+        fs::create_dir_all(&date_folder_path)?;
         fs::write(&output_path, json_content)?;
 
         windows_console::println_japanese(&format!("AI summary saved: {}", output_path.display()));
@@ -1219,6 +1670,21 @@ impl ZoomRecordingDownloader {
         }
     }
 
+    /// ダウンロードしたファイルの整合性を検証する
+    /// 
+    /// 事前条件:
+    /// - file_path は有効なファイルパスである
+    /// - expected_size は正の数値である
+    /// - file_type は空でない文字列である
+    /// 
+    /// 事後条件:
+    /// - 成功時: ファイルの整合性が確認された場合は true を返す
+    /// - 整合性に問題がある場合は false を返す
+    /// - 検証エラーの場合は適切なエラーを返す
+    /// 
+    /// 不変条件:
+    /// - ファイルサイズは expected_size と一致する必要がある
+    /// - ファイル形式は file_type に適合する必要がある
     async fn verify_file_integrity(&self, file_path: &Path, expected_size: u64, file_type: &str) -> Result<bool, Box<dyn std::error::Error>> {
         // Check if file exists
         if !file_path.exists() {
@@ -1336,22 +1802,86 @@ impl ZoomRecordingDownloader {
         let _ = std::fs::write(filepath, formatted_content);
     }
 
+    /// 録画ファイルをダウンロードする（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - recording は有効なRecordingインスタンスである
+    /// - meeting_start_time は有効なISO 8601形式の日時文字列である
+    /// - output_dir は有効なディレクトリパスである
+    /// - アクセストークンが有効である
+    /// - ディレクトリへの書き込み権限がある
+    /// 
+    /// 事後条件:
+    /// - 成功時: 録画ファイルがダウンロードされる
+    /// - ダウンロードされたファイルパスを返す
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    /// 
+    /// 不変条件:
+    /// - ダウンロードしたファイルサイズは recording.file_size と一致する
+    /// - ファイル形式は recording.file_type に適合する
     pub async fn download_recording(&self, recording: &Recording, meeting_start_time: &str, output_dir: &str) -> Result<String, Box<dyn std::error::Error>> {
-        
-        // Create date folder based on meeting start time
         let date_folder_path = self.create_meeting_date_folder(output_dir, meeting_start_time)?;
+        let safe_filename = self.generate_recording_filename(recording)?;
+        let output_path = Path::new(&date_folder_path).join(&safe_filename);
         
-        // Create filename matching Zoom's default naming convention
-        // Format: GMT{timestamp}_{recording_type}.{extension}
+        if self.check_file_exists(&output_path) {
+            return Ok(output_path.to_string_lossy().to_string());
+        }
+        
+        self.download_and_save_file(recording, &output_path, &date_folder_path, &safe_filename).await
+    }
+    
+    /// ファイルの存在確認を行う（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - output_path は有効なPathである
+    /// 
+    /// 事後条件:
+    /// - ファイルが存在する場合は true、そうでなければ false を返す
+    /// - 既存ファイルの場合はメッセージを出力する
+    fn check_file_exists(&self, output_path: &Path) -> bool {
+        if output_path.exists() {
+            windows_console::println_japanese(&format!("File already exists: {}", output_path.display()));
+            true
+        } else {
+            false
+        }
+    }
+    
+    /// 録画ファイルの安全なファイル名を生成する（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - recording は有効なRecordingインスタンスである
+    /// - recording.recording_start は有効なISO 8601形式の日時文字列である
+    /// 
+    /// 事後条件:
+    /// - Zoomの命名規則に従った安全なファイル名を返す
+    /// - GMT{timestamp}_{recording_type}.{extension} 形式
+    fn generate_recording_filename(&self, recording: &Recording) -> Result<String, Box<dyn std::error::Error>> {
         let recording_start_parsed = chrono::DateTime::parse_from_rfc3339(&recording.recording_start)
             .map_err(|e| format!("Failed to parse recording start time: {}", e))?;
         
-        // Convert to GMT and format as Zoom does: YYYYMMDD-HHMMSS
         let gmt_timestamp = recording_start_parsed.with_timezone(&chrono::Utc)
             .format("%Y%m%d-%H%M%S").to_string();
         
-        // Determine recording type suffix based on recording.recording_type and file_type
-        let type_suffix = match (recording.recording_type.to_lowercase().as_str(), recording.file_type.to_lowercase().as_str()) {
+        let type_suffix = self.get_recording_type_suffix(recording);
+        
+        Ok(format!("GMT{}{}.{}", 
+            gmt_timestamp,
+            type_suffix,
+            recording.file_type.to_lowercase()
+        ))
+    }
+    
+    /// 録画タイプに基づくファイル名サフィックスを取得する（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - recording は有効なRecordingインスタンスである
+    /// 
+    /// 事後条件:
+    /// - 録画タイプとファイル形式に適したサフィックスを返す
+    fn get_recording_type_suffix(&self, recording: &Recording) -> &'static str {
+        match (recording.recording_type.to_lowercase().as_str(), recording.file_type.to_lowercase().as_str()) {
             (_, "mp4") => "", // Main video file has no suffix
             (_, "m4a") => "_AUDIO", // Audio-only file
             ("chat_file", _) => "_CHAT", // Chat transcript
@@ -1360,23 +1890,40 @@ impl ZoomRecordingDownloader {
             (_, "csv") => "_POLL", // Poll results or participant data
             (_, "json") => "_META", // Metadata
             _ => ""
-        };
-        
-        let safe_filename = format!("GMT{}{}.{}", 
-            gmt_timestamp,
-            type_suffix,
-            recording.file_type.to_lowercase()
-        );
-        
-        let output_path = Path::new(&date_folder_path).join(&safe_filename);
-        
-        if output_path.exists() {
-            windows_console::println_japanese(&format!("File already exists: {}", output_path.display()));
-            return Ok(output_path.to_string_lossy().to_string());
         }
-
+    }
+    
+    /// ファイルのダウンロードと保存を実行する（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - recording は有効なRecordingインスタンスである
+    /// - output_path は有効なPathである
+    /// - date_folder_path は有効なディレクトリパスである
+    /// - safe_filename は有効なファイル名である
+    /// 
+    /// 事後条件:
+    /// - 成功時: ファイルがダウンロードされ、検証される
+    /// - 失敗時: 適切なエラーを返す
+    async fn download_and_save_file(&self, recording: &Recording, output_path: &Path, date_folder_path: &str, safe_filename: &str) -> Result<String, Box<dyn std::error::Error>> {
         windows_console::println_japanese(&format!("Downloading: {} ({:.2} MB)", safe_filename, recording.file_size as f64 / 1024.0 / 1024.0));
 
+        let response = self.send_download_request(recording).await?;
+        self.save_response_to_file(response, output_path, date_folder_path).await?;
+        self.verify_and_report_download(output_path, recording).await;
+        
+        Ok(output_path.to_string_lossy().to_string())
+    }
+    
+    /// ダウンロードリクエストを送信する（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - recording は有効なRecordingインスタンスである
+    /// - self.access_token は有効なアクセストークンである
+    /// 
+    /// 事後条件:
+    /// - 成功時: HTTPレスポンスを返す
+    /// - 失敗時: 適切なエラーを返す
+    async fn send_download_request(&self, recording: &Recording) -> Result<reqwest::Response, Box<dyn std::error::Error>> {
         let response = self
             .client
             .get(&recording.download_url)
@@ -1388,14 +1935,40 @@ impl ZoomRecordingDownloader {
             return Err(format!("Download failed: {}", response.status()).into());
         }
 
-        fs::create_dir_all(&date_folder_path)?;
+        Ok(response)
+    }
+    
+    /// レスポンスをファイルに保存する（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - response は有効なHTTPレスポンスである
+    /// - output_path は有効なPathである
+    /// - date_folder_path は有効なディレクトリパスである
+    /// 
+    /// 事後条件:
+    /// - 成功時: ファイルが指定パスに保存される
+    /// - 失敗時: 適切なエラーを返す
+    async fn save_response_to_file(&self, response: reqwest::Response, output_path: &Path, date_folder_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        fs::create_dir_all(date_folder_path)?;
         
-        let mut file = tokio::fs::File::create(&output_path).await?;
+        let mut file = tokio::fs::File::create(output_path).await?;
         let content = response.bytes().await?;
         file.write_all(&content).await?;
         
-        // Verify file integrity after download
-        match self.verify_file_integrity(&output_path, recording.file_size, &recording.file_type).await {
+        Ok(())
+    }
+    
+    /// ダウンロードの検証と結果報告を行う（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - output_path は有効なPathである
+    /// - recording は有効なRecordingインスタンスである
+    /// 
+    /// 事後条件:
+    /// - ファイルの整合性検証が実行される
+    /// - 検証結果に応じたメッセージが出力される
+    async fn verify_and_report_download(&self, output_path: &Path, recording: &Recording) {
+        match self.verify_file_integrity(output_path, recording.file_size, &recording.file_type).await {
             Ok(true) => {
                 windows_console::println_japanese(&format!("✓ Download completed and verified: {}", output_path.display()));
             },
@@ -1406,10 +1979,201 @@ impl ZoomRecordingDownloader {
                 windows_console::println_japanese(&format!("⚠ Download completed but verification error: {} - {}", output_path.display(), e));
             }
         }
-        
-        Ok(output_path.to_string_lossy().to_string())
     }
 
+    /// AI要約のダウンロードと保存を処理する（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - meeting は有効なMeetingRecordingである
+    /// - output_dir は有効なディレクトリパスである
+    /// 
+    /// 事後条件:
+    /// - 成功時: AI要約が保存され、(保存パス, ファイルタイプ)のOptionを返す
+    /// - AI要約が利用不可の場合は None を返す
+    /// - 失敗時: エラーメッセージが出力されるが、処理は継続される
+    /// 
+    /// 不変条件:
+    /// - 処理の失敗は全体の処理を停止しない
+    async fn process_ai_summary_for_meeting(&self, meeting: &MeetingRecording, output_dir: &str) -> Option<(String, String)> {
+        windows_console::println_japanese(&format!("=== Checking AI Companion summary for meeting {} ===", meeting.id));
+        windows_console::println_japanese(&format!("Meeting UUID: {}", meeting.uuid));
+        windows_console::println_japanese(&format!("Meeting topic: {}", meeting.topic));
+        windows_console::println_japanese(&format!("Meeting start time: {}", meeting.start_time));
+        
+        // First try with Meeting ID (more likely to work)
+        if let Ok(Some(summary)) = self.get_ai_summary_by_meeting_id(meeting.id).await {
+            windows_console::println_japanese("✓ AI summary found via Meeting ID, saving to file...");
+            match self.save_ai_summary_txt(&summary, &meeting.id.to_string(), &meeting.start_time, output_dir).await {
+                Ok(path) => {
+                    windows_console::println_japanese(&format!("✓ AI summary saved: {}", path));
+                    windows_console::println_japanese("=== End AI summary check ===\n");
+                    return Some((path, "ai_summary".to_string()));
+                },
+                Err(e) => windows_console::println_japanese(&format!("✗ Failed to save AI summary: {}", e)),
+            }
+        } else {
+            windows_console::println_japanese("ℹ No AI summary found via Meeting ID");
+        }
+        
+        // If not found via Meeting ID, try with UUID
+        if let Ok(Some(summary)) = self.get_ai_summary(&meeting.uuid).await {
+            windows_console::println_japanese("✓ AI summary found via UUID, saving to file...");
+            match self.save_ai_summary_txt(&summary, &meeting.id.to_string(), &meeting.start_time, output_dir).await {
+                Ok(path) => {
+                    windows_console::println_japanese(&format!("✓ AI summary saved: {}", path));
+                    windows_console::println_japanese("=== End AI summary check ===\n");
+                    return Some((path, "ai_summary".to_string()));
+                },
+                Err(e) => windows_console::println_japanese(&format!("✗ Failed to save AI summary: {}", e)),
+            }
+        } else {
+            windows_console::println_japanese("ℹ No AI summary found via UUID");
+        }
+        
+        windows_console::println_japanese("ℹ No AI summary available (this is normal for meetings without AI Companion enabled)");
+        windows_console::println_japanese("=== End AI summary check ===\n");
+        None
+    }
+
+    /// ファイルタイプがダウンロード可能かどうかを判定する（純粋関数）
+    /// 
+    /// 事前条件:
+    /// - file_type は空でない文字列である
+    /// 
+    /// 事後条件:
+    /// - ダウンロード可能な場合は true を返す
+    /// - 副作用なし
+    /// 
+    /// 不変条件:
+    /// - 入力パラメータを変更しない
+    fn is_file_type_downloadable(&self, file_type: &str) -> bool {
+        match file_type.to_lowercase().as_str() {
+            "mp4" | "m4a" => true,  // Video and audio files
+            "txt" => true,          // Chat files
+            "vtt" => true,          // Transcript/subtitle files  
+            "csv" => true,          // Poll results, participant lists
+            "json" => true,         // Meeting metadata
+            "cc.vtt" => true,       // Closed captions
+            _ => {
+                // Unknown file types - attempt to download them
+                true
+            }
+        }
+    }
+
+    /// 単一ミーティングの録画ファイルをダウンロードする（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - meeting は有効なMeetingRecordingである
+    /// - output_dir は有効なディレクトリパスである
+    /// 
+    /// 事後条件:
+    /// - 成功時: ダウンロードされたファイルパスとタイプのリストを返す
+    /// - 失敗時: エラーメッセージが出力されるが、処理は継続される
+    /// 
+    /// 不変条件:
+    /// - 個別ファイルの失敗は全体の処理を停止しない
+    async fn download_meeting_recordings(&self, meeting: &MeetingRecording, output_dir: &str) -> Vec<(String, String)> {
+        let mut downloaded_files = Vec::new();
+        
+        for recording in &meeting.recording_files {
+            let file_type = recording.file_type.to_lowercase();
+            
+            if !self.is_file_type_downloadable(&file_type) {
+                continue;
+            }
+            
+            // Log unknown file types
+            if !matches!(file_type.as_str(), "mp4" | "m4a" | "txt" | "vtt" | "csv" | "json" | "cc.vtt") {
+                windows_console::println_japanese(&format!("Unknown file type '{}' for recording {}, attempting download", file_type, recording.id));
+            }
+            
+            windows_console::println_japanese(&format!("Downloading {} file: {}", file_type.to_uppercase(), recording.id));
+            match self.download_recording(recording, &meeting.start_time, output_dir).await {
+                Ok(path) => {
+                    downloaded_files.push((path, file_type));
+                },
+                Err(e) => windows_console::println_japanese(&format!("Download failed {}: {}", recording.id, e)),
+            }
+        }
+        
+        downloaded_files
+    }
+
+    /// ダウンロードサマリーを表示する（複雑度削減版）
+    /// 
+    /// 事前条件:
+    /// - downloaded_files は有効なファイルパスとタイプのリストである
+    /// 
+    /// 事後条件:
+    /// - ダウンロード結果のサマリーが出力される
+    /// - 副作用: コンソールへの出力のみ
+    /// 
+    /// 不変条件:
+    /// - 入力データを変更しない
+    fn display_download_summary(&self, downloaded_files: &[(String, String)]) {
+        let mut file_type_counts = std::collections::HashMap::new();
+        
+        for (_, file_type) in downloaded_files {
+            *file_type_counts.entry(file_type.clone()).or_insert(0) += 1;
+        }
+
+        windows_console::println_japanese(&format!("Download completed: {} files total", downloaded_files.len()));
+        
+        if !file_type_counts.is_empty() {
+            windows_console::println_japanese("File types downloaded:");
+            for (file_type, count) in file_type_counts {
+                let type_name = self.get_file_type_display_name(&file_type);
+                windows_console::println_japanese(&format!("  {} ({}): {} files", type_name, file_type.to_uppercase(), count));
+            }
+        }
+    }
+
+    /// ファイルタイプの表示名を取得する（純粋関数）
+    /// 
+    /// 事前条件:
+    /// - file_type は空でない文字列である
+    /// 
+    /// 事後条件:
+    /// - 適切な表示名を返す
+    /// - 副作用なし
+    /// 
+    /// 不変条件:
+    /// - 入力パラメータを変更しない
+    fn get_file_type_display_name(&self, file_type: &str) -> &'static str {
+        match file_type {
+            "mp4" => "Video files",
+            "m4a" => "Audio files", 
+            "txt" => "Chat files",
+            "vtt" => "Transcript files",
+            "cc.vtt" => "Caption files",
+            "csv" => "Data files",
+            "json" => "Metadata files",
+            "ai_summary" => "AI Companion summaries",
+            _ => "Other files"
+        }
+    }
+
+    /// 指定した期間のすべての録画を一括ダウンロードする（リファクタリング版・複雑度削減）
+    /// 
+    /// 事前条件:
+    /// - user_id は有効なZoomユーザーIDである
+    /// - from は有効な日付形式（YYYY-MM-DD）である
+    /// - to は有効な日付形式（YYYY-MM-DD）である
+    /// - from <= to である
+    /// - output_dir は有効なディレクトリパスである
+    /// - アクセストークンが有効である
+    /// - ディレクトリへの書き込み権限がある
+    /// 
+    /// 事後条件:
+    /// - 成功時: すべての利用可能な録画ファイルがダウンロードされる
+    /// - ダウンロードされたファイルパスのリストを返す
+    /// - AI要約が利用可能な場合は要約も保存される
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    /// 
+    /// 不変条件:
+    /// - 各ファイルは適切なファイル形式と整合性を持つ
+    /// - ファイルは日付別フォルダーに整理される
     pub async fn download_all_recordings(&self, user_id: &str, from: &str, to: &str, output_dir: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
         // Test API access first
         if let Err(e) = self.test_api_access().await {
@@ -1418,124 +2182,27 @@ impl ZoomRecordingDownloader {
 
         let recordings = self.list_recordings(user_id, from, to).await?;
         let mut downloaded_files = Vec::new();
-        let mut file_type_counts = std::collections::HashMap::new();
 
         windows_console::println_japanese(&format!("Found {} recorded meetings", recordings.meetings.len()));
 
         for meeting in recordings.meetings {
             windows_console::println_japanese(&format!("Processing meeting: {} ({})", meeting.topic, meeting.start_time));
             
-            // Try to download AI summary for this meeting
-            windows_console::println_japanese(&format!("=== Checking AI Companion summary for meeting {} ===", meeting.id));
-            windows_console::println_japanese(&format!("Meeting UUID: {}", meeting.uuid));
-            windows_console::println_japanese(&format!("Meeting topic: {}", meeting.topic));
-            windows_console::println_japanese(&format!("Meeting start time: {}", meeting.start_time));
-            
-            // Try both UUID and Meeting ID approaches
-            let mut summary_found = false;
-            
-            // First try with Meeting ID (more likely to work)
-            match self.get_ai_summary_by_meeting_id(meeting.id).await {
-                Ok(Some(summary)) => {
-                    windows_console::println_japanese("✓ AI summary found via Meeting ID, saving to file...");
-                    match self.save_ai_summary_txt(&summary, &meeting.id.to_string(), &meeting.start_time, output_dir).await {
-                        Ok(path) => {
-                            windows_console::println_japanese(&format!("✓ AI summary saved: {}", path));
-                            downloaded_files.push(path);
-                            *file_type_counts.entry("ai_summary".to_string()).or_insert(0) += 1;
-                            summary_found = true;
-                        },
-                        Err(e) => windows_console::println_japanese(&format!("✗ Failed to save AI summary: {}", e)),
-                    }
-                },
-                Ok(None) => {
-                    windows_console::println_japanese("ℹ No AI summary found via Meeting ID");
-                },
-                Err(e) => {
-                    windows_console::println_japanese(&format!("✗ Error checking AI summary via Meeting ID: {}", e));
-                }
+            // Process AI summary for this meeting
+            if let Some((path, file_type)) = self.process_ai_summary_for_meeting(&meeting, output_dir).await {
+                downloaded_files.push((path, file_type));
             }
             
-            // If not found via Meeting ID, try with UUID
-            if !summary_found {
-                match self.get_ai_summary(&meeting.uuid).await {
-                    Ok(Some(summary)) => {
-                        windows_console::println_japanese("✓ AI summary found via UUID, saving to file...");
-                        match self.save_ai_summary_txt(&summary, &meeting.id.to_string(), &meeting.start_time, output_dir).await {
-                            Ok(path) => {
-                                windows_console::println_japanese(&format!("✓ AI summary saved: {}", path));
-                                downloaded_files.push(path);
-                                *file_type_counts.entry("ai_summary".to_string()).or_insert(0) += 1;
-                                summary_found = true;
-                            },
-                            Err(e) => windows_console::println_japanese(&format!("✗ Failed to save AI summary: {}", e)),
-                        }
-                    },
-                    Ok(None) => {
-                        windows_console::println_japanese("ℹ No AI summary found via UUID");
-                    },
-                    Err(e) => {
-                        windows_console::println_japanese(&format!("✗ Error checking AI summary via UUID: {}", e));
-                    }
-                }
-            }
-            
-            if !summary_found {
-                windows_console::println_japanese("ℹ No AI summary available (this is normal for meetings without AI Companion enabled)");
-            }
-            windows_console::println_japanese("=== End AI summary check ===\n");
-            
-            for recording in meeting.recording_files {
-                // Download all file types: videos (MP4), audio (M4A), chat files (TXT), and other assets
-                let file_type = recording.file_type.to_lowercase();
-                let is_downloadable = match file_type.as_str() {
-                    "mp4" | "m4a" => true,  // Video and audio files
-                    "txt" => true,          // Chat files
-                    "vtt" => true,          // Transcript/subtitle files  
-                    "csv" => true,          // Poll results, participant lists
-                    "json" => true,         // Meeting metadata
-                    "cc.vtt" => true,       // Closed captions
-                    _ => {
-                        // Log unknown file types but attempt to download them
-                        windows_console::println_japanese(&format!("Unknown file type '{}' for recording {}, attempting download", file_type, recording.id));
-                        true
-                    }
-                };
-                
-                if is_downloadable {
-                    windows_console::println_japanese(&format!("Downloading {} file: {}", file_type.to_uppercase(), recording.id));
-                    match self.download_recording(&recording, &meeting.start_time, output_dir).await {
-                        Ok(path) => {
-                            downloaded_files.push(path);
-                            *file_type_counts.entry(file_type.clone()).or_insert(0) += 1;
-                        },
-                        Err(e) => windows_console::println_japanese(&format!("Download failed {}: {}", recording.id, e)),
-                    }
-                }
-            }
+            // Download recording files for this meeting
+            let meeting_files = self.download_meeting_recordings(&meeting, output_dir).await;
+            downloaded_files.extend(meeting_files);
         }
 
-        // Display download summary with file type breakdown
-        windows_console::println_japanese(&format!("Download completed: {} files total", downloaded_files.len()));
-        if !file_type_counts.is_empty() {
-            windows_console::println_japanese("File types downloaded:");
-            for (file_type, count) in file_type_counts {
-                let type_name = match file_type.as_str() {
-                    "mp4" => "Video files",
-                    "m4a" => "Audio files", 
-                    "txt" => "Chat files",
-                    "vtt" => "Transcript files",
-                    "cc.vtt" => "Caption files",
-                    "csv" => "Data files",
-                    "json" => "Metadata files",
-                    "ai_summary" => "AI Companion summaries",
-                    _ => "Other files"
-                };
-                windows_console::println_japanese(&format!("  {} ({}): {} files", type_name, file_type.to_uppercase(), count));
-            }
-        }
+        // Display download summary
+        self.display_download_summary(&downloaded_files);
 
-        Ok(downloaded_files)
+        // Extract just the file paths for return value
+        Ok(downloaded_files.into_iter().map(|(path, _)| path).collect())
     }
 }
 
