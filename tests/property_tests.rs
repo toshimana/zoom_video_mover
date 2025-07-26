@@ -2,6 +2,7 @@ use proptest::prelude::*;
 use zoom_video_mover_lib::{Config, ZoomRecordingDownloader};
 use std::fs;
 use tempfile::TempDir;
+use chrono::{NaiveDate, Datelike};
 
 // ==== Config関数群のProperty-basedテスト ====
 
@@ -190,15 +191,14 @@ proptest! {
     }
 
     /// Property: download_all_recordings の事前条件・事後条件・不変条件検証
-    /// 事前条件: 全パラメータが空でない, 日付形式が正しい
+    /// 事前条件: 全パラメータが空でない, 実際に存在する日付, from <= to
     /// 事後条件: ファイルパスのリストが返される
     /// 不変条件: self の状態は変更されない
     #[test]
     fn download_all_recordings_properties(
         access_token in arb_access_token(),
         user_id in "[a-zA-Z0-9@._-]{1,50}",
-        from_date in arb_date_string(),
-        to_date in arb_date_string(),
+        (from_date, to_date) in arb_date_range(),
         output_dir in "[a-zA-Z0-9_/.-]{5,50}"
     ) {
         // 事前条件の確認
@@ -209,12 +209,15 @@ proptest! {
         prop_assert_eq!(from_date.len(), 10);
         prop_assert_eq!(to_date.len(), 10);
         
-        // 日付順序の調整（from <= to になるように）
-        let (from_final, to_final) = if from_date <= to_date {
-            (from_date, to_date)
-        } else {
-            (to_date, from_date)
-        };
+        // 日付が実際に有効であることを確認
+        let from_parsed = NaiveDate::parse_from_str(&from_date, "%Y-%m-%d");
+        let to_parsed = NaiveDate::parse_from_str(&to_date, "%Y-%m-%d");
+        prop_assert!(from_parsed.is_ok(), "from_date should be valid: {}", from_date);
+        prop_assert!(to_parsed.is_ok(), "to_date should be valid: {}", to_date);
+        
+        // from <= to の関係が保証されていることを確認
+        prop_assert!(from_parsed.unwrap() <= to_parsed.unwrap(), 
+                    "from_date ({}) should be <= to_date ({})", from_date, to_date);
         
         let _downloader = ZoomRecordingDownloader::new(access_token);
         
@@ -226,30 +229,81 @@ proptest! {
         
         // 不変条件検証: パラメータが変更されない
         prop_assert!(!user_id.is_empty());
-        prop_assert!(!from_final.is_empty());
-        prop_assert!(!to_final.is_empty());
+        prop_assert!(!from_date.is_empty());
+        prop_assert!(!to_date.is_empty());
         prop_assert!(!output_dir.is_empty());
     }
 }
 
 // ==== 日付とURL検証のProperty-basedテスト ====
 
-// Date validation property tests
+// Date validation property tests with actual date verification
 prop_compose! {
-    fn arb_date_string()
-        (year in 2020u32..2030u32,
+    fn arb_valid_date()
+        (year in 2020i32..2030i32,
          month in 1u32..13u32,
-         day in 1u32..29u32) // 28日までで安全
+         day_offset in 0u32..31u32) // オフセットを使用して有効な日付を生成
         -> String
     {
-        format!("{:04}-{:02}-{:02}", year, month, day)
+        // 指定された年月の最大日数を取得
+        let max_day = match month {
+            2 => {
+                // うるう年判定
+                if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
+                    29
+                } else {
+                    28
+                }
+            },
+            4 | 6 | 9 | 11 => 30, // 4月、6月、9月、11月
+            _ => 31, // その他の月
+        };
+        
+        // 1からmax_dayまでの有効な日を生成
+        let day = (day_offset % max_day) + 1;
+        
+        // NaiveDateで検証してから文字列化
+        let date = NaiveDate::from_ymd_opt(year, month, day)
+            .expect("Generated date should be valid");
+        
+        date.format("%Y-%m-%d").to_string()
+    }
+}
+
+// 日付文字列生成器（arb_valid_dateのエイリアス）
+prop_compose! {
+    fn arb_date_string()
+        (date in arb_valid_date())
+        -> String
+    {
+        date
+    }
+}
+
+// 日付範囲生成器（from <= to を保証）
+prop_compose! {
+    fn arb_date_range()
+        (from_date in arb_valid_date(),
+         to_offset_days in 0u32..365u32) // from_dateから最大365日後まで
+        -> (String, String)
+    {
+        // from_dateをパース
+        let from_naive = NaiveDate::parse_from_str(&from_date, "%Y-%m-%d")
+            .expect("from_date should be valid");
+        
+        // to_dateを計算（from_date + offset_days）
+        let to_naive = from_naive + chrono::Duration::days(to_offset_days as i64);
+        let to_date = to_naive.format("%Y-%m-%d").to_string();
+        
+        (from_date, to_date)
     }
 }
 
 proptest! {
-    /// Property: 有効な日付形式の文字列は常に10文字
+    /// Property: 生成された日付は実際に存在する有効な日付である
     #[test]
-    fn valid_date_format_length(date in arb_date_string()) {
+    fn generated_dates_are_actually_valid(date in arb_valid_date()) {
+        // 形式検証
         prop_assert_eq!(date.len(), 10);
         prop_assert!(date.contains('-'));
         
@@ -259,17 +313,92 @@ proptest! {
         prop_assert_eq!(parts[0].len(), 4); // year
         prop_assert_eq!(parts[1].len(), 2); // month
         prop_assert_eq!(parts[2].len(), 2); // day
+        
+        // 実際の日付として解析可能か検証
+        let parsed_date = NaiveDate::parse_from_str(&date, "%Y-%m-%d");
+        prop_assert!(parsed_date.is_ok(), "Date should be parseable: {}", date);
+        
+        let date_obj = parsed_date.unwrap();
+        
+        // 日付の範囲検証
+        prop_assert!(date_obj.year() >= 2020 && date_obj.year() < 2030);
+        prop_assert!(date_obj.month() >= 1 && date_obj.month() <= 12);
+        prop_assert!(date_obj.day() >= 1 && date_obj.day() <= 31);
+        
+        // 月ごとの日数制限検証
+        match date_obj.month() {
+            2 => {
+                // 2月の日数検証（うるう年考慮）
+                let is_leap = date_obj.year() % 4 == 0 && (date_obj.year() % 100 != 0 || date_obj.year() % 400 == 0);
+                let max_feb_days = if is_leap { 29 } else { 28 };
+                prop_assert!(date_obj.day() <= max_feb_days, "February day should be valid for year {}", date_obj.year());
+            },
+            4 | 6 | 9 | 11 => {
+                // 30日までの月
+                prop_assert!(date_obj.day() <= 30, "30-day month should not exceed 30 days");
+            },
+            _ => {
+                // 31日までの月
+                prop_assert!(date_obj.day() <= 31, "31-day month should not exceed 31 days");
+            }
+        }
     }
 
-    /// Property: from <= to の関係性を検証
+    /// Property: 日付範囲生成器は常に from <= to を保証する
     #[test]
-    fn date_range_ordering(from in arb_date_string(), to in arb_date_string()) {
-        if from <= to {
-            // 有効な日付範囲の場合
-            prop_assert!(from <= to);
+    fn date_range_always_ordered((from_date, to_date) in arb_date_range()) {
+        // 両方とも有効な日付として解析可能
+        let from_parsed = NaiveDate::parse_from_str(&from_date, "%Y-%m-%d").unwrap();
+        let to_parsed = NaiveDate::parse_from_str(&to_date, "%Y-%m-%d").unwrap();
+        
+        // from <= to の関係が保たれている
+        prop_assert!(from_parsed <= to_parsed, "from_date ({}) should be <= to_date ({})", from_date, to_date);
+        
+        // 両方とも有効な形式
+        prop_assert_eq!(from_date.len(), 10);
+        prop_assert_eq!(to_date.len(), 10);
+    }
+
+    /// Property: 特定の月の日数制限を検証
+    #[test]
+    fn month_day_limits_are_respected(date in arb_valid_date()) {
+        let date_obj = NaiveDate::parse_from_str(&date, "%Y-%m-%d").unwrap();
+        
+        match date_obj.month() {
+            1 | 3 | 5 | 7 | 8 | 10 | 12 => {
+                // 31日の月
+                prop_assert!(date_obj.day() >= 1 && date_obj.day() <= 31);
+            },
+            4 | 6 | 9 | 11 => {
+                // 30日の月
+                prop_assert!(date_obj.day() >= 1 && date_obj.day() <= 30);
+            },
+            2 => {
+                // 2月（うるう年考慮）
+                let is_leap = date_obj.year() % 4 == 0 && (date_obj.year() % 100 != 0 || date_obj.year() % 400 == 0);
+                let max_days = if is_leap { 29 } else { 28 };
+                prop_assert!(date_obj.day() >= 1 && date_obj.day() <= max_days);
+            },
+            _ => unreachable!("Month should be 1-12")
+        }
+    }
+
+    /// Property: うるう年の2月29日が正しく生成される
+    #[test]
+    fn leap_year_february_29_is_valid(year in 2020i32..2030i32) {
+        // うるう年判定
+        let is_leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+        
+        if is_leap {
+            // 2月29日が有効であることを確認
+            let feb_29 = format!("{:04}-02-29", year);
+            let parsed = NaiveDate::parse_from_str(&feb_29, "%Y-%m-%d");
+            prop_assert!(parsed.is_ok(), "Leap year {} should allow Feb 29", year);
         } else {
-            // 無効な日付範囲の場合は逆転
-            prop_assert!(to < from);
+            // 非うるう年の2月29日は無効であることを確認
+            let feb_29 = format!("{:04}-02-29", year);
+            let parsed = NaiveDate::parse_from_str(&feb_29, "%Y-%m-%d");
+            prop_assert!(parsed.is_err(), "Non-leap year {} should not allow Feb 29", year);
         }
     }
 }

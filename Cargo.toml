@@ -37,6 +37,8 @@ quickcheck_macros = "1.0"
 proptest-derive = "0.4"
 # Temporary file/directory for testing
 tempfile = "3.8"
+# Date and time manipulation for testing
+chrono = { version = "0.4", features = ["serde"] }
 
 [[bin]]
 name = "zoom_video_mover"

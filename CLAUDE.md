@@ -285,6 +285,75 @@ PROPTEST_VERBOSE=1 cargo test --test property_tests
 PROPTEST_CASES=1000 cargo test --test property_tests
 ```
 
+### 日時・日付の検証規約
+
+#### 実際の日時であることの保証
+すべての日時処理において、以下の規約を遵守する：
+
+##### 1. 日付生成の要件
+- **必須**: 実際に存在する日付のみを生成・受け入れる
+- **検証**: `chrono::NaiveDate`を使用した実際の日付検証
+- **形式**: `YYYY-MM-DD` 形式（ISO 8601準拠）
+
+##### 2. 月別日数制限の遵守
+```rust
+// 月ごとの最大日数
+match month {
+    2 => {
+        // うるう年判定: 4で割り切れ、かつ100で割り切れない、または400で割り切れる
+        if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
+            29 // うるう年の2月
+        } else {
+            28 // 平年の2月
+        }
+    },
+    4 | 6 | 9 | 11 => 30, // 4月、6月、9月、11月
+    _ => 31, // その他の月（1,3,5,7,8,10,12月）
+}
+```
+
+##### 3. Property-basedテストでの日付検証
+```rust
+prop_compose! {
+    fn arb_valid_date()
+        (year in 2020i32..2030i32,
+         month in 1u32..13u32,
+         day_offset in 0u32..31u32)
+        -> String
+    {
+        let max_day = match month {
+            2 => if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) { 29 } else { 28 },
+            4 | 6 | 9 | 11 => 30,
+            _ => 31,
+        };
+        let day = (day_offset % max_day) + 1;
+        
+        // 実際の日付として検証
+        let date = NaiveDate::from_ymd_opt(year, month, day)
+            .expect("Generated date should be valid");
+        date.format("%Y-%m-%d").to_string()
+    }
+}
+```
+
+##### 4. 日付範囲の制約
+- **順序保証**: `from_date <= to_date` の関係を常に維持
+- **期間制限**: 検索・処理範囲は実用的な期間内（通常1年以内）
+- **範囲生成**: `chrono::Duration`を使用した日付算術
+
+##### 5. 必須検証項目
+1. **形式検証**: 文字列長、区切り文字、数値パート
+2. **値域検証**: 年・月・日の有効範囲
+3. **実在性検証**: `chrono::NaiveDate::parse_from_str`による解析
+4. **論理検証**: うるう年、月末日の正確性
+5. **関係検証**: 日付範囲の順序関係
+
+##### 6. Property-basedテストの必須項目
+- `generated_dates_are_actually_valid`: 生成された日付が実在する
+- `date_range_always_ordered`: 日付範囲が常に順序を保つ
+- `month_day_limits_are_respected`: 月ごとの日数制限を守る
+- `leap_year_february_29_is_valid`: うるう年判定の正確性
+
 ## デバッグ・ログ
 - `env_logger`を使用
 - `RUST_LOG=debug cargo run`でデバッグログ出力
