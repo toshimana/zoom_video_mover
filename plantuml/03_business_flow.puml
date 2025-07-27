@@ -65,52 +65,51 @@ note right
   - 保存先フォルダ指定
 end note
 
-if (選択済み?) then (No)
-  :選択促進メッセージ;
-  backward :録画一覧表示;
-else (Yes)
-  :ダウンロード開始;
-endif
-
-fork
-  :動画ファイルDL;
-fork again
-  :音声ファイルDL;
-fork again
-  :チャットログDL;
-fork again
-  :AI要約DL;
-end fork
-
-:進捗表示更新;
-note right
-  - プログレスバー
-  - 完了ファイル数
-  - 残り時間表示
-  - エラー状況
-end note
-
-if (全ファイル完了?) then (No)
-  if (エラー発生?) then (Yes)
-    :リトライ処理;
-    note right
-      - 指数バックオフ
-      - 最大3回リトライ
-      - ネットワークエラー対応
-    end note
+repeat
+  if (選択済み?) then (No)
+    :選択促進メッセージ;
+  else (Yes)
+    :ダウンロード開始;
     
-    if (リトライ成功?) then (No)
-      :エラーログ出力;
-      :部分完了として処理;
-    else (Yes)
-      backward :進捗表示更新;
-    endif
-  else (No)
-    backward :進捗表示更新;
+    fork
+      :動画ファイルDL;
+    fork again
+      :音声ファイルDL;
+    fork again
+      :チャットログDL;
+    fork again
+      :AI要約DL;
+    end fork
+    
+    repeat
+      :進捗表示更新;
+      note right
+        - プログレスバー
+        - 完了ファイル数
+        - 残り時間表示
+        - エラー状況
+      end note
+      
+      if (エラー発生?) then (Yes)
+        :リトライ処理;
+        note right
+          - 指数バックオフ
+          - 最大3回リトライ
+          - ネットワークエラー対応
+        end note
+        
+        if (リトライ成功?) then (No)
+          :エラーログ出力;
+          :部分完了として処理;
+          break
+        endif
+      endif
+    repeat while (全ファイル完了していない?) is (Yes)
+    
+    :完了通知;
+    break
   endif
-else (Yes)
-  :完了通知;
-endif
+repeat while (選択が未完了?) is (Yes)
 
 :結果レポート表示;
 note right
