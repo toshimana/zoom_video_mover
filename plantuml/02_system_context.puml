@@ -1,0 +1,69 @@
+@startuml システムコンテキスト図
+!define RECTANGLE class
+
+skinparam backgroundColor #FAFAFA
+skinparam actorBackgroundColor #FFE4B5
+skinparam componentBackgroundColor #E8F4FD
+skinparam databaseBackgroundColor #F0F8E8
+skinparam packageBackgroundColor #FFF0F5
+
+title システムコンテキスト図 - Zoom Video Mover
+
+actor "エンドユーザー\n(会議主催者)" as User
+actor "システム管理者" as Admin
+
+package "Zoom Video Mover\n[本システム]" as System {
+  component "CLI Interface" as CLI
+  component "GUI Interface" as GUI
+  component "OAuth Manager" as OAuth
+  component "Download Manager" as DL
+}
+
+cloud "Zoom Cloud\nRecording API" as ZoomAPI
+database "ローカル\nファイルシステム" as LocalFS
+file "config.toml\n設定ファイル" as Config
+
+' ユーザーとシステムの関係
+User --> GUI : "GUI操作"
+User --> CLI : "CLI実行"
+Admin --> Config : "設定管理"
+
+' システム内部の関係
+GUI --> OAuth : "認証要求"
+CLI --> OAuth : "認証要求"
+OAuth --> DL : "認証情報"
+GUI --> DL : "DL要求"
+CLI --> DL : "DL要求"
+
+' 外部システムとの関係
+OAuth <--> ZoomAPI : "OAuth 2.0\n認証フロー"
+DL <--> ZoomAPI : "録画一覧取得\nファイルDL"
+DL --> LocalFS : "ファイル保存"
+System --> Config : "設定読込"
+
+' 境界の明示
+note top of System
+  **システム境界**
+  - 認証管理
+  - ファイルダウンロード
+  - ユーザーインターフェース
+  - 設定管理
+end note
+
+note bottom of ZoomAPI
+  **外部依存**
+  - Zoom Developer App
+  - OAuth 2.0 認証
+  - Cloud Recording API
+  - Rate Limiting
+end note
+
+note bottom of LocalFS
+  **制約条件**
+  - ディスク容量
+  - ファイル権限
+  - Windows環境
+  - 日本語文字対応
+end note
+
+@enduml

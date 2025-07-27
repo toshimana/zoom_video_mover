@@ -1,0 +1,123 @@
+@startuml 要求仕様書
+!theme plain
+
+skinparam backgroundColor #FAFAFA
+skinparam packageBackgroundColor #E8F4FD
+skinparam componentBackgroundColor #F0F8E8
+skinparam noteBackgroundColor #FFFFE0
+
+title 要求仕様書 - 機能要求と非機能要求
+
+package "機能要求 (Functional Requirements)" {
+  
+  package "認証機能" as AuthFunc {
+    component "FR001: OAuth認証" as FR001
+    component "FR008: 設定管理" as FR008
+  }
+  
+  package "データ取得機能" as DataFunc {
+    component "FR002: 録画一覧取得" as FR002
+    component "FR003: ファイルダウンロード" as FR003
+  }
+  
+  package "ユーザーIF機能" as UIFunc {
+    component "FR004: GUI操作" as FR004
+    component "FR005: CLI操作" as FR005
+    component "FR006: 進捗表示" as FR006
+  }
+  
+  package "システム機能" as SysFunc {
+    component "FR007: エラーハンドリング" as FR007
+  }
+}
+
+package "非機能要求 (Non-Functional Requirements)" {
+  
+  package "性能要求" as PerfReq {
+    component "NFR001: 同時DL数\n最大5並列" as NFR001
+    component "NFR002: レスポンス時間\nAPI呼出し3秒以内" as NFR002
+  }
+  
+  package "可用性要求" as AvailReq {
+    component "NFR003: エラー回復\n自動リトライ3回" as NFR003
+  }
+  
+  package "セキュリティ要求" as SecReq {
+    component "NFR004: 認証情報保護\nローカル暗号化" as NFR004
+  }
+  
+  package "互換性要求" as CompatReq {
+    component "NFR005: Windows対応\nWindows 10以降" as NFR005
+    component "NFR006: 日本語対応\n文字化けなし" as NFR006
+  }
+  
+  package "保守性要求" as MaintReq {
+    component "NFR007: ログ出力\nデバッグレベル対応" as NFR007
+    component "NFR008: 拡張性\nモジュール分離" as NFR008
+  }
+}
+
+' 機能要求間の関係
+FR001 --> FR002 : "認証後"
+FR002 --> FR003 : "一覧取得後"
+FR004 --> FR001 : "認証要求"
+FR005 --> FR001 : "認証要求"
+FR003 --> FR006 : "進捗更新"
+FR003 --> FR007 : "エラー発生時"
+
+' 機能要求と非機能要求の関係
+FR003 --> NFR001 : "性能制約"
+FR003 --> NFR002 : "応答時間制約"
+FR007 --> NFR003 : "回復性要求"
+FR001 --> NFR004 : "セキュリティ要求"
+FR004 --> NFR005 : "互換性要求"
+FR004 --> NFR006 : "国際化要求"
+FR007 --> NFR007 : "保守性要求"
+
+' 詳細仕様
+note right of FR001
+  **OAuth認証仕様**
+  - プロトコル: OAuth 2.0
+  - 権限スコープ: recording:read, user:read, meeting:read
+  - トークン管理: 自動更新対応
+  - セキュリティ: PKCE対応
+end note
+
+note right of FR003
+  **ダウンロード仕様**
+  - 対象ファイル: MP4, MP3, TXT, JSON
+  - 並列処理: tokio async/await
+  - 進捗監視: リアルタイム更新
+  - エラー処理: 指数バックオフリトライ
+end note
+
+note right of NFR001
+  **性能基準**
+  - 同時ダウンロード: 5並列まで
+  - メモリ使用量: 1GB以下
+  - CPU使用率: 80%以下
+  - ディスク容量: 利用可能容量チェック
+end note
+
+note right of NFR004
+  **セキュリティ基準**
+  - 認証情報: AES-256暗号化
+  - 通信: HTTPS必須
+  - ログ: 機密情報マスク
+  - アクセス制御: ローカルユーザー権限
+end note
+
+' 要求の優先度と相互関係
+legend right
+  **優先度レベル**
+  - 高: システム動作に必須
+  - 中: ユーザビリティ向上
+  - 低: 将来拡張性
+  
+  **要求の種類**
+  - 機能要求: システムが何をするか
+  - 非機能要求: システムがどのように動作するか
+  - 制約条件: システムの制限事項
+end legend
+
+@enduml

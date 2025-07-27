@@ -14,7 +14,8 @@
       "Bash(rm:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(PROPTEST_VERBOSE=1 cargo test --test property_tests -- --nocapture)"
+      "Bash(PROPTEST_VERBOSE=1 cargo test --test property_tests -- --nocapture)",
+      "Bash(mkdir:*)"
     ],
     "deny": []
   }
