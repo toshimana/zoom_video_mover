@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::Path;
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
 
@@ -348,7 +349,7 @@ impl ZoomRecordingDownloader {
         Ok(recordings)
     }
 
-    /// 全録画をダウンロードする（GUI用の簡略版）
+    /// 全録画をダウンロードする
     /// 
     /// # 副作用
     /// - HTTPリクエストの送信
@@ -368,34 +369,116 @@ impl ZoomRecordingDownloader {
     /// - self の状態は変更されない
     /// - 入力パラメータは変更されない
     pub async fn download_all_recordings(&self, user_id: &str, from: &str, to: &str, output_dir: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        
         // 事前条件のassertion
         assert!(!user_id.is_empty(), "user_id must not be empty");
         assert!(!from.is_empty(), "from date must not be empty");
         assert!(!to.is_empty(), "to date must not be empty");
         assert!(!output_dir.is_empty(), "output_dir must not be empty");
         
+        // 出力ディレクトリを作成
+        std::fs::create_dir_all(output_dir)?;
+        
         // 録画一覧を取得
         let recordings = self.list_recordings(user_id, from, to).await?;
         
         let mut downloaded_files = Vec::new();
         
-        // 各会議の録画をダウンロード（簡略版）
+        // 各会議の録画をダウンロード
         for meeting in &recordings.meetings {
+            // 会議用のサブディレクトリを作成
+            let meeting_dir = Path::new(output_dir).join(format!("Meeting_{}", meeting.id));
+            std::fs::create_dir_all(&meeting_dir)?;
+            
             for recording in &meeting.recording_files {
-                // 簡略化のため、ファイル名のみを返す
+                // ファイル名を生成（危険な文字を除去）
+                let safe_topic = meeting.topic
+                    .replace(" ", "_")
+                    .replace("/", "-")
+                    .replace("\\", "-")
+                    .replace(":", "-")
+                    .replace("*", "-")
+                    .replace("?", "-")
+                    .replace("\"", "-")
+                    .replace("<", "-")
+                    .replace(">", "-")
+                    .replace("|", "-");
+                    
                 let filename = format!("{}_{}.{}", 
-                    meeting.topic.replace(" ", "_"),
+                    safe_topic,
                     recording.recording_type,
-                    recording.file_type.to_lowercase()
+                    if recording.file_type.is_empty() { "mp4".to_string() } else { recording.file_type.to_lowercase() }
                 );
-                downloaded_files.push(filename);
+                
+                let file_path = meeting_dir.join(&filename);
+                
+                // ファイルをダウンロード
+                if !recording.download_url.is_empty() {
+                    match self.download_file(&recording.download_url, &file_path).await {
+                        Ok(_) => {
+                            downloaded_files.push(file_path.to_string_lossy().to_string());
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to download {}: {}", filename, e);
+                            // エラーでも継続
+                        }
+                    }
+                }
             }
         }
         
         // 事後条件のassertion
-        // downloaded_files.len() is always >= 0 for Vec, so no assertion needed
+        debug_assert!(Path::new(output_dir).exists(), "output directory should exist");
         
         Ok(downloaded_files)
+    }
+
+    /// 単一ファイルをダウンロードする
+    /// 
+    /// # 副作用
+    /// - HTTPリクエストの送信
+    /// - ファイルシステムへの書き込み
+    /// 
+    /// # 事前条件
+    /// - url は有効なHTTP/HTTPS URLである
+    /// - file_path は有効なファイルパスである
+    /// - file_pathの親ディレクトリが存在する
+    /// 
+    /// # 事後条件
+    /// - 成功時: ファイルがダウンロードされる
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    /// 
+    /// # 不変条件
+    /// - self の状態は変更されない
+    async fn download_file(&self, url: &str, file_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        use std::io::Write;
+        
+        // 事前条件のassertion
+        assert!(!url.is_empty(), "URL must not be empty");
+        assert!(url.starts_with("http"), "URL must be HTTP/HTTPS");
+        
+        let response = self
+            .client
+            .get(url)
+            .bearer_auth(&self.access_token)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(format!("Download failed: HTTP {}", response.status()).into());
+        }
+
+        let content = response.bytes().await?;
+        
+        let mut file = std::fs::File::create(file_path)?;
+        file.write_all(&content)?;
+        file.sync_all()?;
+        
+        // 事後条件のassertion
+        debug_assert!(file_path.exists(), "downloaded file should exist");
+        debug_assert!(file_path.metadata()?.len() > 0, "downloaded file should not be empty");
+        
+        Ok(())
     }
 }
 
