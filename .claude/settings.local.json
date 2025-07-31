@@ -16,7 +16,9 @@
       "Bash(git commit:*)",
       "Bash(PROPTEST_VERBOSE=1 cargo test --test property_tests -- --nocapture)",
       "Bash(mkdir:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "WebFetch(domain:developers.zoom.us)",
+      "WebFetch(domain:devforum.zoom.us)"
     ],
     "deny": []
   }
