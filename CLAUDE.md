@@ -396,36 +396,39 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 #### 要件（Requirements）→ 設計（Design）→ 実装（Implementation）
 
-| 要件ID | 要件名 | 設計文書 | 実装ファイル | テスト | 備考 |
-|--------|--------|----------|-------------|--------|------|
-| **FR001** | **OAuth認証** | | | | |
-| FR001-1 | OAuth 2.0認証フロー | rdra_models.md:OAuth認証フロー図 | lib.rs:ZoomRecordingDownloader | tests/oauth_tests.rs | 認証プロセス全体 |
-| FR001-2 | Client ID/Secret設定 | requirements.md:認証機能 | lib.rs:Config | tests/config_tests.rs | 設定永続化 |
-| FR001-3 | トークン取得・更新 | ARCHITECTURE.md:OAuth認証フロー図 | lib.rs:authenticate_user | tests/token_tests.rs | リフレッシュトークン対応 |
-| **FR002** | **録画一覧取得** | | | | |
-| FR002-1 | Zoom API呼び出し | ARCHITECTURE.md:データフロー図 | lib.rs:get_recordings | tests/api_tests.rs | REST API通信 |
-| FR002-2 | 録画リスト表示 | rdra_models.md:ビジネスフロー図 | gui.rs:render_recordings | tests/gui_tests.rs | UI表示処理 |
-| FR002-3 | 期間フィルタリング | requirements.md:ダウンロード機能 | lib.rs:filter_by_date | tests/filter_tests.rs | 日付範囲検索 |
-| **FR003** | **ファイルダウンロード** | | | | |
-| FR003-1 | 並列ダウンロード | ARCHITECTURE.md:システム構成図 | lib.rs:download_recording | tests/download_tests.rs | 非同期処理 |
-| FR003-2 | 進捗表示 | rdra_models.md:GUI状態遷移図 | gui.rs:render_progress | tests/progress_tests.rs | リアルタイム更新 |
-| FR003-3 | ファイル種別対応 | requirements.md:対象ファイル | lib.rs:DownloadableFile | tests/file_type_tests.rs | MP4/MP3/TXT/JSON |
-| **FR004** | **GUI操作** | | | | |
-| FR004-1 | egui/eframe UI | ARCHITECTURE.md:GUI状態遷移図 | gui.rs:ZoomDownloaderApp | tests/gui_integration.rs | メインアプリ画面 |
-| FR004-2 | 設定画面 | rdra_models.md:システムコンテキスト図 | gui.rs:render_config | tests/config_ui_tests.rs | 設定入力フォーム |
-| FR004-3 | ファイル選択 | requirements.md:ユーザーインターフェース | gui.rs:render_file_selection | tests/selection_tests.rs | チェックボックス選択 |
-| **NFR001** | **性能要件** | | | | |
-| NFR001-1 | 同時ダウンロード数制限 | requirements.md:パフォーマンス | lib.rs:CONCURRENT_LIMIT | tests/performance_tests.rs | セマフォ制御 |
-| NFR001-2 | API レート制限対応 | ARCHITECTURE.md:エラー処理戦略 | lib.rs:rate_limit_handler | tests/rate_limit_tests.rs | 指数バックオフ |
-| **NFR002** | **信頼性要件** | | | | |
-| NFR002-1 | エラーハンドリング | ARCHITECTURE.md:エラー処理戦略 | lib.rs:ZoomVideoMoverError | tests/error_handling_tests.rs | Result型エラー処理 |
-| NFR002-2 | ログ出力 | requirements.md:信頼性 | lib.rs:logger_init | tests/logging_tests.rs | env_logger使用 |
-| **NFR003** | **セキュリティ要件** | | | | |
-| NFR003-1 | OAuth情報保護 | requirements.md:セキュリティ | lib.rs:secure_storage | tests/security_tests.rs | ローカル暗号化 |
-| NFR003-2 | HTTPS通信強制 | ARCHITECTURE.md:技術選定 | lib.rs:reqwest_client | tests/https_tests.rs | TLS証明書検証 |
-| **NFR004** | **国際化要件** | | | | |
-| NFR004-1 | Windows日本語対応 | requirements.md:国際化 | windows_console.rs | tests/encoding_tests.rs | UTF-8エンコーディング |
-| NFR004-2 | 日本語ファイル名 | ARCHITECTURE.md:データフロー | lib.rs:sanitize_filename | tests/filename_tests.rs | パス処理 |
+| 要件ID | 要件名 | 設計文書 | 実装ファイル | テスト | 画面仕様 | 操作仕様 | 機能仕様 |
+|--------|--------|----------|-------------|--------|----------|----------|----------|
+| **FR001** | **OAuth認証** | | | | | | |
+| FR001-1 | OAuth 2.0認証フロー | rdra_models.md:OAuth認証フロー図 | lib.rs:ZoomRecordingDownloader | tests/oauth_tests.rs | SC003:認証画面 | OP003:OAuth認証実行 | FN002:OAuth認証機能 |
+| FR001-2 | Client ID/Secret設定 | requirements.md:認証機能 | lib.rs:Config | tests/config_tests.rs | SC002:設定画面 | OP002:設定入力・保存 | FN001:設定管理機能 |
+| FR001-3 | トークン取得・更新 | ARCHITECTURE.md:OAuth認証フロー図 | lib.rs:authenticate_user | tests/token_tests.rs | SC003:認証画面 | OP003:OAuth認証実行 | FN002:OAuth認証機能 |
+| **FR002** | **録画一覧取得** | | | | | | |
+| FR002-1 | Zoom API呼び出し | ARCHITECTURE.md:データフロー図 | lib.rs:get_recordings | tests/api_tests.rs | SC004:録画リスト画面 | OP004:録画検索・一覧表示 | FN003:録画検索機能 |
+| FR002-2 | 録画リスト表示 | rdra_models.md:ビジネスフロー図 | gui.rs:render_recordings | tests/gui_tests.rs | SC004:録画リスト画面 | OP004:録画検索・一覧表示 | FN003:録画検索機能 |
+| FR002-3 | 期間フィルタリング | requirements.md:ダウンロード機能 | lib.rs:filter_by_date | tests/filter_tests.rs | SC004:録画リスト画面 | OP004:録画検索・一覧表示 | FN003:録画検索機能 |
+| **FR003** | **ファイルダウンロード** | | | | | | |
+| FR003-1 | 並列ダウンロード | ARCHITECTURE.md:システム構成図 | lib.rs:download_recording | tests/download_tests.rs | SC005:ダウンロード進捗画面 | OP006:ダウンロード実行 | FN004:ファイルダウンロード機能 |
+| FR003-2 | 進捗表示 | rdra_models.md:GUI状態遷移図 | gui.rs:render_progress | tests/progress_tests.rs | SC005:ダウンロード進捗画面 | OP007:進捗監視・制御 | FN006:進捗管理機能 |
+| FR003-3 | ファイル種別対応 | requirements.md:対象ファイル | lib.rs:DownloadableFile | tests/file_type_tests.rs | SC004:録画リスト画面 | OP005:ファイル選択 | FN004:ファイルダウンロード機能 |
+| FR003-4 | AI要約ダウンロード | requirements.md:対象ファイル | lib.rs:get_ai_summary | tests/ai_summary_tests.rs | SC004:録画リスト画面 | OP005:ファイル選択 | FN005:AI要約取得機能 |
+| **FR004** | **GUI操作** | | | | | | |
+| FR004-1 | egui/eframe UI | ARCHITECTURE.md:GUI状態遷移図 | gui.rs:ZoomDownloaderApp | tests/gui_integration.rs | SC001:メイン画面 | OP001:アプリケーション起動 | - |
+| FR004-2 | 設定画面 | rdra_models.md:システムコンテキスト図 | gui.rs:render_config | tests/config_ui_tests.rs | SC002:設定画面 | OP002:設定入力・保存 | FN001:設定管理機能 |
+| FR004-3 | ファイル選択 | requirements.md:ユーザーインターフェース | gui.rs:render_file_selection | tests/selection_tests.rs | SC004:録画リスト画面 | OP005:ファイル選択 | - |
+| **FR005** | **CLI操作** | | | | | | |
+| FR005-1 | CLI実行 | requirements.md:ユーザーインターフェース | main.rs | tests/cli_tests.rs | - | OP009:CLI実行 | - |
+| **NFR001** | **性能要件** | | | | | | |
+| NFR001-1 | 同時ダウンロード数制限 | requirements.md:パフォーマンス | lib.rs:CONCURRENT_LIMIT | tests/performance_tests.rs | SC005:ダウンロード進捗画面 | OP006:ダウンロード実行 | FN004:ファイルダウンロード機能 |
+| NFR001-2 | API レート制限対応 | ARCHITECTURE.md:エラー処理戦略 | lib.rs:rate_limit_handler | tests/rate_limit_tests.rs | SC006:エラー表示画面 | OP008:エラー処理・回復 | FN007:エラー処理機能 |
+| **NFR002** | **信頼性要件** | | | | | | |
+| NFR002-1 | エラーハンドリング | ARCHITECTURE.md:エラー処理戦略 | lib.rs:ZoomVideoMoverError | tests/error_handling_tests.rs | SC006:エラー表示画面 | OP008:エラー処理・回復 | FN007:エラー処理機能 |
+| NFR002-2 | ログ出力 | requirements.md:信頼性 | lib.rs:logger_init | tests/logging_tests.rs | - | - | FN009:ログ出力機能 |
+| **NFR003** | **セキュリティ要件** | | | | | | |
+| NFR003-1 | OAuth情報保護 | requirements.md:セキュリティ | lib.rs:secure_storage | tests/security_tests.rs | SC002:設定画面 | OP002:設定入力・保存 | FN001:設定管理機能 |
+| NFR003-2 | HTTPS通信強制 | ARCHITECTURE.md:技術選定 | lib.rs:reqwest_client | tests/https_tests.rs | - | - | FN002:OAuth認証機能 |
+| **NFR004** | **国際化要件** | | | | | | |
+| NFR004-1 | Windows日本語対応 | requirements.md:国際化 | windows_console.rs | tests/encoding_tests.rs | - | OP001:アプリケーション起動 | FN010:Windows対応機能 |
+| NFR004-2 | 日本語ファイル名 | ARCHITECTURE.md:データフロー | lib.rs:sanitize_filename | tests/filename_tests.rs | SC005:ダウンロード進捗画面 | OP006:ダウンロード実行 | FN008:ファイル管理機能 |
 
 #### 逆トレーサビリティ（実装→要件）
 
@@ -473,18 +476,50 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 | **統合テスト** | システム全体 | `cargo test --test integration` | 要件充足 | 全シナリオ合格 |
 | **Property-based** | データ処理 | `cargo test --test property_tests` | データ整合性 | 1000ケース合格 |
 
-#### 文書間相互参照
+#### 仕様書間相互参照
 
-| 文書名 | セクション | 参照先文書 | 参照内容 |
-|--------|------------|------------|----------|
-| **requirements.md** | 機能要件 | ARCHITECTURE.md | システム構成との対応 |
-| **requirements.md** | 非機能要件 | rdra_models.md | RDRA要求仕様書 |
-| **ARCHITECTURE.md** | システム構成図 | lib.rs | 実装クラス構造 |
-| **ARCHITECTURE.md** | OAuth認証フロー | gui.rs | GUI状態遷移 |
-| **rdra_models.md** | ビジネスフロー | lib.rs | ビジネスロジック |
-| **rdra_models.md** | 要求仕様書 | tests/ | テスト仕様 |
-| **CLAUDE.md** | コーディング規約 | src/ | 実装ガイドライン |
-| **CLAUDE.md** | テスト戦略 | tests/ | テスト実装方針 |
+| 仕様書分類 | 文書名 | 主要セクション | 参照関係 | 参照内容 |
+|------------|--------|---------------|----------|----------|
+| **要件仕様** | requirements.md | 機能要件・非機能要件 | → 設計仕様 | システム要件の詳細定義 |
+| **設計仕様** | ARCHITECTURE.md | システム構成・データフロー | requirements.md ← → 実装 | アーキテクチャ設計 |
+| **設計仕様** | rdra_models.md | RDRA 6モデル図 | requirements.md ← → 実装 | 要件の構造化表現 |
+| **画面仕様** | screen_specifications.md | 6画面の詳細仕様 | requirements.md ← → GUI実装 | UI/UX設計詳細 |
+| **操作仕様** | operation_specifications.md | 9操作の手順・フロー | 画面仕様 ← → 機能仕様 | ユーザー操作の定義 |
+| **機能仕様** | function_specifications.md | 10機能の詳細仕様 | 要件仕様 ← → 実装 | 機能の内部仕様 |
+| **実装仕様** | CLAUDE.md | コーディング規約・テスト | 全仕様書 ← → src/ | 実装ガイドライン |
+
+#### 新規作成文書のトレーサビリティ
+
+| 仕様書 | 画面ID | 操作ID | 機能ID | 要件ID | 実装箇所 |
+|--------|--------|--------|--------|--------|----------|
+| **screen_specifications.md** | | | | | |
+| SC001:メイン画面 | - | OP001 | - | FR004-1 | gui.rs:ZoomDownloaderApp |
+| SC002:設定画面 | - | OP002 | FN001 | FR001-2, FR004-2 | gui.rs:render_config |
+| SC003:認証画面 | - | OP003 | FN002 | FR001-1 | gui.rs:render_auth |
+| SC004:録画リスト画面 | - | OP004, OP005 | FN003 | FR002-1, FR002-2, FR004-3 | gui.rs:render_recordings |
+| SC005:ダウンロード進捗画面 | - | OP006, OP007 | FN004, FN006 | FR003-1, FR003-2 | gui.rs:render_progress |
+| SC006:エラー表示画面 | - | OP008 | FN007 | NFR002-1 | gui.rs:render_error |
+| **operation_specifications.md** | | | | | |
+| OP001:アプリケーション起動 | SC001 | - | - | FR004-1 | main_gui.rs:main |
+| OP002:設定入力・保存 | SC002 | - | FN001 | FR001-2 | gui.rs:render_config |
+| OP003:OAuth認証実行 | SC003 | - | FN002 | FR001-1 | lib.rs:authenticate_user |
+| OP004:録画検索・一覧表示 | SC004 | - | FN003 | FR002-1, FR002-2 | lib.rs:get_recordings |
+| OP005:ファイル選択 | SC004 | - | - | FR004-3 | gui.rs:render_recordings |
+| OP006:ダウンロード実行 | SC005 | - | FN004 | FR003-1 | lib.rs:download_recording |
+| OP007:進捗監視・制御 | SC005 | - | FN006 | FR003-2 | gui.rs:render_progress |
+| OP008:エラー処理・回復 | SC006 | - | FN007 | NFR002-1 | lib.rs:Error handling |
+| OP009:CLI実行 | - | - | - | FR005-1 | main.rs |
+| **function_specifications.md** | | | | | |
+| FN001:設定管理機能 | SC002 | OP002 | - | FR001-2 | lib.rs:Config |
+| FN002:OAuth認証機能 | SC003 | OP003 | - | FR001-1 | lib.rs:ZoomRecordingDownloader |
+| FN003:録画検索機能 | SC004 | OP004 | - | FR002-1 | lib.rs:get_recordings |
+| FN004:ファイルダウンロード機能 | SC005 | OP006 | - | FR003-1 | lib.rs:download_recording |
+| FN005:AI要約取得機能 | SC004 | OP005 | - | FR003-4 | lib.rs:get_ai_summary |
+| FN006:進捗管理機能 | SC005 | OP007 | - | FR003-2 | gui.rs:ProgressTracker |
+| FN007:エラー処理機能 | SC006 | OP008 | - | NFR002-1 | lib.rs:ZoomVideoMoverError |
+| FN008:ファイル管理機能 | SC005 | OP006 | - | NFR004-2 | lib.rs:FileManager |
+| FN009:ログ出力機能 | - | - | - | NFR002-2 | lib.rs:Logger |
+| FN010:Windows対応機能 | - | OP001 | - | NFR004-1 | windows_console.rs |
 
 ### トレーサビリティ管理プロセス
 
