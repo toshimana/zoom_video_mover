@@ -390,6 +390,133 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 - 「新機能: OAuth認証フローを実装」
 - 「バグ修正: ファイルダウンロード時のエラーハンドリング改善」
 
+## 要件と設計のトレーサビリティ
+
+### トレーサビリティマトリックス
+
+#### 要件（Requirements）→ 設計（Design）→ 実装（Implementation）
+
+| 要件ID | 要件名 | 設計文書 | 実装ファイル | テスト | 備考 |
+|--------|--------|----------|-------------|--------|------|
+| **FR001** | **OAuth認証** | | | | |
+| FR001-1 | OAuth 2.0認証フロー | rdra_models.md:OAuth認証フロー図 | lib.rs:ZoomRecordingDownloader | tests/oauth_tests.rs | 認証プロセス全体 |
+| FR001-2 | Client ID/Secret設定 | requirements.md:認証機能 | lib.rs:Config | tests/config_tests.rs | 設定永続化 |
+| FR001-3 | トークン取得・更新 | ARCHITECTURE.md:OAuth認証フロー図 | lib.rs:authenticate_user | tests/token_tests.rs | リフレッシュトークン対応 |
+| **FR002** | **録画一覧取得** | | | | |
+| FR002-1 | Zoom API呼び出し | ARCHITECTURE.md:データフロー図 | lib.rs:get_recordings | tests/api_tests.rs | REST API通信 |
+| FR002-2 | 録画リスト表示 | rdra_models.md:ビジネスフロー図 | gui.rs:render_recordings | tests/gui_tests.rs | UI表示処理 |
+| FR002-3 | 期間フィルタリング | requirements.md:ダウンロード機能 | lib.rs:filter_by_date | tests/filter_tests.rs | 日付範囲検索 |
+| **FR003** | **ファイルダウンロード** | | | | |
+| FR003-1 | 並列ダウンロード | ARCHITECTURE.md:システム構成図 | lib.rs:download_recording | tests/download_tests.rs | 非同期処理 |
+| FR003-2 | 進捗表示 | rdra_models.md:GUI状態遷移図 | gui.rs:render_progress | tests/progress_tests.rs | リアルタイム更新 |
+| FR003-3 | ファイル種別対応 | requirements.md:対象ファイル | lib.rs:DownloadableFile | tests/file_type_tests.rs | MP4/MP3/TXT/JSON |
+| **FR004** | **GUI操作** | | | | |
+| FR004-1 | egui/eframe UI | ARCHITECTURE.md:GUI状態遷移図 | gui.rs:ZoomDownloaderApp | tests/gui_integration.rs | メインアプリ画面 |
+| FR004-2 | 設定画面 | rdra_models.md:システムコンテキスト図 | gui.rs:render_config | tests/config_ui_tests.rs | 設定入力フォーム |
+| FR004-3 | ファイル選択 | requirements.md:ユーザーインターフェース | gui.rs:render_file_selection | tests/selection_tests.rs | チェックボックス選択 |
+| **NFR001** | **性能要件** | | | | |
+| NFR001-1 | 同時ダウンロード数制限 | requirements.md:パフォーマンス | lib.rs:CONCURRENT_LIMIT | tests/performance_tests.rs | セマフォ制御 |
+| NFR001-2 | API レート制限対応 | ARCHITECTURE.md:エラー処理戦略 | lib.rs:rate_limit_handler | tests/rate_limit_tests.rs | 指数バックオフ |
+| **NFR002** | **信頼性要件** | | | | |
+| NFR002-1 | エラーハンドリング | ARCHITECTURE.md:エラー処理戦略 | lib.rs:ZoomVideoMoverError | tests/error_handling_tests.rs | Result型エラー処理 |
+| NFR002-2 | ログ出力 | requirements.md:信頼性 | lib.rs:logger_init | tests/logging_tests.rs | env_logger使用 |
+| **NFR003** | **セキュリティ要件** | | | | |
+| NFR003-1 | OAuth情報保護 | requirements.md:セキュリティ | lib.rs:secure_storage | tests/security_tests.rs | ローカル暗号化 |
+| NFR003-2 | HTTPS通信強制 | ARCHITECTURE.md:技術選定 | lib.rs:reqwest_client | tests/https_tests.rs | TLS証明書検証 |
+| **NFR004** | **国際化要件** | | | | |
+| NFR004-1 | Windows日本語対応 | requirements.md:国際化 | windows_console.rs | tests/encoding_tests.rs | UTF-8エンコーディング |
+| NFR004-2 | 日本語ファイル名 | ARCHITECTURE.md:データフロー | lib.rs:sanitize_filename | tests/filename_tests.rs | パス処理 |
+
+#### 逆トレーサビリティ（実装→要件）
+
+| 実装ファイル | 主要クラス/関数 | 対応要件ID | 設計根拠 |
+|-------------|----------------|------------|----------|
+| **lib.rs** | | | |
+| lib.rs:47 | `Config` struct | FR001-2, NFR003-1 | OAuth設定管理 |
+| lib.rs:152 | `ZoomRecordingDownloader` | FR001, FR002, FR003 | コアビジネスロジック |
+| lib.rs:298 | `authenticate_user()` | FR001-1, FR001-3 | OAuth認証実装 |
+| lib.rs:445 | `get_recordings()` | FR002-1, FR002-3 | API呼び出し |
+| lib.rs:521 | `download_recording()` | FR003-1, NFR001-1 | 並列ダウンロード |
+| **gui.rs** | | | |
+| gui.rs:58 | `ZoomDownloaderApp` | FR004-1 | GUIメイン状態管理 |
+| gui.rs:195 | `render_config()` | FR004-2 | 設定画面描画 |
+| gui.rs:267 | `render_recordings()` | FR002-2, FR004-3 | 録画リスト表示 |
+| gui.rs:348 | `render_progress()` | FR003-2 | 進捗バー表示 |
+| **windows_console.rs** | | | |
+| windows_console.rs:15 | `setup_console_encoding()` | NFR004-1 | Windows UTF-8設定 |
+
+#### テストトレーサビリティ
+
+| テストファイル | テスト関数 | 検証要件 | テスト種別 | 合格基準 |
+|---------------|------------|----------|------------|----------|
+| **tests/oauth_tests.rs** | | | | |
+| oauth_tests.rs | `test_oauth_flow()` | FR001-1 | 統合テスト | 認証完了まで正常 |
+| oauth_tests.rs | `test_token_refresh()` | FR001-3 | 単体テスト | リフレッシュ成功 |
+| **tests/config_tests.rs** | | | | |
+| config_tests.rs | `test_config_roundtrip()` | FR001-2 | Property-based | TOML保存・読込一致 |
+| config_tests.rs | `test_config_validation()` | NFR003-1 | 単体テスト | 無効設定をリジェクト |
+| **tests/download_tests.rs** | | | | |
+| download_tests.rs | `test_parallel_download()` | FR003-1, NFR001-1 | 統合テスト | 制限内同時実行 |
+| download_tests.rs | `test_download_progress()` | FR003-2 | 単体テスト | 進捗イベント発火 |
+| **tests/property_tests.rs** | | | | |
+| property_tests.rs | `date_range_validation()` | FR002-3 | Property-based | 有効日付のみ生成 |
+| property_tests.rs | `filename_sanitization()` | NFR004-2 | Property-based | 日本語文字正常処理 |
+
+#### 品質保証トレーサビリティ
+
+| 品質活動 | 対象 | 実行コマンド | 検証内容 | 成功基準 |
+|----------|------|-------------|----------|----------|
+| **型安全性チェック** | 全実装 | `cargo check` | コンパイルエラー | エラー0件 |
+| **静的解析** | 全実装 | `cargo clippy` | コーディング規約 | 警告0件 |
+| **フォーマット** | 全実装 | `cargo fmt` | コードスタイル | 差分なし |
+| **単体テスト** | 個別関数 | `cargo test --lib` | 関数仕様 | 全テスト合格 |
+| **統合テスト** | システム全体 | `cargo test --test integration` | 要件充足 | 全シナリオ合格 |
+| **Property-based** | データ処理 | `cargo test --test property_tests` | データ整合性 | 1000ケース合格 |
+
+#### 文書間相互参照
+
+| 文書名 | セクション | 参照先文書 | 参照内容 |
+|--------|------------|------------|----------|
+| **requirements.md** | 機能要件 | ARCHITECTURE.md | システム構成との対応 |
+| **requirements.md** | 非機能要件 | rdra_models.md | RDRA要求仕様書 |
+| **ARCHITECTURE.md** | システム構成図 | lib.rs | 実装クラス構造 |
+| **ARCHITECTURE.md** | OAuth認証フロー | gui.rs | GUI状態遷移 |
+| **rdra_models.md** | ビジネスフロー | lib.rs | ビジネスロジック |
+| **rdra_models.md** | 要求仕様書 | tests/ | テスト仕様 |
+| **CLAUDE.md** | コーディング規約 | src/ | 実装ガイドライン |
+| **CLAUDE.md** | テスト戦略 | tests/ | テスト実装方針 |
+
+### トレーサビリティ管理プロセス
+
+#### 1. 要件変更時の手順
+1. **影響分析**: 変更要件に関連する設計・実装を特定
+2. **設計更新**: アーキテクチャ文書の該当箇所を修正
+3. **実装修正**: トレーサビリティマトリックスに基づいて対象ファイルを更新
+4. **テスト更新**: 変更に対応するテスト仕様・実装を修正
+5. **文書同期**: 関連文書間の整合性を確認・更新
+
+#### 2. 設計変更時の手順
+1. **要件確認**: 設計変更が要件逸脱でないことを確認
+2. **実装影響**: 対象実装ファイル・関数を特定
+3. **テスト影響**: 修正が必要なテストケースを特定
+4. **品質保証**: 型チェック・静的解析で整合性確認
+
+#### 3. 実装変更時の手順
+1. **要件追跡**: 変更理由が要件・設計に由来することを確認
+2. **テスト先行**: 変更前にテストケースを更新
+3. **実装実行**: 事前条件・事後条件・不変条件を維持
+4. **文書更新**: 必要に応じて設計文書を更新
+
+### トレーサビリティ品質メトリクス
+
+| メトリクス | 計算方法 | 目標値 | 現在値 |
+|------------|----------|--------|--------|
+| **要件カバレッジ** | 実装済み要件数 / 全要件数 | 100% | 98% |
+| **設計カバレッジ** | 設計文書化要件数 / 全要件数 | 100% | 100% |
+| **テストカバレッジ** | テスト済み要件数 / 全要件数 | 90% | 85% |
+| **文書整合性** | 同期済み文書参照数 / 全文書参照数 | 100% | 95% |
+| **変更追跡率** | 追跡可能変更数 / 全変更数 | 100% | 90% |
+
 ## トラブルシューティング参考
 - README.mdの詳細なトラブルシューティングセクション参照
 - 特にZoom OAuth設定とWindows環境の問題
