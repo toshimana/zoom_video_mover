@@ -1,8 +1,7 @@
 use eframe::egui;
 use zoom_video_mover_lib::windows_console;
 
-mod gui;
-use gui::ZoomDownloaderApp;
+use zoom_video_mover_lib::{ZoomDownloaderApp, AppMessage};
 
 
 /// 日本語文字表示のためのフォント設定

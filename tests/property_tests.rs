@@ -180,7 +180,11 @@ proptest! {
         let original_token = access_token.clone();
         
         // 関数実行
-        let _downloader = ZoomRecordingDownloader::new(access_token);
+        let _downloader = ZoomRecordingDownloader::new_with_token(
+            "test_client".to_string(),
+            "test_secret".to_string(),
+            access_token
+        );
         
         // 事後条件検証: 有効なインスタンスが作成される
         // Note: access_tokenはprivateなので直接アクセスできないが、
@@ -219,7 +223,11 @@ proptest! {
         prop_assert!(from_parsed.unwrap() <= to_parsed.unwrap(), 
                     "from_date ({}) should be <= to_date ({})", from_date, to_date);
         
-        let _downloader = ZoomRecordingDownloader::new(access_token);
+        let _downloader = ZoomRecordingDownloader::new_with_token(
+            "test_client".to_string(),
+            "test_secret".to_string(),
+            access_token
+        );
         
         // Note: 実際のHTTPリクエストは行わず、関数の構造的な妥当性のみ検証
         // 本来はmockを使用すべきだが、簡略版として事前条件のassertionのみテスト
