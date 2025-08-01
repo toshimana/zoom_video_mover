@@ -18,7 +18,10 @@
       "Bash(mkdir:*)",
       "Bash(find:*)",
       "WebFetch(domain:developers.zoom.us)",
-      "WebFetch(domain:devforum.zoom.us)"
+      "WebFetch(domain:devforum.zoom.us)",
+      "Bash(powershell:*)",
+      "Bash(python3:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }

@@ -1,4 +1,4 @@
-テストファイル,テスト関数,検証要件,テスト種別,合格基準,対応実装,実装状況
+﻿テストファイル,テスト関数,検証要件,テスト種別,合格基準,対応実装,実装状況
 tests/property_tests.rs,config_roundtrip_property,FR001-2,Property-based,TOML保存・読込一致,"Config::save_to_file(), Config::load_from_file()",✅ 実装済み
 tests/property_tests.rs,oauth_token_validation_property,FR001-3,Property-based,トークン有効性検証,AuthToken::is_valid(),✅ 実装済み
 tests/property_tests.rs,filename_sanitization_property,"FR003-4, NFR004-2",Property-based,日本語文字正常処理,sanitize_filename(),✅ 実装済み

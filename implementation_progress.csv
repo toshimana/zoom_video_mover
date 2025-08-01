@@ -1,4 +1,4 @@
-実装ファイル,主要クラス/関数,行番号,対応要件ID,設計根拠,テストファイル,実装状況
+﻿実装ファイル,主要クラス/関数,行番号,対応要件ID,設計根拠,テストファイル,実装状況
 src/lib.rs,Config::load_from_file(),39-52,"FR001-2, NFR003-1",OAuth設定管理,tests/property_tests.rs,✅ 完了
 src/lib.rs,Config::create_sample_file(),72-95,FR001-2,サンプル設定生成,tests/property_tests.rs,✅ 完了
 src/lib.rs,Config::save_to_file(),115-133,"FR001-2, NFR003-1",設定保存・暗号化,tests/property_tests.rs,✅ 完了

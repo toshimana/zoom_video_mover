@@ -1,4 +1,4 @@
-要件ID,要件名,設計文書,実装ファイル,実装関数/クラス,テストファイル,画面仕様,操作仕様,機能仕様,ステータス
+﻿要件ID,要件名,設計文書,実装ファイル,実装関数/クラス,テストファイル,画面仕様,操作仕様,機能仕様,ステータス
 FR001,OAuth認証,,,,,,,,,
 FR001-1,OAuth 2.0認証フロー,ARCHITECTURE.md:OAuth認証フロー図,src/lib.rs:542-618,exchange_code(),tests/property_tests.rs,SC003:認証画面,OP003:OAuth認証実行,FN002:OAuth認証機能,✅ 実装完了
 FR001-2,Client ID/Secret設定,requirements.md:認証機能,src/lib.rs:23-134,"Config::load_from_file(), Config::save_to_file()",tests/property_tests.rs,SC002:設定画面,OP002:設定入力・保存,FN001:設定管理機能,✅ 実装完了
