@@ -1,0 +1,21 @@
+テストファイル,テスト関数,検証要件,テスト種別,合格基準,対応実装,実装状況
+tests/property_tests.rs,config_roundtrip_property,FR001-2,Property-based,TOML保存・読込一致,"Config::save_to_file(), Config::load_from_file()",✅ 実装済み
+tests/property_tests.rs,oauth_token_validation_property,FR001-3,Property-based,トークン有効性検証,AuthToken::is_valid(),✅ 実装済み
+tests/property_tests.rs,filename_sanitization_property,"FR003-4, NFR004-2",Property-based,日本語文字正常処理,sanitize_filename(),✅ 実装済み
+tests/property_tests.rs,date_range_validation_property,FR002-3,Property-based,有効日付のみ生成,parse_datetime(),✅ 実装済み
+tests/property_tests.rs,recording_response_structure_property,FR002-1,Property-based,API レスポンス構造,RecordingResponse,✅ 実装済み
+tests/unit_tests.rs,test_oauth_flow,FR001-1,統合テスト,認証完了まで正常,exchange_code(),⏳ 実装予定
+tests/unit_tests.rs,test_token_refresh,FR001-3,単体テスト,リフレッシュ成功,AuthToken,⏳ 実装予定
+tests/unit_tests.rs,test_parallel_download,"FR003-1, NFR001-1",統合テスト,制限内同時実行,download_file(),⏳ 実装予定
+tests/unit_tests.rs,test_download_progress,FR003-2,単体テスト,進捗イベント発火,download_file(),⏳ 実装予定
+tests/unit_tests.rs,test_rate_limit_handling,NFR001-1,単体テスト,429エラー適切処理,handle_rate_limit_response(),⏳ 実装予定
+tests/unit_tests.rs,test_exponential_backoff,NFR001-2,単体テスト,リトライ間隔正常,retry_with_exponential_backoff(),⏳ 実装予定
+tests/unit_tests.rs,test_error_classification,"NFR002-1, NFR002-2",単体テスト,エラー種別正確,ZoomVideoMoverError,⏳ 実装予定
+tests/integration_tests.rs,test_end_to_end_download,FR001+FR002+FR003,E2Eテスト,全工程正常完了,全モジュール,⏳ 実装予定
+tests/integration_tests.rs,test_gui_workflow,"FR005-1, FR005-2, FR005-3",GUI統合テスト,UI操作正常,src/gui.rs,⏳ 実装予定
+tests/integration_tests.rs,test_cli_workflow,FR006-1,CLI統合テスト,コマンド実行正常,src/main.rs,⏳ 実装予定
+tests/performance_tests.rs,test_rate_limit_compliance,NFR001-1,パフォーマンステスト,レート制限遵守,rate_limit_check(),⏳ 実装予定
+tests/performance_tests.rs,test_concurrent_downloads,NFR001-3,パフォーマンステスト,同時ダウンロード制限,download_file(),⏳ 実装予定
+tests/security_tests.rs,test_oauth_security,NFR003-1,セキュリティテスト,認証情報保護,Config::save_to_file(),⏳ 実装予定
+tests/security_tests.rs,test_https_enforcement,NFR003-2,セキュリティテスト,HTTPS通信強制,HTTPクライアント,⏳ 実装予定
+tests/gui_tests.rs,test_ui_components,FR005,GUIテスト,UI要素正常動作,src/gui.rs,⏳ 実装予定

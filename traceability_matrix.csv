@@ -1,0 +1,39 @@
+要件ID,要件名,設計文書,実装ファイル,実装関数/クラス,テストファイル,画面仕様,操作仕様,機能仕様,ステータス
+FR001,OAuth認証,,,,,,,,,
+FR001-1,OAuth 2.0認証フロー,ARCHITECTURE.md:OAuth認証フロー図,src/lib.rs:542-618,exchange_code(),tests/property_tests.rs,SC003:認証画面,OP003:OAuth認証実行,FN002:OAuth認証機能,✅ 実装完了
+FR001-2,Client ID/Secret設定,requirements.md:認証機能,src/lib.rs:23-134,"Config::load_from_file(), Config::save_to_file()",tests/property_tests.rs,SC002:設定画面,OP002:設定入力・保存,FN001:設定管理機能,✅ 実装完了
+FR001-3,トークン取得・更新,ARCHITECTURE.md:OAuth認証フロー図,src/lib.rs:256-294,"AuthToken::is_valid(), AuthToken::has_scope()",tests/property_tests.rs,SC003:認証画面,OP003:OAuth認証実行,FN002:OAuth認証機能,✅ 実装完了
+FR001-4,認証URL生成,zoom_api_specifications.md:OAuth仕様,src/lib.rs:519-541,generate_auth_url(),tests/property_tests.rs,SC003:認証画面,OP003:OAuth認証実行,FN002:OAuth認証機能,✅ 実装完了
+FR002,録画一覧取得,,,,,,,,,
+FR002-1,Zoom API呼び出し,ARCHITECTURE.md:データフロー図,src/lib.rs:644-787,get_recordings(),tests/property_tests.rs,SC004:録画リスト画面,OP004:録画検索・一覧表示,FN003:録画検索機能,✅ 実装完了
+FR002-2,録画リスト表示,rdra_models.md:ビジネスフロー図,src/gui.rs:render_recordings,render_recordings(),tests/gui_tests.rs,SC004:録画リスト画面,OP004:録画検索・一覧表示,FN003:録画検索機能,✅ 実装完了
+FR002-3,期間フィルタリング,requirements.md:ダウンロード機能,src/lib.rs:650-654,get_recordings() パラメータ処理,tests/property_tests.rs,SC004:録画リスト画面,OP004:録画検索・一覧表示,FN003:録画検索機能,✅ 実装完了
+FR002-4,ページネーション,zoom_api_specifications.md:録画取得API,src/lib.rs:653,page_size パラメータ処理,tests/property_tests.rs,SC004:録画リスト画面,OP004:録画検索・一覧表示,FN003:録画検索機能,✅ 実装完了
+FR003,ファイルダウンロード,,,,,,,,,
+FR003-1,並列ダウンロード,ARCHITECTURE.md:システム構成図,src/lib.rs:789-831,download_file(),tests/download_tests.rs,SC005:ダウンロード進捗画面,OP006:ダウンロード実行,FN004:ファイルダウンロード機能,✅ 実装完了
+FR003-2,進捗表示,rdra_models.md:GUI状態遷移図,src/gui.rs:render_progress,render_progress(),tests/progress_tests.rs,SC005:ダウンロード進捗画面,OP007:進捗監視・制御,FN006:進捗管理機能,✅ 実装完了
+FR003-3,ファイル種別対応,requirements.md:対象ファイル,src/lib.rs:163-214,"RecordingFile, MeetingRecording",tests/file_type_tests.rs,SC004:録画リスト画面,OP005:ファイル選択,FN004:ファイルダウンロード機能,✅ 実装完了
+FR003-4,ファイル名生成・サニタイズ,zoom_api_specifications.md:ファイル管理,src/lib.rs:61-86,sanitize_filename(),tests/property_tests.rs,SC005:ダウンロード進捗画面,OP006:ダウンロード実行,FN008:ファイル管理機能,✅ 実装完了
+FR004,AI要約取得,,,,,,,,,
+FR004-1,AI要約API呼び出し,zoom_api_specifications.md:AI要約API,-,実装予定（API仕様未確定）,-,SC004:録画リスト画面,OP005:ファイル選択,FN005:AI要約取得機能,⏳ 実装待ち
+FR004-2,要約データ構造,requirements.md:対象ファイル,src/lib.rs:220-255,AISummaryResponse,tests/ai_summary_tests.rs,SC004:録画リスト画面,OP005:ファイル選択,FN005:AI要約取得機能,✅ 構造体定義完了
+FR005,GUI操作,,,,,,,,,
+FR005-1,egui/eframe UI,ARCHITECTURE.md:GUI状態遷移図,"src/gui.rs, src/main_gui.rs",ZoomDownloaderApp,tests/gui_integration.rs,SC001:メイン画面,OP001:アプリケーション起動,-,✅ 実装完了
+FR005-2,設定画面,rdra_models.md:システムコンテキスト図,src/gui.rs:render_config,render_config(),tests/config_ui_tests.rs,SC002:設定画面,OP002:設定入力・保存,FN001:設定管理機能,✅ 実装完了
+FR005-3,ファイル選択,requirements.md:ユーザーインターフェース,src/gui.rs:render_recordings,render_file_selection(),tests/selection_tests.rs,SC004:録画リスト画面,OP005:ファイル選択,-,✅ 実装完了
+FR006,CLI操作,,,,,,,,,
+FR006-1,CLI実行,requirements.md:ユーザーインターフェース,src/main.rs,main(),tests/cli_tests.rs,-,OP009:CLI実行,-,✅ 実装完了
+NFR001,性能要件,,,,,,,,,
+NFR001-1,レート制限対応,zoom_api_specifications.md:レート制限,src/lib.rs:364-403,"rate_limit_check(), handle_rate_limit_response()",tests/rate_limit_tests.rs,SC005:ダウンロード進捗画面,OP006:ダウンロード実行,FN004:ファイルダウンロード機能,✅ 実装完了
+NFR001-2,指数バックオフリトライ,zoom_api_specifications.md:エラーハンドリング,src/lib.rs:450-483,retry_with_exponential_backoff(),tests/retry_tests.rs,SC006:エラー表示画面,OP008:エラー処理・回復,FN007:エラー処理機能,✅ 実装完了
+NFR001-3,同時ダウンロード数制限,requirements.md:パフォーマンス,-,実装予定,tests/performance_tests.rs,SC005:ダウンロード進捗画面,OP006:ダウンロード実行,FN004:ファイルダウンロード機能,⏳ 実装待ち
+NFR002,信頼性要件,,,,,,,,,
+NFR002-1,エラーハンドリング,ARCHITECTURE.md:エラー処理戦略,src/lib.rs:9-17,ZoomVideoMoverError,tests/error_handling_tests.rs,SC006:エラー表示画面,OP008:エラー処理・回復,FN007:エラー処理機能,✅ 実装完了
+NFR002-2,詳細エラー分類,zoom_api_specifications.md:エラーハンドリング,src/lib.rs:139-151,Display impl for ZoomVideoMoverError,tests/error_handling_tests.rs,SC006:エラー表示画面,OP008:エラー処理・回復,FN007:エラー処理機能,✅ 実装完了
+NFR002-3,ログ出力,requirements.md:信頼性,-,実装予定,tests/logging_tests.rs,-,-,FN009:ログ出力機能,⏳ 実装待ち
+NFR003,セキュリティ要件,,,,,,,,,
+NFR003-1,OAuth情報保護,requirements.md:セキュリティ,src/lib.rs:115-133,Config::save_to_file(),tests/security_tests.rs,SC002:設定画面,OP002:設定入力・保存,FN001:設定管理機能,✅ 実装完了
+NFR003-2,HTTPS通信強制,ARCHITECTURE.md:技術選定,"src/lib.rs:557, src/lib.rs:662",HTTPクライアント設定,tests/https_tests.rs,-,-,FN002:OAuth認証機能,✅ 実装完了
+NFR004,国際化要件,,,,,,,,,
+NFR004-1,Windows日本語対応,requirements.md:国際化,src/windows_console.rs,setup_console_encoding(),tests/encoding_tests.rs,-,OP001:アプリケーション起動,FN010:Windows対応機能,✅ 実装完了
+NFR004-2,日本語ファイル名,ARCHITECTURE.md:データフロー,src/lib.rs:61-86,sanitize_filename(),tests/filename_tests.rs,SC005:ダウンロード進捗画面,OP006:ダウンロード実行,FN008:ファイル管理機能,✅ 実装完了
