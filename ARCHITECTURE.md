@@ -74,6 +74,60 @@ flowchart TD
     NextMeeting -->|No| Complete([完了])
 ```
 
+## 2.1 AI要約取得の詳細フロー
+
+```mermaid
+flowchart TD
+    Start([AI要約取得開始]) --> CheckUUID{Meeting UUID<br/>有効?}
+    CheckUUID -->|Yes| UUIDFlow[UUID使用フロー]
+    CheckUUID -->|No| IDFlow[Meeting ID使用フロー]
+    
+    UUIDFlow --> GenVariants[UUID変形生成<br/>・原形<br/>・URLエンコード<br/>・ダブルエンコード]
+    GenVariants --> UUIDEndpoints[UUID用エンドポイント生成<br/>16個のエンドポイント]
+    
+    IDFlow --> IDEndpoints[Meeting ID用エンドポイント生成<br/>15個のエンドポイント]
+    
+    UUIDEndpoints --> TryEndpoint{エンドポイント<br/>試行}
+    IDEndpoints --> TryEndpoint
+    
+    TryEndpoint --> RateLimit[レート制限チェック]
+    RateLimit --> SendRequest[HTTPリクエスト送信]
+    
+    SendRequest --> CheckStatus{レスポンス<br/>ステータス}
+    CheckStatus -->|200| ProcessSuccess[成功レスポンス処理]
+    CheckStatus -->|404| NextEndpoint[次のエンドポイント]
+    CheckStatus -->|401/403| AuthError[認証エラー処理]
+    CheckStatus -->|429| WaitRetry[レート制限待機]
+    CheckStatus -->|422| ProcessingWait[要約処理中]
+    CheckStatus -->|5xx| ServerError[サーバーエラー]
+    
+    ProcessSuccess --> SaveDebug[デバッグレスポンス保存]
+    SaveDebug --> ParseJSON{JSONパース<br/>可能?}
+    
+    ParseJSON -->|AISummaryResponse| DirectParse[直接パース成功]
+    ParseJSON -->|Generic JSON| ConvertJSON[汎用JSON変換]
+    ParseJSON -->|Invalid| NextEndpoint
+    
+    DirectParse --> ReturnSummary[要約データ返却]
+    ConvertJSON --> FieldMapping[フィールドマッピング<br/>・summary → summary_overview<br/>・key_points → key_points<br/>・action_items → next_steps]
+    FieldMapping --> ReturnSummary
+    
+    AuthError --> NextEndpoint
+    WaitRetry --> TryEndpoint
+    ProcessingWait --> NextEndpoint
+    ServerError --> NextEndpoint
+    
+    NextEndpoint --> HasMore{次のエンドポイント<br/>存在?}
+    HasMore -->|Yes| TryEndpoint
+    HasMore -->|No| CheckUUIDFallback{UUID→ID<br/>フォールバック?}
+    
+    CheckUUIDFallback -->|Yes| IDFlow
+    CheckUUIDFallback -->|No| NoSummary[要約取得失敗<br/>None返却]
+    
+    ReturnSummary --> End([終了])
+    NoSummary --> End
+```
+
 ## 3. システム構成図
 
 ```mermaid
@@ -256,4 +310,60 @@ zoom_video_mover/
 ├── config.toml          # OAuth設定
 ├── debug_responses/     # AI要約レスポンスログ
 └── Cargo.toml          # 依存関係・ビルド設定
+```
+
+## 7.1 AI要約データ構造の詳細
+
+```rust
+// 主要なAI要約レスポンス構造
+pub struct AISummaryResponse {
+    // 基本情報
+    pub meeting_uuid: String,
+    pub meeting_id: String,
+    pub summary_title: String,
+    
+    // タイムスタンプ
+    pub summary_start_time: String,
+    pub summary_end_time: String,
+    pub summary_created_time: String,
+    pub summary_last_modified_time: String,
+    
+    // 要約コンテンツ
+    pub summary_overview: String,      // 概要
+    pub summary_content: String,       // 詳細内容（Markdown）
+    pub summary_keyword: Vec<String>,  // キーワード
+    
+    // 構造化データ
+    pub summary_details: Vec<SummaryDetail>,
+    pub topic_summaries: Vec<TopicSummary>,
+    pub detailed_sections: Vec<DetailedSection>,
+    pub next_steps: Vec<String>,
+    
+    // 代替フィールド（Zoom APIの変動対応）
+    pub summary: String,               // alias for summary_overview
+    pub key_points: Vec<String>,       // alias for important points
+    pub action_items: Vec<String>,     // alias for next_steps
+}
+
+// 支援構造体
+pub struct SummaryDetail {
+    pub label: String,
+    pub summary: String,
+}
+
+pub struct TopicSummary {
+    pub topic_title: String,
+    pub topic_content: String,
+}
+
+pub struct DetailedSection {
+    pub section_title: String,
+    pub section_content: String,
+}
+
+// 汎用フォーマット対応
+pub struct GenericAISummary {
+    #[serde(flatten)]
+    pub data: serde_json::Map<String, serde_json::Value>,
+}
 ```

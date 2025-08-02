@@ -34,7 +34,14 @@
 | | | | Property-based | property_tests/invariant_tests.rs | generated_dates_are_actually_valid | なし |
 | | | | | | date_range_always_ordered | なし |
 | | FN004 | ファイルDL機能 | 統合テスト | integration_tests/operation_flow_tests.rs | test_op006_download_execution_flow | HTTP Mock |
-| | FN005 | AI要約取得機能 | 単体テスト | unit_tests/ai_summary_tests.rs | test_ai_summary_retrieval | HTTP Mock |
+| | FN005 | AI要約取得機能 | 単体テスト | unit_tests/ai_summary_tests.rs | test_ai_summary_retrieval_uuid | HTTP Mock |
+| | | | | | test_ai_summary_retrieval_meeting_id | HTTP Mock |
+| | | | | | test_uuid_variants_generation | なし |
+| | | | | | test_endpoint_generation | なし |
+| | | | | | test_response_conversion | なし |
+| | | | 統合テスト | integration_tests/ai_summary_integration_tests.rs | test_ai_summary_full_flow | HTTP Mock |
+| | | | Property-based | property_tests/ai_summary_property_tests.rs | ai_summary_endpoint_response_handling | HTTP Mock |
+| | | | | | ai_summary_json_conversion_invariants | なし |
 | | FN006 | 進捗管理機能 | UIテスト | ui_tests/screen_component_tests.rs | test_sc005_progress_screen_ui_components | UI Mock |
 | | FN007 | エラー処理機能 | 統合テスト | integration_tests/operation_flow_tests.rs | test_op008_error_handling_recovery_flow | HTTP Mock |
 | | FN008 | ファイル管理機能 | Property-based | property_tests/invariant_tests.rs | filename_sanitization_invariants | なし |
@@ -204,6 +211,158 @@ serial_test = "3.0"          # シリアル実行制御
 ```
 
 ---
+
+## AI要約取得機能 (FN005) 詳細テスト仕様
+
+### 単体テスト: tests/unit_tests/ai_summary_tests.rs
+
+#### test_ai_summary_retrieval_uuid
+**目的**: Meeting UUIDによるAI要約取得の基本動作検証
+
+**テストケース**:
+```rust
+#[tokio::test]
+async fn test_ai_summary_retrieval_uuid() {
+    // UUID変形パターンテスト
+    let test_cases = vec![
+        ("Q09aD/1T+O8Tlew8Qoppw==", "原形UUID"),
+        ("Q09aD%2F1T%2BO8Tlew8Qoppw%3D%3D", "URLエンコード済み"),
+    ];
+    
+    for (uuid, description) in test_cases {
+        // Mock: 成功レスポンス
+        // 検証: UUID変形生成、エンドポイント試行、レスポンス解析
+    }
+}
+```
+
+#### test_ai_summary_retrieval_meeting_id
+**目的**: Meeting IDによるAI要約取得の基本動作検証
+
+**テストケース**:
+```rust
+#[tokio::test] 
+async fn test_ai_summary_retrieval_meeting_id() {
+    let meeting_id = 123456789u64;
+    
+    // Mock: 15個のエンドポイント候補で1つが成功
+    // 検証: エンドポイント順次試行、レスポンス処理
+}
+```
+
+#### test_uuid_variants_generation
+**目的**: UUID変形生成の純粋関数テスト
+
+**テストケース**:
+```rust
+#[test]
+fn test_uuid_variants_generation() {
+    let uuid = "Q09aD/1T+O8Tlew8Qoppw==";
+    let variants = generate_uuid_variants(uuid);
+    
+    assert_eq!(variants.len(), 2);
+    assert_eq!(variants[0], "Q09aD/1T+O8Tlew8Qoppw==");
+    assert_eq!(variants[1], "Q09aD%2F1T%2BO8Tlew8Qoppw%3D%3D");
+}
+```
+
+#### test_endpoint_generation  
+**目的**: エンドポイントURL生成の純粋関数テスト
+
+**テストケース**:
+```rust
+#[test]
+fn test_endpoint_generation() {
+    let uuid = "test-uuid";
+    let endpoints = generate_ai_summary_endpoints(uuid);
+    
+    assert_eq!(endpoints.len(), 16);
+    assert!(endpoints[0].contains("/meeting_summary"));
+    assert!(endpoints[1].contains("/recordings"));
+    // 全エンドポイント形式検証
+}
+```
+
+#### test_response_conversion
+**目的**: 汎用JSON→AISummaryResponse変換テスト
+
+**テストケース**:
+```rust
+#[test]
+fn test_response_conversion() {
+    // 様々なJSON形式でのマッピングテスト
+    let test_jsons = vec![
+        (r#"{"summary": "test", "key_points": ["p1"]}"#, "基本形式"),
+        (r#"{"overview": "test", "highlights": ["p1"]}"#, "代替フィールド名"),
+        (r#"{"title": "Meeting", "content": "details"}"#, "最小限形式"),
+    ];
+    
+    for (json_str, description) in test_jsons {
+        // 変換実行・フィールドマッピング検証
+    }
+}
+```
+
+### 統合テスト: tests/integration_tests/ai_summary_integration_tests.rs
+
+#### test_ai_summary_full_flow
+**目的**: AI要約取得の完全フロー統合テスト
+
+**シナリオ**:
+1. UUID→エンドポイント試行→失敗→Meeting IDフォールバック→成功
+2. レート制限処理→リトライ→成功  
+3. 全エンドポイント失敗→None返却
+
+### Property-basedテスト: tests/property_tests/ai_summary_property_tests.rs
+
+#### ai_summary_endpoint_response_handling
+**目的**: 様々なHTTPレスポンスに対する堅牢性検証
+
+**検証プロパティ**:
+- 200以外のステータスコードで例外が発生しない
+- 不正JSONでパニックしない  
+- レート制限時に適切な待機処理
+
+#### ai_summary_json_conversion_invariants
+**目的**: JSON変換処理の不変条件検証
+
+**検証プロパティ**:
+- 任意の有効JSONから有効なAISummaryResponseが生成される
+- 必須フィールドが常にデフォルト値で初期化される
+- 変換処理でパニックしない
+
+### Mock仕様: tests/mocks/ai_summary_mock.rs
+
+#### HTTP Mock Server
+```rust
+// 成功レスポンス
+fn mock_ai_summary_success() -> ResponseTemplate {
+    ResponseTemplate::new(200)
+        .set_body_json(json!({
+            "meeting_uuid": "test-uuid",
+            "summary": "Test meeting summary",
+            "key_points": ["Point 1", "Point 2"]
+        }))
+}
+
+// エラーレスポンス群
+fn mock_ai_summary_404() -> ResponseTemplate { ... }
+fn mock_ai_summary_401() -> ResponseTemplate { ... }
+fn mock_ai_summary_429() -> ResponseTemplate { ... }
+```
+
+### テスト実行・検証基準
+
+#### 成功基準
+- **UUID試行**: 2つのUUID変形 × 16エンドポイント = 32回試行
+- **Meeting ID試行**: 15エンドポイント試行
+- **レスポンス変換**: 100%の有効JSON→AISummaryResponse変換成功
+- **エラー処理**: 全HTTPステータスコードで適切な処理
+
+#### 性能基準  
+- **レート制限**: 50ms間隔での適切な制御
+- **タイムアウト**: 30秒以内での全エンドポイント試行完了
+- **メモリ**: デバッグレスポンス保存時のメモリリーク無し
 
 ## 単体テスト (機能仕様対応)
 

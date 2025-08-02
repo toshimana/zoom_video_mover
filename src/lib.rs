@@ -312,40 +312,75 @@ pub struct RecordingResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TopicSummary {
-    pub name: String,
-    pub summary: String,
+    #[serde(default)]
+    pub topic_title: String,
+    #[serde(default)]
+    pub topic_content: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetailedSection {
-    pub section_name: String,
-    pub section_summary: String,
+    #[serde(default)]
+    pub section_title: String,
+    #[serde(default)]
+    pub section_content: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SummaryDetail {
-    pub detail_type: String,
-    pub content: String,
+    #[serde(default)]
+    pub label: String,
+    #[serde(default)]
+    pub summary: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AISummaryResponse {
+    #[serde(default)]
     pub meeting_uuid: String,
+    #[serde(default)]
     pub summary_start_time: String,
+    #[serde(default)]
     pub summary_end_time: String,
+    #[serde(default)]
     pub summary_created_time: String,
+    #[serde(default)]
     pub summary_last_modified_time: String,
-    pub meeting_topic: String,
-    pub meeting_id: String,
-    pub meeting_host: String,
-    pub summary_created_by: String,
+    #[serde(default)]
     pub summary_title: String,
+    #[serde(default)]
     pub summary_overview: String,
-    pub summary_keywords: Vec<String>,
+    #[serde(default)]
     pub summary_details: Vec<SummaryDetail>,
-    pub detailed_sections: Vec<DetailedSection>,
-    pub topic_summaries: Vec<TopicSummary>,
+    #[serde(default)]
+    pub summary_content: String,
+    #[serde(default)]
     pub next_steps: Vec<String>,
+    #[serde(default)]
+    pub summary_keyword: Vec<String>,
+    
+    // Alternative field names that Zoom might use
+    #[serde(default, alias = "summary")]
+    pub summary: String,
+    #[serde(default, alias = "key_points")]
+    pub key_points: Vec<String>,
+    #[serde(default, alias = "action_items")]
+    pub action_items: Vec<String>,
+    #[serde(default, alias = "meeting_id")]
+    pub meeting_id: String,
+    
+    // Additional structured content fields
+    #[serde(default, alias = "topic_summaries")]
+    pub topic_summaries: Vec<TopicSummary>,
+    #[serde(default, alias = "detailed_sections")]
+    pub detailed_sections: Vec<DetailedSection>,
+}
+
+// Alternative structure for unknown AI summary formats
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenericAISummary {
+    #[serde(flatten)]
+    pub data: serde_json::Map<String, serde_json::Value>,
 }
 
 pub struct ZoomRecordingDownloader {
@@ -823,6 +858,440 @@ impl ZoomRecordingDownloader {
         }
         
         Ok(request.output_path)
+    }
+
+    /// ミーティングUUIDを使用してAI要約を取得する
+    /// 
+    /// # 副作用
+    /// - HTTPリクエストの送信
+    /// - デバッグレスポンスファイルの保存
+    /// 
+    /// # 事前条件
+    /// - meeting_uuid は有効なZoomミーティングUUIDである
+    /// - アクセストークンが有効である
+    /// - 必要なスコープ（meeting:read）が許可されている
+    /// 
+    /// # 事後条件
+    /// - 成功時: AI要約が利用可能な場合は Some(AISummaryResponse) を返す
+    /// - AI要約が利用不可の場合は None を返す
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    /// 
+    /// # 不変条件
+    /// - self の access_token は変更されない
+    pub async fn get_ai_summary(&mut self, meeting_uuid: &str) -> Result<Option<AISummaryResponse>, ZoomVideoMoverError> {
+        println!("Requesting AI summary for UUID: {}", meeting_uuid);
+        
+        let uuid_variants = self.generate_uuid_variants(meeting_uuid);
+        
+        for (variant_idx, uuid_variant) in uuid_variants.iter().enumerate() {
+            println!("Trying UUID variant {}/{}: {}", variant_idx + 1, uuid_variants.len(), uuid_variant);
+            
+            let endpoints = self.generate_ai_summary_endpoints(uuid_variant);
+            
+            for (endpoint_idx, url) in endpoints.iter().enumerate() {
+                if let Some(summary) = self.try_single_endpoint(url, meeting_uuid, variant_idx, endpoint_idx).await? {
+                    return Ok(Some(summary));
+                }
+            }
+        }
+        
+        println!("ℹ No AI summary available for meeting {} (this is normal if AI Companion was not enabled)", meeting_uuid);
+        println!("ℹ AI summaries require: 1) AI Companion enabled, 2) Meeting host access, 3) Processing time (up to 24h)");
+        Ok(None)
+    }
+
+    /// ミーティングIDを使用してAI要約を取得する
+    /// 
+    /// # 副作用
+    /// - HTTPリクエストの送信
+    /// - デバッグレスポンスファイルの保存
+    /// 
+    /// # 事前条件
+    /// - meeting_id は有効なZoomミーティングIDである
+    /// - アクセストークンが有効である
+    /// - 必要なスコープ（meeting:read）が許可されている
+    /// 
+    /// # 事後条件
+    /// - 成功時: AI要約が利用可能な場合は Some(AISummaryResponse) を返す
+    /// - AI要約が利用不可の場合は None を返す
+    /// - 失敗時: 適切なエラーメッセージと共にエラーを返す
+    pub async fn get_ai_summary_by_meeting_id(&mut self, meeting_id: u64) -> Result<Option<AISummaryResponse>, ZoomVideoMoverError> {
+        println!("Requesting AI summary for Meeting ID: {}", meeting_id);
+        
+        let endpoints = vec![
+            format!("https://api.zoom.us/v2/meetings/{}/batch_summary", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/summary", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/ai_companion_summary", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/recording_summary", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/meeting_summary", meeting_id),
+            format!("https://api.zoom.us/v2/ai_companion/meetings/{}/summary", meeting_id),
+            format!("https://api.zoom.us/v2/ai_companion/summary/{}", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/ai_summary", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/detailed_summary", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/content_summary", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/companion_summary", meeting_id),
+            format!("https://api.zoom.us/v2/ai/meetings/{}/summary", meeting_id),
+            format!("https://api.zoom.us/v2/ai/summary/meetings/{}", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/analysis", meeting_id),
+            format!("https://api.zoom.us/v2/meetings/{}/insights", meeting_id),
+        ];
+        
+        for (i, url) in endpoints.iter().enumerate() {
+            println!("Trying endpoint {}: {}", i + 1, url);
+            
+            self.rate_limit_check().await;
+            
+            let response = self.client
+                .get(url)
+                .bearer_auth(&self.access_token)
+                .send()
+                .await
+                .map_err(|e| ZoomVideoMoverError::NetworkError(e.to_string()))?;
+
+            match response.status().as_u16() {
+                200 => {
+                    println!("AI summary response received via Meeting ID!");
+                    let response_text = response.text().await
+                        .map_err(|e| ZoomVideoMoverError::NetworkError(e.to_string()))?;
+                    println!("Response length: {} chars", response_text.len());
+                    
+                    // Save debug response
+                    self.save_debug_response(&response_text, &format!("meeting_id_{}_endpoint_{}", meeting_id, i+1)).await;
+                    
+                    if let Ok(summary) = serde_json::from_str::<AISummaryResponse>(&response_text) {
+                        println!("Successfully parsed AI summary!");
+                        return Ok(Some(summary));
+                    } else if let Ok(generic_json) = serde_json::from_str::<serde_json::Value>(&response_text) {
+                        println!("Received valid JSON, converting to AI summary format");
+                        let converted_summary = self.convert_generic_to_ai_summary(generic_json, &meeting_id.to_string());
+                        return Ok(Some(converted_summary));
+                    } else {
+                        println!("Response is not valid JSON");
+                        self.save_debug_response(&response_text, &format!("meeting_id_{}_endpoint_{}_invalid", meeting_id, i+1)).await;
+                        continue;
+                    }
+                },
+                404 => {
+                    println!("Meeting ID endpoint {} returned 404 (not found)", i+1);
+                },
+                401 => {
+                    println!("Meeting ID endpoint {} returned 401 (Unauthorized)", i+1);
+                    println!("ℹ Note: Access token may be expired or insufficient scopes");
+                },
+                403 => {
+                    println!("Meeting ID endpoint {} returned 403 (Forbidden)", i+1);
+                    println!("ℹ Note: You may need to be the meeting host to access summaries");
+                },
+                429 => {
+                    println!("Meeting ID endpoint {} returned 429 (Rate limit exceeded)", i+1);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                },
+                422 => {
+                    println!("Meeting ID endpoint {} returned 422 (Unprocessable Entity)", i+1);
+                    println!("ℹ This may indicate the summary is still being processed");
+                },
+                500..=599 => {
+                    println!("Meeting ID endpoint {} returned {} (Server error)", i+1, response.status());
+                },
+                _ => {
+                    println!("Meeting ID endpoint {} returned {} (Unknown error)", i+1, response.status());
+                    if let Ok(error_text) = response.text().await {
+                        if !error_text.is_empty() {
+                            println!("Error details: {}", 
+                                if error_text.len() > 300 { 
+                                    format!("{}...", &error_text[..300]) 
+                                } else { 
+                                    error_text 
+                                }
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        
+        println!("No AI summary found via Meeting ID {}", meeting_id);
+        Ok(None)
+    }
+
+    /// UUID形式のバリエーションを生成する（純粋関数）
+    /// 
+    /// # 事前条件
+    /// - meeting_uuid は空でない文字列である
+    /// 
+    /// # 事後条件
+    /// - UUIDのエンコーディング変形リストを返す
+    /// - 副作用なし
+    /// 
+    /// # 不変条件
+    /// - 入力パラメータを変更しない
+    fn generate_uuid_variants(&self, meeting_uuid: &str) -> Vec<String> {
+        vec![
+            meeting_uuid.to_string(),
+            meeting_uuid.replace("/", "%2F").replace("=", "%3D"),
+        ]
+    }
+
+    /// AI要約エンドポイントのリストを生成する（純粋関数）
+    /// 
+    /// # 事前条件
+    /// - uuid_variant は空でない文字列である
+    /// 
+    /// # 事後条件
+    /// - エンドポイントURLのリストを返す
+    /// - 副作用なし
+    /// 
+    /// # 不変条件
+    /// - 入力パラメータを変更しない
+    fn generate_ai_summary_endpoints(&self, uuid_variant: &str) -> Vec<String> {
+        vec![
+            format!("https://api.zoom.us/v2/meetings/{}/meeting_summary", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/recordings", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/summary", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/batch_summary", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/ai_companion_summary", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/ai_summary", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/detailed_summary", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/content_summary", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/companion_summary", uuid_variant),
+            format!("https://api.zoom.us/v2/ai_companion/meetings/{}/summary", uuid_variant),
+            format!("https://api.zoom.us/v2/ai_companion/summary/{}", uuid_variant),
+            format!("https://api.zoom.us/v2/ai/meetings/{}/summary", uuid_variant),
+            format!("https://api.zoom.us/v2/ai/summary/meetings/{}", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/analysis", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/insights", uuid_variant),
+            format!("https://api.zoom.us/v2/meetings/{}/recording_summary", uuid_variant),
+        ]
+    }
+
+    /// 単一のエンドポイントでAI要約を試行する
+    /// 
+    /// # 副作用
+    /// - HTTPリクエストの送信
+    /// - デバッグレスポンスファイルの保存
+    /// 
+    /// # 事前条件
+    /// - url は有効なURLである
+    /// - meeting_uuid は空でない文字列である
+    /// - variant_idx と endpoint_idx は有効なインデックスである
+    /// 
+    /// # 事後条件
+    /// - 成功時: AISummaryResponseを返す
+    /// - 失敗時: None を返す
+    /// 
+    /// # 不変条件
+    /// - ネットワークエラーは上位に伝播される
+    async fn try_single_endpoint(&mut self, url: &str, meeting_uuid: &str, variant_idx: usize, endpoint_idx: usize) -> Result<Option<AISummaryResponse>, ZoomVideoMoverError> {
+        println!("Trying endpoint {}: {}", endpoint_idx + 1, url);
+
+        self.rate_limit_check().await;
+
+        let response = self.client
+            .get(url)
+            .bearer_auth(&self.access_token)
+            .send()
+            .await
+            .map_err(|e| ZoomVideoMoverError::NetworkError(e.to_string()))?;
+
+        match response.status().as_u16() {
+            200 => {
+                println!("✓ Received 200 response!");
+                let response_text = response.text().await
+                    .map_err(|e| ZoomVideoMoverError::NetworkError(e.to_string()))?;
+                println!("Response length: {} chars", response_text.len());
+                
+                // Save debug response
+                self.save_debug_response(&response_text, &format!("uuid_{}_variant_{}_endpoint_{}", meeting_uuid.replace("/", "_").replace("=", "_"), variant_idx + 1, endpoint_idx + 1)).await;
+                
+                return Ok(self.extract_ai_summary_from_response(&response_text, url, meeting_uuid).await);
+            },
+            404 => {
+                println!("Endpoint {} returned 404 (not found)", endpoint_idx + 1);
+            },
+            401 => {
+                println!("Endpoint {} returned 401 (Unauthorized)", endpoint_idx + 1);
+                println!("ℹ Note: Access token may be expired or insufficient scopes");
+            },
+            403 => {
+                println!("Endpoint {} returned 403 (Forbidden)", endpoint_idx + 1);
+                println!("ℹ Note: You may need to be the meeting host to access summaries");
+            },
+            429 => {
+                println!("Endpoint {} returned 429 (Rate limit exceeded)", endpoint_idx + 1);
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            },
+            422 => {
+                println!("Endpoint {} returned 422 (Unprocessable Entity)", endpoint_idx + 1);
+                println!("ℹ This may indicate the summary is still being processed");
+            },
+            500..=599 => {
+                println!("Endpoint {} returned {} (Server error)", endpoint_idx + 1, response.status());
+            },
+            _ => {
+                println!("Endpoint {} returned {} (Unknown error)", endpoint_idx + 1, response.status());
+                if let Ok(error_text) = response.text().await {
+                    if !error_text.is_empty() {
+                        println!("Error details: {}", 
+                            if error_text.len() > 300 { 
+                                format!("{}...", &error_text[..300]) 
+                            } else { 
+                                error_text 
+                            }
+                        );
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// HTTPレスポンスからAI要約を抽出する
+    /// 
+    /// # 事前条件
+    /// - response_text は有効なHTTPレスポンステキストである
+    /// - url は有効なURLである
+    /// - meeting_uuid は空でない文字列である
+    /// 
+    /// # 事後条件
+    /// - 成功時: AISummaryResponseを返す
+    /// - 失敗時: None を返す
+    /// 
+    /// # 不変条件
+    /// - 入力パラメータを変更しない
+    async fn extract_ai_summary_from_response(&self, response_text: &str, url: &str, meeting_uuid: &str) -> Option<AISummaryResponse> {
+        // Check if this is a recordings endpoint response
+        if url.contains("/recordings") {
+            if let Ok(recordings_data) = serde_json::from_str::<serde_json::Value>(response_text) {
+                // Look for SUMMARY file type in recording files
+                if let Some(recording_files) = recordings_data.get("recording_files").and_then(|v| v.as_array()) {
+                    for file in recording_files {
+                        if let Some(file_type) = file.get("file_type").and_then(|v| v.as_str()) {
+                            if file_type == "SUMMARY" {
+                                println!("✓ Found SUMMARY file in recordings!");
+                                let converted_summary = self.convert_generic_to_ai_summary(file.clone(), meeting_uuid);
+                                return Some(converted_summary);
+                            }
+                        }
+                    }
+                }
+                println!("No SUMMARY file found in recordings");
+                return None;
+            }
+        } else {
+            // Try to parse as meeting summary response
+            if let Ok(summary) = serde_json::from_str::<AISummaryResponse>(response_text) {
+                println!("✓ Successfully parsed AI summary!");
+                return Some(summary);
+            } else if let Ok(generic_json) = serde_json::from_str::<serde_json::Value>(response_text) {
+                println!("✓ Received valid JSON, converting to AI summary format");
+                let converted_summary = self.convert_generic_to_ai_summary(generic_json, meeting_uuid);
+                return Some(converted_summary);
+            } else {
+                println!("Response is not valid JSON");
+                return None;
+            }
+        }
+        None
+    }
+
+    /// 汎用JSON形式をAISummaryResponseに変換する
+    /// 
+    /// # 事前条件
+    /// - json は有効なJSON Valueである
+    /// - meeting_uuid は空でない文字列である
+    /// 
+    /// # 事後条件
+    /// - 常に有効なAISummaryResponseを返す
+    /// - 不明なフィールドは適切なデフォルト値で初期化される
+    /// 
+    /// # 不変条件
+    /// - 入力パラメータを変更しない
+    fn convert_generic_to_ai_summary(&self, json: serde_json::Value, meeting_uuid: &str) -> AISummaryResponse {
+        // Extract common fields that might exist in various formats
+        let summary_text = json.get("summary")
+            .or_else(|| json.get("overview"))
+            .or_else(|| json.get("content"))
+            .or_else(|| json.get("brief_summary"))
+            .or_else(|| json.get("executive_summary"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let key_points = json.get("key_points")
+            .or_else(|| json.get("highlights"))
+            .or_else(|| json.get("main_points"))
+            .or_else(|| json.get("important_points"))
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+
+        let action_items: Vec<String> = json.get("action_items")
+            .or_else(|| json.get("next_steps"))
+            .or_else(|| json.get("todos"))
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+
+        // Extract summary_content (detailed markdown content)
+        let summary_content = json.get("summary_content")
+            .or_else(|| json.get("detailed_content"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        AISummaryResponse {
+            meeting_uuid: meeting_uuid.to_string(),
+            summary_start_time: json.get("start_time").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            summary_end_time: json.get("end_time").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            summary_created_time: json.get("created_time").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            summary_last_modified_time: json.get("modified_time").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            summary_title: json.get("title").and_then(|v| v.as_str()).unwrap_or("AI Generated Summary").to_string(),
+            summary_overview: summary_text.clone(),
+            summary_details: Vec::new(), // TODO: Extract from nested structures
+            summary_content: summary_content,
+            next_steps: action_items.clone(),
+            summary_keyword: json.get("keywords")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                .unwrap_or_default(),
+            summary: summary_text,
+            key_points: key_points,
+            action_items: action_items,
+            meeting_id: json.get("meeting_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            topic_summaries: Vec::new(), // TODO: Extract topic summaries
+            detailed_sections: Vec::new(), // TODO: Extract detailed sections
+        }
+    }
+
+    /// デバッグレスポンスをファイルに保存
+    /// 
+    /// # 副作用
+    /// - ファイルシステムへの書き込み
+    /// 
+    /// # 事前条件
+    /// - response_text は空でない文字列である
+    /// - suffix は有効なファイル名接尾辞である
+    /// 
+    /// # 事後条件
+    /// - デバッグファイルが作成される（エラー時は警告出力のみ）
+    /// 
+    /// # 不変条件
+    /// - self の状態は変更されない
+    async fn save_debug_response(&self, response_text: &str, suffix: &str) {
+        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S_%3f").to_string();
+        let filename = format!("debug_responses/ai_response_{}_{}_{}.json", suffix, timestamp, std::process::id());
+        
+        // Create debug directory if it doesn't exist
+        if let Err(e) = std::fs::create_dir_all("debug_responses") {
+            println!("Warning: Could not create debug directory: {}", e);
+            return;
+        }
+        
+        if let Err(e) = std::fs::write(&filename, response_text) {
+            println!("Warning: Could not save debug response to {}: {}", filename, e);
+        } else {
+            println!("Debug response saved to: {}", filename);
+        }
     }
 
 }
