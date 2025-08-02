@@ -21,7 +21,10 @@
       "WebFetch(domain:devforum.zoom.us)",
       "Bash(powershell:*)",
       "Bash(python3:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "WebFetch(domain:www.rdra.jp)",
+      "WebFetch(domain:qiita.com)",
+      "WebFetch(domain:tech.layerx.co.jp)"
     ],
     "deny": []
   }
