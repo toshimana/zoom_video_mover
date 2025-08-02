@@ -61,7 +61,6 @@
 | | OP007 | 進捗監視・制御 | UIテスト | ui_tests/screen_component_tests.rs | test_sc005_progress_screen_ui_components | UI Mock |
 | | OP008 | エラー処理・回復 | 統合テスト | integration_tests/operation_flow_tests.rs | test_op008_error_handling_recovery_flow | HTTP Mock |
 | | | | UIテスト | ui_tests/screen_component_tests.rs | test_sc006_error_display_screen_ui_components | UI Mock |
-| | OP009 | CLI実行 | 統合テスト | integration_tests/cli_tests.rs | test_cli_execution_flow | HTTP Mock |
 | **screen_specifications.md** | | | | | | |
 | | SC001 | メイン画面 | UIテスト | ui_tests/screen_component_tests.rs | (各画面テスト内でメイン画面検証) | UI Mock |
 | | SC002 | 設定画面 | UIテスト | ui_tests/screen_component_tests.rs | test_sc002_config_screen_ui_components | UI Mock |

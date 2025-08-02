@@ -4,11 +4,9 @@
 
 ```mermaid
 graph TB
-    User[ユーザー] --> GUI[GUI Interface<br/>main_gui.rs]
-    User --> CLI[CLI Interface<br/>main.rs]
+    User[ユーザー] --> GUI[GUI Interface<br/>main.rs]
     
     GUI --> Core[Core Library<br/>lib.rs]
-    CLI --> Core
     
     Core --> Config[設定管理<br/>Config struct]
     Core --> Auth[OAuth認証<br/>ZoomRecordingDownloader]
@@ -239,9 +237,8 @@ stateDiagram-v2
 
 ```mermaid
 graph TD
-    subgraph "Binary Targets"
-        MainGUI[main_gui.rs<br/>GUI Entry Point]
-        MainCLI[main.rs<br/>CLI Entry Point]
+    subgraph "Binary Target"
+        MainGUI[main.rs<br/>GUI Entry Point]
     end
     
     subgraph "Core Modules"
@@ -268,7 +265,6 @@ graph TD
     
     MainGUI --> GUI
     MainGUI --> WinConsole
-    MainCLI --> Lib
     
     GUI --> Lib
     GUI --> EFrame
@@ -293,8 +289,7 @@ graph TD
 ```
 zoom_video_mover/
 ├── src/
-│   ├── main_gui.rs      # GUI アプリケーションエントリーポイント
-│   ├── main.rs          # CLI アプリケーションエントリーポイント (非推奨)
+│   ├── main.rs          # GUI アプリケーションエントリーポイント
 │   ├── lib.rs           # コアライブラリ
 │   │   ├── Config       # 設定管理
 │   │   ├── Recording    # 録画データ構造

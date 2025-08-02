@@ -1,13 +1,12 @@
 # CLAUDE.md - Zoom Video Mover プロジェクト
 
 ## プロジェクト概要
-ZoomクラウドレコーディングをローカルにダウンロードするRustアプリケーション（CLI・GUI両対応）
+ZoomクラウドレコーディングをローカルにダウンロードするRust GUIアプリケーション
 
 ## プロジェクト構造
 ```
 src/
-├── main.rs          # CLIアプリケーションのエントリーポイント
-├── main_gui.rs      # GUIアプリケーションのエントリーポイント
+├── main.rs          # GUIアプリケーションのエントリーポイント
 ├── lib.rs           # コアライブラリ
 ├── gui.rs           # GUI実装
 └── windows_console.rs # Windows固有のコンソール処理
@@ -24,11 +23,8 @@ src/
 
 ### 開発・テスト
 ```bash
-# CLIアプリケーション
+# GUIアプリケーション
 cargo run
-
-# GUIアプリケーション  
-cargo run --bin zoom_video_mover_gui
 
 # リリースビルド
 cargo build --release
@@ -415,8 +411,6 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 | FR004-1 | egui/eframe UI | ARCHITECTURE.md:GUI状態遷移図 | gui.rs:ZoomDownloaderApp | tests/gui_integration.rs | SC001:メイン画面 | OP001:アプリケーション起動 | - |
 | FR004-2 | 設定画面 | rdra_models.md:システムコンテキスト図 | gui.rs:render_config | tests/config_ui_tests.rs | SC002:設定画面 | OP002:設定入力・保存 | FN001:設定管理機能 |
 | FR004-3 | ファイル選択 | requirements.md:ユーザーインターフェース | gui.rs:render_file_selection | tests/selection_tests.rs | SC004:録画リスト画面 | OP005:ファイル選択 | - |
-| **FR005** | **CLI操作** | | | | | | |
-| FR005-1 | CLI実行 | requirements.md:ユーザーインターフェース | main.rs | tests/cli_tests.rs | - | OP009:CLI実行 | - |
 | **NFR001** | **性能要件** | | | | | | |
 | NFR001-1 | 同時ダウンロード数制限 | requirements.md:パフォーマンス | lib.rs:CONCURRENT_LIMIT | tests/performance_tests.rs | SC005:ダウンロード進捗画面 | OP006:ダウンロード実行 | FN004:ファイルダウンロード機能 |
 | NFR001-2 | API レート制限対応 | ARCHITECTURE.md:エラー処理戦略 | lib.rs:rate_limit_handler | tests/rate_limit_tests.rs | SC006:エラー表示画面 | OP008:エラー処理・回復 | FN007:エラー処理機能 |
@@ -500,7 +494,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 | SC005:ダウンロード進捗画面 | - | OP006, OP007 | FN004, FN006 | FR003-1, FR003-2 | gui.rs:render_progress |
 | SC006:エラー表示画面 | - | OP008 | FN007 | NFR002-1 | gui.rs:render_error |
 | **operation_specifications.md** | | | | | |
-| OP001:アプリケーション起動 | SC001 | - | - | FR004-1 | main_gui.rs:main |
+| OP001:アプリケーション起動 | SC001 | - | - | FR004-1 | main.rs:main |
 | OP002:設定入力・保存 | SC002 | - | FN001 | FR001-2 | gui.rs:render_config |
 | OP003:OAuth認証実行 | SC003 | - | FN002 | FR001-1 | lib.rs:authenticate_user |
 | OP004:録画検索・一覧表示 | SC004 | - | FN003 | FR002-1, FR002-2 | lib.rs:get_recordings |
@@ -508,7 +502,6 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 | OP006:ダウンロード実行 | SC005 | - | FN004 | FR003-1 | lib.rs:download_recording |
 | OP007:進捗監視・制御 | SC005 | - | FN006 | FR003-2 | gui.rs:render_progress |
 | OP008:エラー処理・回復 | SC006 | - | FN007 | NFR002-1 | lib.rs:Error handling |
-| OP009:CLI実行 | - | - | - | FR005-1 | main.rs |
 | **function_specifications.md** | | | | | |
 | FN001:設定管理機能 | SC002 | OP002 | - | FR001-2 | lib.rs:Config |
 | FN002:OAuth認証機能 | SC003 | OP003 | - | FR001-1 | lib.rs:ZoomRecordingDownloader |
