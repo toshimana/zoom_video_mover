@@ -6,24 +6,36 @@ ZoomクラウドレコーディングをローカルにダウンロードするR
 
 プロジェクトドキュメントは以下のフォルダに整理されています：
 
-### `/docs/requirements/` - 要求・要件仕様
-- **requirements_policy.md** - 要件定義方針とプロセス
+### `/docs/policies/` - 📋 統合ポリシー管理
+プロジェクト全体のポリシーを一括管理：
+- **requirements_policy.md** - 要件定義方針・RDRAプロセス
+- **functional_requirements.md** - 機能要件詳細・依存関係  
+- **design_policy.md** - 設計方針・アーキテクチャガイドライン
+- **implementation_policy.md** - 実装方針・コーディング規約
+- **testing_policy.md** - テスト戦略・Property-based Testing方針
+- **README.md** - ポリシー統合管理ガイド
+
+### `/docs/requirements/` - 📋 要求・要件仕様
 - **system_requirements_summary.md** - システム要求仕様書
 
-### `/docs/design/` - 設計仕様
-- **design_policy.md** - 設計方針とアーキテクチャガイドライン
+### `/docs/design/` - 🏗️ 設計仕様
+- 設計関連文書（今後追加予定）
 
-### `/docs/implementation/` - 実装仕様
-- **implementation_policy.md** - 実装方針とコーディング規約
+### `/docs/implementation/` - ⚙️ 実装仕様  
+- 実装関連文書（今後追加予定）
 
-### `/docs/testing/` - テスト仕様
-- **testing_policy.md** - テスト戦略とProperty-based Testing方針
+### `/docs/testing/` - 🧪 テスト仕様
+- テスト関連文書（今後追加予定）
 
-### `/docs/analysis/` - 分析・レポート
-- **development_process_and_deliverables_report.md** - 開発プロセスと成果物の関係分析
+### `/docs/analysis/` - 📊 分析・レポート
+- **development_process_and_deliverables_report.md** - 開発プロセス分析
+- **policy_consistency_issues.md** - ポリシー整合性分析レポート
 
-### 🔗 トレーサビリティ
-すべての文書は要件-設計-実装-テストの完全なトレーサビリティを提供し、`CLAUDE.md`の包括的な開発ガイドラインと連携しています。
+### 🔗 トレーサビリティ・品質管理
+- **完全追跡**: 要件→設計→実装→テストの一貫性
+- **ポリシー統合**: `docs/policies/` での一括管理
+- **品質保証**: 整合性監視・継続改善プロセス
+- **開発ガイド**: `CLAUDE.md` との完全連携
 
 ## 必要なソフトウェア
 
