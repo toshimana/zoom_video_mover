@@ -2,6 +2,10 @@
 
 本書は、Zoom Video Moverプロジェクトで使用するZoom APIの仕様をまとめたものです。
 
+## 重要な注記
+**AI要約取得API（4.2節）の想定仕様について**: 
+4.2節「AI要約取得の想定仕様」は、gitコミット c271d65a623d6d3c8497f68478f2878ec3c7fd84 時点での実装動作例に基づいて作成された想定仕様です。Zoom APIの公式ドキュメントに明記されていない部分についても、実際の動作例から推定した仕様を記載しています。
+
 ## 1. 概要
 
 ### Base URL
@@ -181,13 +185,191 @@ Zoom AI Companionの要約機能は以下の状況です：
 
 #### API提供状況
 - **公式API**: 明確なドキュメントは確認できず
-- **要望多数**: 開発者フォーラムでAPI提供の要望が多数
-- **可能性のあるエンドポイント**: `GET /meetings/{meetingId}/summary`（未確認）
+- **要望多数**: 開発者フォーラムでAPI提供の要約が多数
+- **実装可能な戦略**: 複数のエンドポイントを順次試行する方式
 
-#### 実装時の注意点
-- API仕様が不明確なため、Web UI経由での取得を検討
-- 将来的にAPI提供される可能性が高い
-- 現時点では録画データと併せてWeb UIからの取得を推奨
+### 4.2 AI要約取得の想定仕様
+
+本セクションでは、実際の動作例（gitコミット c271d65a）に基づいた想定仕様を記載します。
+
+#### 4.2.1 基本戦略
+AI要約取得は以下の戦略で実装されています：
+
+1. **複数エンドポイント試行**: 複数の候補エンドポイントを順次試行
+2. **UUID形式対応**: Meeting UUIDの異なるエンコーディング形式に対応
+3. **Meeting ID併用**: UUIDで失敗した場合はMeeting IDでも試行
+4. **柔軟なレスポンス解析**: 複数のJSONフォーマットに対応
+
+#### 4.2.2 試行エンドポイント一覧
+
+##### Meeting UUID使用時
+```
+GET https://api.zoom.us/v2/meetings/{meeting_uuid}/meeting_summary
+GET https://api.zoom.us/v2/meetings/{meeting_uuid}/recordings  # SUMMARY file探索用
+GET https://api.zoom.us/v2/meetings/{meeting_uuid}/summary
+GET https://api.zoom.us/v2/meetings/{meeting_uuid}/batch_summary
+GET https://api.zoom.us/v2/meetings/{meeting_uuid}/ai_companion_summary
+GET https://api.zoom.us/v2/meetings/{meeting_uuid}/ai_summary
+GET https://api.zoom.us/v2/meetings/{meeting_uuid}/detailed_summary
+GET https://api.zoom.us/v2/meetings/{meeting_uuid}/content_summary
+GET https://api.zoom.us/v2/meetings/{meeting_uuid}/companion_summary
+GET https://api.zoom.us/v2/ai_companion/meetings/{meeting_uuid}/summary
+GET https://api.zoom.us/v2/ai_companion/summary/{meeting_uuid}
+GET https://api.zoom.us/v2/ai/meetings/{meeting_uuid}/summary
+GET https://api.zoom.us/v2/ai/summary/meetings/{meeting_uuid}
+GET https://api.zoom.us/v2/meetings/{meeting_uuid}/analysis
+GET https://api.zoom.us/v2/meetings/{meeting_uuid}/insights
+GET https://api.zoom.us/v2/meetings/{meeting_uuid}/recording_summary
+```
+
+##### Meeting ID使用時
+```
+GET https://api.zoom.us/v2/meetings/{meeting_id}/batch_summary
+GET https://api.zoom.us/v2/meetings/{meeting_id}/summary
+GET https://api.zoom.us/v2/meetings/{meeting_id}/ai_companion_summary
+GET https://api.zoom.us/v2/meetings/{meeting_id}/recording_summary
+GET https://api.zoom.us/v2/meetings/{meeting_id}/meeting_summary
+GET https://api.zoom.us/v2/ai_companion/meetings/{meeting_id}/summary
+GET https://api.zoom.us/v2/ai_companion/summary/{meeting_id}
+GET https://api.zoom.us/v2/meetings/{meeting_id}/ai_summary
+GET https://api.zoom.us/v2/meetings/{meeting_id}/detailed_summary
+GET https://api.zoom.us/v2/meetings/{meeting_id}/content_summary
+GET https://api.zoom.us/v2/meetings/{meeting_id}/companion_summary
+GET https://api.zoom.us/v2/ai/meetings/{meeting_id}/summary
+GET https://api.zoom.us/v2/ai/summary/meetings/{meeting_id}
+GET https://api.zoom.us/v2/meetings/{meeting_id}/analysis
+GET https://api.zoom.us/v2/meetings/{meeting_id}/insights
+```
+
+#### 4.2.3 UUID エンコーディング対応
+
+Meeting UUIDは以下の形式で順次試行：
+1. **原形**: `Q09aD/1T+O8Tlew8Qoppw==`
+2. **URLエンコード**: `Q09aD%2F1T%2BO8Tlew8Qoppw%3D%3D`
+3. **ダブルエンコード**: `Q09aD%252F1T%252BO8Tlew8Qoppw%253D%253D`
+
+#### 4.2.4 レスポンス形式
+
+##### 成功レスポンス（想定仕様）
+```json
+{
+  "meeting_uuid": "Q09aD/1T+O8Tlew8Qoppw==",
+  "summary_start_time": "2025-01-15T10:00:00Z",
+  "summary_end_time": "2025-01-15T11:00:00Z",
+  "summary_created_time": "2025-01-15T11:15:00Z",
+  "summary_last_modified_time": "2025-01-15T11:15:00Z",
+  "summary_title": "プロジェクトミーティング - AI要約",
+  "summary_overview": "本日の会議では、新機能の実装について議論し...",
+  "summary_content": "# 会議要約\n\n## 主要な議論点\n...",
+  "summary_details": [
+    {
+      "label": "主要な決定事項",
+      "summary": "新機能は来月リリース予定"
+    }
+  ],
+  "next_steps": [
+    "設計書の作成 - 担当: 田中",
+    "プロトタイプの実装 - 担当: 佐藤"
+  ],
+  "summary_keyword": ["新機能", "リリース", "設計"],
+  "key_points": [
+    "新機能の要件定義が完了",
+    "開発スケジュールが確定"
+  ],
+  "action_items": [
+    "設計書の作成 - 担当: 田中",
+    "プロトタイプの実装 - 担当: 佐藤"
+  ],
+  "topic_summaries": [
+    {
+      "topic_title": "新機能の要件",
+      "topic_content": "ユーザーからの要望に基づき..."
+    }
+  ],
+  "detailed_sections": [
+    {
+      "section_title": "技術的検討事項",
+      "section_content": "パフォーマンスとセキュリティの観点から..."
+    }
+  ]
+}
+```
+
+##### 録画ファイル内SUMMARY形式
+録画エンドポイント（`/recordings`）からSUMMARYファイルが見つかった場合：
+
+```json
+{
+  "recording_files": [
+    {
+      "id": "summary-file-id",
+      "file_type": "SUMMARY",
+      "download_url": "https://zoom.us/rec/download/...",
+      "file_size": 4096,
+      "status": "completed"
+    }
+  ]
+}
+```
+
+#### 4.2.5 HTTPステータスコード対応
+
+| ステータス | 説明 | 対処法 |
+|------------|------|--------|
+| 200 | 成功 | レスポンスをパース、要約データを抽出 |
+| 404 | Not Found | 次のエンドポイントを試行 |
+| 401 | Unauthorized | アクセストークンを更新後リトライ |
+| 403 | Forbidden | ホスト権限確認、次のエンドポイントを試行 |
+| 422 | Unprocessable Entity | 要約処理中の可能性、後で再試行 |
+| 429 | Rate Limit | 2秒待機後リトライ |
+| 500-599 | Server Error | 次のエンドポイントを試行 |
+
+#### 4.2.6 必要な権限・前提条件
+
+- **必須スコープ**: `meeting:read`
+- **ユーザー権限**: 会議ホストまたは共同ホスト
+- **AI Companion**: アカウントで有効化済み
+- **要約生成**: 会議終了後10分〜24時間以内
+- **処理時間**: 要約生成には時間がかかる場合あり
+
+#### 4.2.7 レスポンス変換機能
+
+様々なJSONフォーマットに対応するため、以下の変換処理を実装：
+
+1. **フィールド名マッピング**: 
+   - `summary` → `summary_overview`
+   - `overview` → `summary_overview`
+   - `key_points` → `key_points`
+   - `action_items` → `next_steps`
+
+2. **構造の正規化**: 
+   - ネストした構造を平坦化
+   - 配列形式の統一
+
+3. **デフォルト値設定**: 
+   - 欠損フィールドの補完
+   - 空文字列/空配列での初期化
+
+#### 4.2.8 デバッグ支援機能
+
+- **レスポンス保存**: 各エンドポイントのレスポンスをファイル保存
+- **詳細ログ**: 試行エンドポイント、ステータスコード、レスポンス長を記録
+- **UUID表示**: 各形式のUUIDをログ出力
+
+#### 4.2.9 実装時の注意点
+
+1. **エンドポイント順序**: より可能性の高いエンドポイントを先に試行
+2. **タイムアウト**: 各リクエストに適切なタイムアウトを設定
+3. **エラーハンドリング**: 全てのエンドポイントが失敗した場合の処理
+4. **レート制限**: 連続リクエスト時の適切な間隔設定
+5. **セキュリティ**: デバッグファイルに機密情報を含めない
+
+#### 4.2.10 フォールバック戦略
+
+1. **UUID→Meeting ID**: UUID試行後、Meeting IDで再試行
+2. **録画ファイル探索**: SUMMARYファイルタイプの検索
+3. **手動取得案内**: 全て失敗時はWeb UI使用を案内
+4. **処理待ち案内**: 422エラー時は時間を置いて再試行を案内
 
 ## 5. レート制限
 
