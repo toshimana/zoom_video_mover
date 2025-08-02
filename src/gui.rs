@@ -2,7 +2,7 @@ use eframe::egui;
 use std::sync::mpsc;
 use std::thread;
 use chrono::{Datelike, Local};
-use crate::{Config, ZoomRecordingDownloader, RecordingResponse};
+use crate::{Config, RecordingResponse};
 
 #[derive(Debug)]
 pub enum AppMessage {
