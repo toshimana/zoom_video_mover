@@ -4,39 +4,53 @@ use zoom_video_mover_lib::windows_console;
 use zoom_video_mover_lib::ZoomDownloaderApp;
 
 
-/// 日本語文字表示のためのフォント設定
+/// GUI表示設定（フォント・テーマ・可視性）
 /// 
 /// 事前条件:
 /// - ctx は有効なegui::Contextである
 /// - windows_console::setup_console_encoding() が事前に呼び出されている
 /// 
 /// 事後条件:
-/// - GUIのフォントサイズとスペーシングが読みやすく調整される
-/// - フォントサイズが最小14ptに設定される
-/// - 既存のフォント設定を保持し、サイズのみ調整される
-fn setup_gui_fonts(ctx: &egui::Context) {
-    windows_console::println_japanese("GUI font setup starting...");
+/// - 明確なライトテーマが設定される
+/// - フォントサイズと色が読みやすく調整される
+/// - UI要素の可視性が向上する
+fn setup_gui_appearance(ctx: &egui::Context) {
+    windows_console::println_japanese("Setting up GUI appearance...");
     
-    // Use eGUI's default font settings
-    // Avoid custom font name specifications to prevent errors
+    // ライトテーマを明示的に設定
+    ctx.set_visuals(egui::Visuals::light());
     
-    // Optimize font size and display settings only
+    // フォントとスタイルの設定
     ctx.style_mut(|style| {
-        // Adjust font size for better readability
+        // フォントサイズを読みやすく調整
         for (_, font_id) in style.text_styles.iter_mut() {
-            font_id.size = (font_id.size * 1.1).max(14.0); // 10% larger, minimum 14pt
+            font_id.size = (font_id.size * 1.2).max(16.0); // より大きなフォント
         }
         
-        // Adjust spacing for better readability
-        style.spacing.item_spacing.x *= 1.2;
-        style.spacing.item_spacing.y *= 1.1;
+        // スペーシングの改善
+        style.spacing.item_spacing.x = 8.0;
+        style.spacing.item_spacing.y = 6.0;
+        style.spacing.button_padding.x = 12.0;
+        style.spacing.button_padding.y = 8.0;
         
-        // Adjust button padding
-        style.spacing.button_padding.x *= 1.3;
-        style.spacing.button_padding.y *= 1.2;
+        // より明確な色設定
+        style.visuals.widgets.noninteractive.bg_fill = egui::Color32::WHITE;
+        style.visuals.widgets.inactive.bg_fill = egui::Color32::from_gray(245);
+        style.visuals.widgets.hovered.bg_fill = egui::Color32::from_gray(230);
+        style.visuals.widgets.active.bg_fill = egui::Color32::from_rgb(100, 149, 237);
+        
+        // テキスト色を明確に
+        style.visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::BLACK;
+        style.visuals.widgets.inactive.fg_stroke.color = egui::Color32::BLACK;
+        style.visuals.widgets.hovered.fg_stroke.color = egui::Color32::BLACK;
+        style.visuals.widgets.active.fg_stroke.color = egui::Color32::WHITE;
+        
+        // 背景色を明確に
+        style.visuals.panel_fill = egui::Color32::from_gray(248);
+        style.visuals.window_fill = egui::Color32::WHITE;
     });
     
-    windows_console::println_japanese("GUI display optimization completed");
+    windows_console::println_japanese("GUI appearance setup completed");
 }
 
 /// GUIアプリケーションのエントリーポイント
@@ -72,8 +86,8 @@ fn main() -> Result<(), eframe::Error> {
         "Zoom Recording Downloader",
         options,
         Box::new(|cc| {
-            // GUI font configuration for Windows environment
-            setup_gui_fonts(&cc.egui_ctx);
+            // GUI appearance configuration for better visibility
+            setup_gui_appearance(&cc.egui_ctx);
             
             Ok(Box::new(ZoomDownloaderApp::default()))
         }),

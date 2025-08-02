@@ -2,7 +2,6 @@ use std::fs;
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
 use chrono::{DateTime, Utc};
-use eframe;
 use std::time::Duration;
 use tokio::time::{sleep, Instant};
 
@@ -1296,38 +1295,9 @@ impl ZoomRecordingDownloader {
 
 }
 
-// GUI関連の構造体（テスト用）
-#[derive(Default)]
-pub struct ZoomDownloaderApp {
-    pub client_id: String,
-    pub client_secret: String,
-    pub output_dir: String,
-    pub config_loaded: bool,
-}
-
-#[allow(dead_code)]
-pub enum AppMessage {
-    ConfigUpdated,
-    DownloadStarted,
-    DownloadCompleted,
-    Error(String),
-}
-
-impl ZoomDownloaderApp {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-// eframeのApp traitの実装（テスト用）
-impl eframe::App for ZoomDownloaderApp {
-    fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
-        eframe::egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Zoom Recording Downloader");
-            ui.label("GUI implementation placeholder");
-        });
-    }
-}
+// GUI module
+pub mod gui;
+pub use gui::{ZoomDownloaderApp, AppMessage};
 
 pub mod windows_console {
     pub fn println_japanese(text: &str) {
