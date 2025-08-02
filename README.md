@@ -2,6 +2,29 @@
 
 ZoomクラウドレコーディングをローカルにダウンロードするRustアプリケーション
 
+## 📚 ドキュメント構成
+
+プロジェクトドキュメントは以下のフォルダに整理されています：
+
+### `/docs/requirements/` - 要求・要件仕様
+- **requirements_policy.md** - 要件定義方針とプロセス
+- **system_requirements_summary.md** - システム要求仕様書
+
+### `/docs/design/` - 設計仕様
+- **design_policy.md** - 設計方針とアーキテクチャガイドライン
+
+### `/docs/implementation/` - 実装仕様
+- **implementation_policy.md** - 実装方針とコーディング規約
+
+### `/docs/testing/` - テスト仕様
+- **testing_policy.md** - テスト戦略とProperty-based Testing方針
+
+### `/docs/analysis/` - 分析・レポート
+- **development_process_and_deliverables_report.md** - 開発プロセスと成果物の関係分析
+
+### 🔗 トレーサビリティ
+すべての文書は要件-設計-実装-テストの完全なトレーサビリティを提供し、`CLAUDE.md`の包括的な開発ガイドラインと連携しています。
+
 ## 必要なソフトウェア
 
 ### Windows 11
