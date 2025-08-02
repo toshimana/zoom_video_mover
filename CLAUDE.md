@@ -388,7 +388,29 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ## 要件と設計のトレーサビリティ
 
-### トレーサビリティマトリックス
+### 要件定義プロセス内トレーサビリティ管理
+
+#### プロセス間トレーサビリティの維持
+要件定義の各フェーズ間で成果物の関連性を明確に追跡し、変更時の影響分析を可能にする：
+
+**実装すべきトレーサビリティ**:
+1. **Phase間の成果物関連付け**: 前フェーズの成果物→次フェーズの成果物
+2. **決定事項の根拠追跡**: 意思決定→決定理由→反映成果物
+3. **変更の影響追跡**: 変更要求→影響範囲→更新成果物→検証結果
+4. **リスクの対策追跡**: リスク特定→対策立案→実施→効果測定
+
+#### トレーサビリティマトリックス管理ルール
+- **成果物作成時**: 必ずトレーサビリティマトリックスに登録
+- **成果物変更時**: 影響を受ける全成果物を特定・更新
+- **フェーズ完了時**: 完全性監査を実施（100%追跡可能性確認）
+- **定期監査**: 週次でマトリックス整合性をチェック
+
+#### 品質指標
+- **縦方向完全性**: 要件→実装の追跡可能率 = 100%
+- **横方向完全性**: フェーズ間の成果物関連付け率 = 100%
+- **更新完全性**: 変更時のマトリックス更新率 = 100%
+
+### 開発ライフサイクル全体トレーサビリティ
 
 #### 要件（Requirements）→ 設計（Design）→ 実装（Implementation）
 
@@ -407,6 +429,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 | FR003-2 | 進捗表示 | rdra_models.md:GUI状態遷移図 | gui.rs:render_progress | tests/progress_tests.rs | SC005:ダウンロード進捗画面 | OP007:進捗監視・制御 | FN006:進捗管理機能 |
 | FR003-3 | ファイル種別対応 | requirements.md:対象ファイル | lib.rs:DownloadableFile | tests/file_type_tests.rs | SC004:録画リスト画面 | OP005:ファイル選択 | FN004:ファイルダウンロード機能 |
 | FR003-4 | AI要約ダウンロード | requirements.md:対象ファイル | lib.rs:get_ai_summary | tests/ai_summary_tests.rs | SC004:録画リスト画面 | OP005:ファイル選択 | FN005:AI要約取得機能 |
+| FR003-5 | 会議別フォルダ管理 | functional_requirements.md:会議別フォルダ管理 | lib.rs:meeting_folder_manager | tests/folder_tests.rs | SC005:ダウンロード進捗画面 | OP006:ダウンロード実行 | FN008:ファイル管理機能 |
 | **FR004** | **GUI操作** | | | | | | |
 | FR004-1 | egui/eframe UI | ARCHITECTURE.md:GUI状態遷移図 | gui.rs:ZoomDownloaderApp | tests/gui_integration.rs | SC001:メイン画面 | OP001:アプリケーション起動 | - |
 | FR004-2 | 設定画面 | rdra_models.md:システムコンテキスト図 | gui.rs:render_config | tests/config_ui_tests.rs | SC002:設定画面 | OP002:設定入力・保存 | FN001:設定管理機能 |
