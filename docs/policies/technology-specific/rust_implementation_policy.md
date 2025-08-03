@@ -855,7 +855,7 @@ proptest! {
                 prop_assert!(result.is_ok() || result.unwrap_err().is_retryable());
             }
             
-            // 不変条件: リソースリークなし
+            // 不変条件: システムリークなし
             prop_assert_eq!(downloader.active_connections(), 0);
         });
     }
@@ -881,7 +881,7 @@ PROPTEST_RNG_SEED=12345 cargo test --test property_tests
 - **テストケース数**: 1000ケース以上/プロパティ
 - **成功率**: 99.5%以上
 - **カバレッジ**: 全純粋関数・データ変換処理
-- **実行時間**: CI環境で5分以内完了
+- **実行効率**: CI環境での効率的実行
 
 ## 関数設計・実装規約
 
@@ -1001,7 +1001,7 @@ assert!(start_date <= end_date, "start_date must be before or equal to end_date"
 assert!(self.is_authenticated(), "must be authenticated before API calls");
 assert!(self.config.is_valid(), "configuration must be valid");
 
-// リソース検証
+// システム検証
 assert!(path.exists(), "path must exist: {}", path.display());
 assert!(file.metadata()?.len() > 0, "file must not be empty");
 ```
@@ -1354,7 +1354,7 @@ pub async fn download_streaming(
 }
 ```
 
-#### リソースプール
+#### システムプール
 ```rust
 /// 効率的なHTTPクライアントプール
 pub struct HttpClientPool {
@@ -1949,7 +1949,7 @@ pub async fn download_with_verification(
         );
     }
     
-    // 実行時間チェック
+    // 実行効率チェック
     let elapsed = initial_time.elapsed();
     if elapsed > Duration::from_secs(300) { // 5分
         log::warn!(
@@ -2075,7 +2075,7 @@ pub enum HealthIssue {
 ### 実装方針の特徴
 - **Rust最新機能の活用**: 型安全性・メモリ安全性・並行性の完全活用
 - **防御的プログラミング**: 事前/事後条件・不変条件による堅牢性確保
-- **パフォーマンス重視**: 非同期処理・ゼロコスト抽象化・リソース効率化
+- **パフォーマンス重視**: 非同期処理・ゼロコスト抽象化・システム効率化
 - **セキュリティファースト**: 認証情報保護・通信暗号化・実行時検証
 - **品質保証**: 包括的エラーハンドリング・実行時監視・自動フォールバック
 - **保守性**: 明確なコード構造・包括的ログ・テスト容易性
@@ -2087,4 +2087,4 @@ pub enum HealthIssue {
 - **セキュリティ**: 多層防御による堅牢なセキュリティ実現
 - **保守性**: 構造化された実装による長期保守の容易化
 
-この実装方針に従うことで、**ユーザーの期待を超え、技術的に優秀で、長期間にわたって安定稼働する**ソフトウェアシステムを構築できます。
+この実装方針に従うことで、**ユーザーの期待を超え、技術的に優秀で、持続的に安定稼働する**ソフトウェアシステムを構築できます。
