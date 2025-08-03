@@ -388,185 +388,63 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ## 要件と設計のトレーサビリティ
 
-### 要件定義プロセス内トレーサビリティ管理
+### 二層トレーサビリティ管理体制
 
-#### プロセス間トレーサビリティの維持
-要件定義の各フェーズ間で成果物の関連性を明確に追跡し、変更時の影響分析を可能にする：
+#### 1. 要件プロセス内トレーサビリティ (`requirements_traceability_matrix.md`)
+要件定義Phase0-6内での成果物間関係性を追跡：
 
-**実装すべきトレーサビリティ**:
-1. **Phase間の成果物関連付け**: 前フェーズの成果物→次フェーズの成果物
-2. **決定事項の根拠追跡**: 意思決定→決定理由→反映成果物
-3. **変更の影響追跡**: 変更要求→影響範囲→更新成果物→検証結果
-4. **リスクの対策追跡**: リスク特定→対策立案→実施→効果測定
+**対象範囲**:
+- Phase間の成果物関連付け: 前フェーズ成果物→次フェーズ成果物  
+- Phase内の要件間整合性: ステークホルダー要求→システム要件→非機能要件
+- 要件変更の要件プロセス内影響範囲分析
 
-#### トレーサビリティマトリックス管理ルール
-- **成果物作成時**: 必ずトレーサビリティマトリックスに登録
-- **成果物変更時**: 影響を受ける全成果物を特定・更新
-- **フェーズ完了時**: 完全性監査を実施（100%追跡可能性確認）
-- **定期監査**: 週次でマトリックス整合性をチェック
+#### 2. 全体プロセス間トレーサビリティ (`overall_traceability_matrix.md`)  
+要件→設計→実装→テスト間の一貫性を追跡：
+
+**対象範囲**:
+- 要件プロセス→設計プロセス: システム要件→アーキテクチャ設計
+- 設計プロセス→実装プロセス: 詳細設計→Rustコード実装  
+- 実装プロセス→テストプロセス: コード→単体・統合・E2Eテスト
+- プロセス間変更影響の全体分析
+#### トレーサビリティ管理ルール
+**要件プロセス内**:
+- Phase間成果物関連付けの維持
+- 要件変更時の要件プロセス内影響分析  
+- Phase完了時の要件整合性監査
+
+**プロセス間**:
+- 要件→設計→実装→テストの完全トレース
+- プロセス間変更影響の全体分析
+- 品質ゲート通過時の整合性確認
 
 #### 品質指標
-- **縦方向完全性**: 要件→実装の追跡可能率 = 100%
-- **横方向完全性**: フェーズ間の成果物関連付け率 = 100%
+- **要件プロセス内完全性**: Phase間関連付け率 = 100%
+- **プロセス間完全性**: 要件→テスト追跡可能率 = 100%  
 - **更新完全性**: 変更時のマトリックス更新率 = 100%
 
-### 開発ライフサイクル全体トレーサビリティ
+### トレーサビリティマトリックス参照
 
-#### 要件（Requirements）→ 設計（Design）→ 実装（Implementation）
+#### 詳細トレーサビリティ情報
+詳細なトレーサビリティ情報は以下の専用ファイルを参照：
 
-| 要件ID | 要件名 | 設計文書 | 実装ファイル | テスト | 画面仕様 | 操作仕様 | 機能仕様 |
-|--------|--------|----------|-------------|--------|----------|----------|----------|
-| **FR001** | **OAuth認証** | | | | | | |
-| FR001-1 | OAuth 2.0認証フロー | rdra_models.md:OAuth認証フロー図 | lib.rs:ZoomRecordingDownloader | tests/oauth_tests.rs | SC003:認証画面 | OP003:OAuth認証実行 | FN002:OAuth認証機能 |
-| FR001-2 | Client ID/Secret設定 | requirements.md:認証機能 | lib.rs:Config | tests/config_tests.rs | SC002:設定画面 | OP002:設定入力・保存 | FN001:設定管理機能 |
-| FR001-3 | トークン取得・更新 | ARCHITECTURE.md:OAuth認証フロー図 | lib.rs:authenticate_user | tests/token_tests.rs | SC003:認証画面 | OP003:OAuth認証実行 | FN002:OAuth認証機能 |
-| **FR002** | **録画一覧取得** | | | | | | |
-| FR002-1 | Zoom API呼び出し | ARCHITECTURE.md:データフロー図 | lib.rs:get_recordings | tests/api_tests.rs | SC004:録画リスト画面 | OP004:録画検索・一覧表示 | FN003:録画検索機能 |
-| FR002-2 | 録画リスト表示 | rdra_models.md:ビジネスフロー図 | gui.rs:render_recordings | tests/gui_tests.rs | SC004:録画リスト画面 | OP004:録画検索・一覧表示 | FN003:録画検索機能 |
-| FR002-3 | 期間フィルタリング | requirements.md:ダウンロード機能 | lib.rs:filter_by_date | tests/filter_tests.rs | SC004:録画リスト画面 | OP004:録画検索・一覧表示 | FN003:録画検索機能 |
-| **FR003** | **ファイルダウンロード** | | | | | | |
-| FR003-1 | 並列ダウンロード | ARCHITECTURE.md:システム構成図 | lib.rs:download_recording | tests/download_tests.rs | SC005:ダウンロード進捗画面 | OP006:ダウンロード実行 | FN004:ファイルダウンロード機能 |
-| FR003-2 | 進捗表示 | rdra_models.md:GUI状態遷移図 | gui.rs:render_progress | tests/progress_tests.rs | SC005:ダウンロード進捗画面 | OP007:進捗監視・制御 | FN006:進捗管理機能 |
-| FR003-3 | ファイル種別対応 | requirements.md:対象ファイル | lib.rs:DownloadableFile | tests/file_type_tests.rs | SC004:録画リスト画面 | OP005:ファイル選択 | FN004:ファイルダウンロード機能 |
-| FR003-4 | AI要約ダウンロード | requirements.md:対象ファイル | lib.rs:get_ai_summary | tests/ai_summary_tests.rs | SC004:録画リスト画面 | OP005:ファイル選択 | FN005:AI要約取得機能 |
-| FR003-5 | 会議別フォルダ管理 | functional_requirements.md:会議別フォルダ管理 | lib.rs:meeting_folder_manager | tests/folder_tests.rs | SC005:ダウンロード進捗画面 | OP006:ダウンロード実行 | FN008:ファイル管理機能 |
-| **FR004** | **GUI操作** | | | | | | |
-| FR004-1 | egui/eframe UI | ARCHITECTURE.md:GUI状態遷移図 | gui.rs:ZoomDownloaderApp | tests/gui_integration.rs | SC001:メイン画面 | OP001:アプリケーション起動 | - |
-| FR004-2 | 設定画面 | rdra_models.md:システムコンテキスト図 | gui.rs:render_config | tests/config_ui_tests.rs | SC002:設定画面 | OP002:設定入力・保存 | FN001:設定管理機能 |
-| FR004-3 | ファイル選択 | requirements.md:ユーザーインターフェース | gui.rs:render_file_selection | tests/selection_tests.rs | SC004:録画リスト画面 | OP005:ファイル選択 | - |
-| **NFR001** | **性能要件** | | | | | | |
-| NFR001-1 | 同時ダウンロード数制限 | requirements.md:パフォーマンス | lib.rs:CONCURRENT_LIMIT | tests/performance_tests.rs | SC005:ダウンロード進捗画面 | OP006:ダウンロード実行 | FN004:ファイルダウンロード機能 |
-| NFR001-2 | API レート制限対応 | ARCHITECTURE.md:エラー処理戦略 | lib.rs:rate_limit_handler | tests/rate_limit_tests.rs | SC006:エラー表示画面 | OP008:エラー処理・回復 | FN007:エラー処理機能 |
-| **NFR002** | **信頼性要件** | | | | | | |
-| NFR002-1 | エラーハンドリング | ARCHITECTURE.md:エラー処理戦略 | lib.rs:ZoomVideoMoverError | tests/error_handling_tests.rs | SC006:エラー表示画面 | OP008:エラー処理・回復 | FN007:エラー処理機能 |
-| NFR002-2 | ログ出力 | requirements.md:信頼性 | lib.rs:logger_init | tests/logging_tests.rs | - | - | FN009:ログ出力機能 |
-| **NFR003** | **セキュリティ要件** | | | | | | |
-| NFR003-1 | OAuth情報保護 | requirements.md:セキュリティ | lib.rs:secure_storage | tests/security_tests.rs | SC002:設定画面 | OP002:設定入力・保存 | FN001:設定管理機能 |
-| NFR003-2 | HTTPS通信強制 | ARCHITECTURE.md:技術選定 | lib.rs:reqwest_client | tests/https_tests.rs | - | - | FN002:OAuth認証機能 |
-| **NFR004** | **国際化要件** | | | | | | |
-| NFR004-1 | Windows日本語対応 | requirements.md:国際化 | windows_console.rs | tests/encoding_tests.rs | - | OP001:アプリケーション起動 | FN010:Windows対応機能 |
-| NFR004-2 | 日本語ファイル名 | ARCHITECTURE.md:データフロー | lib.rs:sanitize_filename | tests/filename_tests.rs | SC005:ダウンロード進捗画面 | OP006:ダウンロード実行 | FN008:ファイル管理機能 |
+**要件プロセス内トレーサビリティ**:
+- `docs/requirements/crosscutting/requirements_traceability_matrix.md`
+- Phase0-6内の成果物間関係性
+- 要件変更の要件プロセス内影響分析
 
-#### 逆トレーサビリティ（実装→要件）
+**プロセス間トレーサビリティ**:
+- `docs/requirements/crosscutting/overall_traceability_matrix.md`
+- 要件→設計→実装→テストの完全トレース
+- プロセス間変更影響の全体分析
 
-| 実装ファイル | 主要クラス/関数 | 対応要件ID | 設計根拠 |
-|-------------|----------------|------------|----------|
-| **lib.rs** | | | |
-| lib.rs:47 | `Config` struct | FR001-2, NFR003-1 | OAuth設定管理 |
-| lib.rs:152 | `ZoomRecordingDownloader` | FR001, FR002, FR003 | コアビジネスロジック |
-| lib.rs:298 | `authenticate_user()` | FR001-1, FR001-3 | OAuth認証実装 |
-| lib.rs:445 | `get_recordings()` | FR002-1, FR002-3 | API呼び出し |
-| lib.rs:521 | `download_recording()` | FR003-1, NFR001-1 | 並列ダウンロード |
-| **gui.rs** | | | |
-| gui.rs:58 | `ZoomDownloaderApp` | FR004-1 | GUIメイン状態管理 |
-| gui.rs:195 | `render_config()` | FR004-2 | 設定画面描画 |
-| gui.rs:267 | `render_recordings()` | FR002-2, FR004-3 | 録画リスト表示 |
-| gui.rs:348 | `render_progress()` | FR003-2 | 進捗バー表示 |
-| **windows_console.rs** | | | |
-| windows_console.rs:15 | `setup_console_encoding()` | NFR004-1 | Windows UTF-8設定 |
+#### 変更管理プロセス
 
-#### テストトレーサビリティ
+1. **要件変更時**: 要件プロセス内影響分析 → プロセス間影響分析 → 実装・テスト更新
+2. **設計変更時**: プロセス間影響分析 → 実装・テスト更新  
+3. **実装変更時**: 事前条件・事後条件・不変条件の維持 → テスト更新
 
-| テストファイル | テスト関数 | 検証要件 | テスト種別 | 合格基準 |
-|---------------|------------|----------|------------|----------|
-| **tests/oauth_tests.rs** | | | | |
-| oauth_tests.rs | `test_oauth_flow()` | FR001-1 | 統合テスト | 認証完了まで正常 |
-| oauth_tests.rs | `test_token_refresh()` | FR001-3 | 単体テスト | リフレッシュ成功 |
-| **tests/config_tests.rs** | | | | |
-| config_tests.rs | `test_config_roundtrip()` | FR001-2 | Property-based | TOML保存・読込一致 |
-| config_tests.rs | `test_config_validation()` | NFR003-1 | 単体テスト | 無効設定をリジェクト |
-| **tests/download_tests.rs** | | | | |
-| download_tests.rs | `test_parallel_download()` | FR003-1, NFR001-1 | 統合テスト | 制限内同時実行 |
-| download_tests.rs | `test_download_progress()` | FR003-2 | 単体テスト | 進捗イベント発火 |
-| **tests/property_tests.rs** | | | | |
-| property_tests.rs | `date_range_validation()` | FR002-3 | Property-based | 有効日付のみ生成 |
-| property_tests.rs | `filename_sanitization()` | NFR004-2 | Property-based | 日本語文字正常処理 |
-
-#### 品質保証トレーサビリティ
-
-| 品質活動 | 対象 | 実行コマンド | 検証内容 | 成功基準 |
-|----------|------|-------------|----------|----------|
-| **型安全性チェック** | 全実装 | `cargo check` | コンパイルエラー | エラー0件 |
-| **静的解析** | 全実装 | `cargo clippy` | コーディング規約 | 警告0件 |
-| **フォーマット** | 全実装 | `cargo fmt` | コードスタイル | 差分なし |
-| **単体テスト** | 個別関数 | `cargo test --lib` | 関数仕様 | 全テスト合格 |
-| **統合テスト** | システム全体 | `cargo test --test integration` | 要件充足 | 全シナリオ合格 |
-| **Property-based** | データ処理 | `cargo test --test property_tests` | データ整合性 | 1000ケース合格 |
-
-#### 仕様書間相互参照
-
-| 仕様書分類 | 文書名 | 主要セクション | 参照関係 | 参照内容 |
-|------------|--------|---------------|----------|----------|
-| **要件仕様** | requirements.md | 機能要件・非機能要件 | → 設計仕様 | システム要件の詳細定義 |
-| **設計仕様** | ARCHITECTURE.md | システム構成・データフロー | requirements.md ← → 実装 | アーキテクチャ設計 |
-| **設計仕様** | rdra_models.md | RDRA 6モデル図 | requirements.md ← → 実装 | 要件の構造化表現 |
-| **画面仕様** | screen_specifications.md | 6画面の詳細仕様 | requirements.md ← → GUI実装 | UI/UX設計詳細 |
-| **操作仕様** | operation_specifications.md | 9操作の手順・フロー | 画面仕様 ← → 機能仕様 | ユーザー操作の定義 |
-| **機能仕様** | function_specifications.md | 10機能の詳細仕様 | 要件仕様 ← → 実装 | 機能の内部仕様 |
-| **実装仕様** | CLAUDE.md | コーディング規約・テスト | 全仕様書 ← → src/ | 実装ガイドライン |
-
-#### 新規作成文書のトレーサビリティ
-
-| 仕様書 | 画面ID | 操作ID | 機能ID | 要件ID | 実装箇所 |
-|--------|--------|--------|--------|--------|----------|
-| **screen_specifications.md** | | | | | |
-| SC001:メイン画面 | - | OP001 | - | FR004-1 | gui.rs:ZoomDownloaderApp |
-| SC002:設定画面 | - | OP002 | FN001 | FR001-2, FR004-2 | gui.rs:render_config |
-| SC003:認証画面 | - | OP003 | FN002 | FR001-1 | gui.rs:render_auth |
-| SC004:録画リスト画面 | - | OP004, OP005 | FN003 | FR002-1, FR002-2, FR004-3 | gui.rs:render_recordings |
-| SC005:ダウンロード進捗画面 | - | OP006, OP007 | FN004, FN006 | FR003-1, FR003-2 | gui.rs:render_progress |
-| SC006:エラー表示画面 | - | OP008 | FN007 | NFR002-1 | gui.rs:render_error |
-| **operation_specifications.md** | | | | | |
-| OP001:アプリケーション起動 | SC001 | - | - | FR004-1 | main.rs:main |
-| OP002:設定入力・保存 | SC002 | - | FN001 | FR001-2 | gui.rs:render_config |
-| OP003:OAuth認証実行 | SC003 | - | FN002 | FR001-1 | lib.rs:authenticate_user |
-| OP004:録画検索・一覧表示 | SC004 | - | FN003 | FR002-1, FR002-2 | lib.rs:get_recordings |
-| OP005:ファイル選択 | SC004 | - | - | FR004-3 | gui.rs:render_recordings |
-| OP006:ダウンロード実行 | SC005 | - | FN004 | FR003-1 | lib.rs:download_recording |
-| OP007:進捗監視・制御 | SC005 | - | FN006 | FR003-2 | gui.rs:render_progress |
-| OP008:エラー処理・回復 | SC006 | - | FN007 | NFR002-1 | lib.rs:Error handling |
-| **function_specifications.md** | | | | | |
-| FN001:設定管理機能 | SC002 | OP002 | - | FR001-2 | lib.rs:Config |
-| FN002:OAuth認証機能 | SC003 | OP003 | - | FR001-1 | lib.rs:ZoomRecordingDownloader |
-| FN003:録画検索機能 | SC004 | OP004 | - | FR002-1 | lib.rs:get_recordings |
-| FN004:ファイルダウンロード機能 | SC005 | OP006 | - | FR003-1 | lib.rs:download_recording |
-| FN005:AI要約取得機能 | SC004 | OP005 | - | FR003-4 | lib.rs:get_ai_summary |
-| FN006:進捗管理機能 | SC005 | OP007 | - | FR003-2 | gui.rs:ProgressTracker |
-| FN007:エラー処理機能 | SC006 | OP008 | - | NFR002-1 | lib.rs:ZoomVideoMoverError |
-| FN008:ファイル管理機能 | SC005 | OP006 | - | NFR004-2 | lib.rs:FileManager |
-| FN009:ログ出力機能 | - | - | - | NFR002-2 | lib.rs:Logger |
-| FN010:Windows対応機能 | - | OP001 | - | NFR004-1 | windows_console.rs |
-
-### トレーサビリティ管理プロセス
-
-#### 1. 要件変更時の手順
-1. **影響分析**: 変更要件に関連する設計・実装を特定
-2. **設計更新**: アーキテクチャ文書の該当箇所を修正
-3. **実装修正**: トレーサビリティマトリックスに基づいて対象ファイルを更新
-4. **テスト更新**: 変更に対応するテスト仕様・実装を修正
-5. **文書同期**: 関連文書間の整合性を確認・更新
-
-#### 2. 設計変更時の手順
-1. **要件確認**: 設計変更が要件逸脱でないことを確認
-2. **実装影響**: 対象実装ファイル・関数を特定
-3. **テスト影響**: 修正が必要なテストケースを特定
-4. **品質保証**: 型チェック・静的解析で整合性確認
-
-#### 3. 実装変更時の手順
-1. **要件追跡**: 変更理由が要件・設計に由来することを確認
-2. **テスト先行**: 変更前にテストケースを更新
-3. **実装実行**: 事前条件・事後条件・不変条件を維持
-4. **文書更新**: 必要に応じて設計文書を更新
-
-### トレーサビリティ品質メトリクス
-
-| メトリクス | 計算方法 | 目標値 | 現在値 |
-|------------|----------|--------|--------|
-| **要件カバレッジ** | 実装済み要件数 / 全要件数 | 100% | 98% |
-| **設計カバレッジ** | 設計文書化要件数 / 全要件数 | 100% | 100% |
-| **テストカバレッジ** | テスト済み要件数 / 全要件数 | 90% | 85% |
-| **文書整合性** | 同期済み文書参照数 / 全文書参照数 | 100% | 95% |
-| **変更追跡率** | 追跡可能変更数 / 全変更数 | 100% | 90% |
+詳細な変更管理手順は以下を参照：
+- `docs/requirements/crosscutting/change_management.md`
 
 ## トラブルシューティング参考
 - README.mdの詳細なトラブルシューティングセクション参照

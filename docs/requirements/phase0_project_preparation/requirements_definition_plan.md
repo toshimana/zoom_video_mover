@@ -230,7 +230,8 @@ Phase 6: 統合・検証・承認     │                        ████│
 
 #### 横断的テンプレート
 - `review_checklist_template.md`
-- `traceability_matrix_template.csv`
+- `requirements_traceability_matrix.md` - 要件プロセス内トレーサビリティ
+- `overall_traceability_matrix.md` - プロセス間トレーサビリティ
 - `change_request_template.md`
 
 ## リスク管理計画
