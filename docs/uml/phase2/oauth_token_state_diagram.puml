@@ -1,0 +1,123 @@
+@startuml OAuthTokenStateDiagram
+!theme plain
+title 状態遷移図 - OAuth2Token状態管理
+
+[*] --> NOT_AUTHENTICATED : アプリ起動
+
+state NOT_AUTHENTICATED {
+  NOT_AUTHENTICATED : entry / clearStoredToken()
+  NOT_AUTHENTICATED : do / showLoginPrompt()
+}
+
+NOT_AUTHENTICATED --> AUTHENTICATING : startAuth() / initiateOAuth()
+
+state AUTHENTICATING {
+  AUTHENTICATING : entry / openBrowser()
+  AUTHENTICATING : do / waitForCallback()
+  
+  state WAITING_USER_AUTH {
+    WAITING_USER_AUTH : do / displayAuthURL()
+    WAITING_USER_AUTH : do / pollCallback()
+  }
+  
+  state EXCHANGING_CODE {
+    EXCHANGING_CODE : entry / sendTokenRequest()
+    EXCHANGING_CODE : do / validateResponse()
+  }
+  
+  WAITING_USER_AUTH --> EXCHANGING_CODE : callbackReceived()
+}
+
+AUTHENTICATING --> AUTHENTICATED : tokenReceived() / storeToken()
+AUTHENTICATING --> AUTH_FAILED : authError() / logError()
+AUTHENTICATING --> NOT_AUTHENTICATED : userCancelled() / cleanup()
+
+state AUTHENTICATED {
+  AUTHENTICATED : entry / notifySuccess()
+  AUTHENTICATED : do / enableAPIAccess()
+  
+  state VALID {
+    VALID : do / allowAPIRequests()
+    VALID : do / monitorExpiry()
+  }
+  
+  state NEAR_EXPIRY {
+    NEAR_EXPIRY : entry / scheduleRefresh()
+    NEAR_EXPIRY : do / warnUser()
+  }
+  
+  VALID --> NEAR_EXPIRY : expiryApproaching() [timeLeft < 5min]
+}
+
+AUTHENTICATED --> REFRESHING : tokenExpiring() / attemptRefresh()
+AUTHENTICATED --> NOT_AUTHENTICATED : logout() / clearToken()
+AUTHENTICATED --> AUTH_FAILED : tokenInvalid() / clearToken()
+
+state REFRESHING {
+  REFRESHING : entry / sendRefreshRequest()
+  REFRESHING : do / validateNewToken()
+  REFRESHING : exit / updateStoredToken()
+}
+
+REFRESHING --> AUTHENTICATED : refreshSuccess() / updateToken()
+REFRESHING --> AUTH_FAILED : refreshFailed() / clearToken()
+
+state AUTH_FAILED {
+  AUTH_FAILED : entry / logFailure()
+  AUTH_FAILED : do / displayError()
+  
+  state RECOVERABLE_ERROR {
+    RECOVERABLE_ERROR : do / showRetryOption()
+  }
+  
+  state PERMANENT_ERROR {
+    PERMANENT_ERROR : do / showReauthOption()
+  }
+  
+  AUTH_FAILED --> RECOVERABLE_ERROR : networkError()
+  AUTH_FAILED --> PERMANENT_ERROR : invalidCredentials()
+}
+
+AUTH_FAILED --> AUTHENTICATING : retry() / clearError()
+AUTH_FAILED --> NOT_AUTHENTICATED : giveUp() / reset()
+
+' 自動遷移
+AUTHENTICATED --> REFRESHING : [timer:expiryTime-5min]
+REFRESHING --> AUTH_FAILED : [timer:refreshTimeout]
+
+' イベント・ガード条件
+note right of AUTHENTICATING
+  **Events:**
+  - startAuth(): 認証開始
+  - callbackReceived(): コールバック受信
+  - authError(): 認証エラー
+  - userCancelled(): ユーザーキャンセル
+  
+  **Timeout:**
+  - 2分でタイムアウト
+end note
+
+note left of AUTHENTICATED
+  **Token Validation:**
+  - トークン形式チェック
+  - 有効期限確認
+  - スコープ検証
+  
+  **Auto Refresh:**
+  - 期限5分前に自動更新
+  - 失敗時は再認証
+end note
+
+note bottom of REFRESHING
+  **Refresh Strategy:**
+  - リフレッシュトークン使用
+  - 失敗時は最大3回リトライ
+  - 最終的に失敗なら再認証要求
+  
+  **Error Handling:**
+  - ネットワークエラー: リトライ
+  - 無効トークン: 再認証
+  - レート制限: 遅延後リトライ
+end note
+
+@enduml

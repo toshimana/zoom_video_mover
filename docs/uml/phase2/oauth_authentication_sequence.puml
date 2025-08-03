@@ -1,0 +1,98 @@
+@startuml OAuthAuthenticationSequence
+!theme plain
+title シーケンス図 - OAuth認証フロー
+
+actor User as user
+participant "MainWindow" as ui
+participant "AuthenticationService" as auth
+participant "OAuthClient" as oauth
+participant "SecureStorage" as storage
+participant "ZoomAPI" as zoom
+participant "ConfigService" as config
+
+user -> ui : アプリケーション起動
+activate ui
+
+ui -> config : loadConfig()
+activate config
+config --> ui : ApplicationConfig
+deactivate config
+
+ui -> auth : validateStoredToken()
+activate auth
+
+auth -> storage : loadEncryptedToken()
+activate storage
+storage --> auth : EncryptedToken?
+deactivate storage
+
+alt トークンが存在し、有効
+    auth -> auth : decryptToken()
+    auth -> zoom : validateToken()
+    activate zoom
+    zoom --> auth : TokenValidation
+    deactivate zoom
+    auth --> ui : TokenValid
+    ui --> user : メイン画面表示
+else トークンが無効または存在しない
+    auth --> ui : AuthenticationRequired
+    
+    ui --> user : 認証が必要です
+    user -> ui : OAuth認証開始ボタンクリック
+    
+    ui -> auth : startOAuthFlow(config)
+    
+    auth -> oauth : initiateAuthorizationFlow()
+    activate oauth
+    oauth -> oauth : generateCodeVerifier()
+    oauth -> oauth : generateCodeChallenge()
+    oauth -> oauth : buildAuthorizationUrl()
+    oauth --> auth : AuthorizationUrl
+    deactivate oauth
+    
+    auth -> ui : openBrowser(url)
+    ui -> ui : ブラウザ起動
+    
+    note right of user
+        ユーザーがブラウザで
+        Zoom認証を実施
+    end note
+    
+    user -> zoom : 認証情報入力・承認
+    activate zoom
+    zoom --> oauth : リダイレクト(authorization_code)
+    deactivate zoom
+    
+    oauth -> auth : コールバック受信(code)
+    
+    auth -> oauth : exchangeCodeForToken(code)
+    activate oauth
+    oauth -> zoom : POST /oauth/token
+    activate zoom
+    zoom --> oauth : AccessToken + RefreshToken
+    deactivate zoom
+    oauth --> auth : OAuth2Token
+    deactivate oauth
+    
+    auth -> auth : validateToken()
+    
+    auth -> storage : encryptAndStoreToken(token)
+    activate storage
+    storage -> storage : encrypt(token)
+    storage -> storage : saveToFile()
+    storage --> auth : StorageSuccess
+    deactivate storage
+    
+    auth -> zoom : getUserInfo(token)
+    activate zoom
+    zoom --> auth : UserInfo
+    deactivate zoom
+    
+    auth --> ui : AuthenticationSuccess(user)
+    ui --> user : 認証成功 - メイン画面表示
+end
+
+deactivate auth
+deactivate ui
+
+@enduml

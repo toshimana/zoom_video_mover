@@ -1,0 +1,115 @@
+@startuml ConceptualClassDiagram
+!theme plain
+title 概念クラス図 - Zoom Video Mover ドメインモデル
+
+package "認証ドメイン" {
+  class User {
+    + userId: String
+    + email: String
+  }
+  
+  class OAuth2Token {
+    + accessToken: String
+    + refreshToken: String
+    + expiresAt: DateTime
+  }
+  
+  class ZoomAccount {
+    + accountId: String
+    + accountType: String
+  }
+}
+
+package "会議録画ドメイン" {
+  class Meeting {
+    + meetingId: String
+    + topic: String
+    + startTime: DateTime
+    + duration: Duration
+    + hostId: String
+  }
+  
+  class Recording {
+    + recordingId: String
+    + fileType: FileType
+    + downloadUrl: String
+    + fileSize: Long
+    + recordingType: RecordingType
+  }
+  
+  class AISummary {
+    + summaryId: String
+    + content: String
+    + language: String
+    + generatedAt: DateTime
+  }
+}
+
+package "ダウンロードドメイン" {
+  class DownloadTask {
+    + taskId: String
+    + status: DownloadStatus
+    + progress: Percentage
+    + startedAt: DateTime
+  }
+  
+  class LocalFile {
+    + filePath: Path
+    + fileName: String
+    + checksum: String
+    + createdAt: DateTime
+  }
+}
+
+package "設定ドメイン" {
+  class ApplicationConfig {
+    + clientId: String
+    + clientSecret: String
+    + redirectUri: String
+    + downloadPath: Path
+  }
+  
+  class FilterCriteria {
+    + fromDate: Date
+    + toDate: Date
+    + includeTypes: List<FileType>
+    + hostFilter: String
+  }
+}
+
+' ドメイン間関係性
+User ||--|| ZoomAccount : "has"
+User ||--|| OAuth2Token : "authenticated by"
+ZoomAccount ||--o{ Meeting : "hosts"
+Meeting ||--o{ Recording : "generates"
+Meeting ||--o| AISummary : "may have"
+Recording ||--|| DownloadTask : "downloaded via"
+DownloadTask ||--|| LocalFile : "creates"
+User ||--|| ApplicationConfig : "configures"
+User ||--|| FilterCriteria : "specifies"
+
+' 列挙型
+enum FileType {
+  VIDEO_MP4
+  AUDIO_MP3
+  TRANSCRIPT_VTT
+  CHAT_TXT
+}
+
+enum RecordingType {
+  SHARED_SCREEN_WITH_SPEAKER_VIEW
+  SHARED_SCREEN_WITH_GALLERY_VIEW
+  SPEAKER_VIEW
+  GALLERY_VIEW
+  AUDIO_ONLY
+}
+
+enum DownloadStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+@enduml

@@ -1,0 +1,139 @@
+@startuml PackageDiagram
+!theme plain
+title パッケージ図 - Zoom Video Mover システム構造
+
+package "Presentation Layer" {
+  package "gui" {
+    package "components" {
+      class MainWindow
+      class SettingsDialog
+      class ProgressPanel
+      class ErrorDialog
+    }
+    package "state" {
+      class AppState
+      class UIEventHandler
+    }
+  }
+  
+  package "platform" {
+    class WindowsConsole
+    class FileDialogWrapper
+  }
+}
+
+package "Application Layer" {
+  package "services" {
+    class AuthenticationService
+    class RecordingService
+    class DownloadService
+    class ConfigService
+  }
+  
+  package "workflows" {
+    class OAuthWorkflow
+    class SearchWorkflow
+    class DownloadWorkflow
+  }
+  
+  package "domain" {
+    package "auth" {
+      class User
+      class OAuth2Token
+      class ZoomAccount
+    }
+    
+    package "recording" {
+      class Meeting
+      class Recording
+      class AISummary
+    }
+    
+    package "download" {
+      class DownloadTask
+      class LocalFile
+      class ProgressTracker
+    }
+    
+    package "config" {
+      class ApplicationConfig
+      class FilterCriteria
+    }
+  }
+}
+
+package "Infrastructure Layer" {
+  package "api" {
+    package "zoom" {
+      class ZoomApiClient
+      class OAuthClient
+      class RecordingApiClient
+    }
+    
+    package "http" {
+      class HttpClient
+      class RateLimiter
+      class RequestBuilder
+    }
+  }
+  
+  package "storage" {
+    package "config" {
+      class TomlConfigRepository
+      class SecureStorage
+    }
+    
+    package "file" {
+      class FileManager
+      class DownloadManager
+      class HashVerifier
+    }
+  }
+  
+  package "crypto" {
+    class AesGcmCipher
+    class TokenEncryption
+  }
+}
+
+package "External Systems" {
+  package "Zoom Cloud Platform" {
+    interface ZoomAPI
+    interface OAuthServer
+    interface RecordingStorage
+  }
+  
+  package "Operating System" {
+    interface FileSystem
+    interface NetworkStack
+    interface CryptoProvider
+  }
+}
+
+' レイヤー間依存関係
+"Presentation Layer" --> "Application Layer" : uses
+"Application Layer" --> "Infrastructure Layer" : uses
+"Infrastructure Layer" --> "External Systems" : uses
+
+' パッケージ間詳細依存関係
+gui --> services : "calls"
+workflows --> domain : "operates on"
+services --> api : "uses"
+services --> storage : "uses"
+api --> "External Systems" : "communicates with"
+storage --> "External Systems" : "persists to"
+
+' 循環依存の回避
+note right of "Application Layer"
+  ドメインモデルは
+  インフラストラクチャに
+  依存しない
+end note
+
+note bottom of "Infrastructure Layer"
+  Repository Pattern で
+  ドメインとインフラを
+  分離
+end note
+
+@enduml

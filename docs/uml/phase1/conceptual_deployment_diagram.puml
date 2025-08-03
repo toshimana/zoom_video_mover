@@ -1,0 +1,89 @@
+@startuml ConceptualDeploymentDiagram
+!theme plain
+title 配置図（概念） - Zoom Video Mover アーキテクチャ概要
+
+node "ユーザー環境" as UserEnv {
+  node "Windows PC" as WindowsPC {
+    artifact "zoom_video_mover.exe" as App
+    database "設定ファイル" as ConfigDB {
+      file "config.toml"
+      file "auth_tokens.enc"
+    }
+    folder "ダウンロードフォルダ" as DownloadFolder {
+      file "recording_*.mp4"
+      file "transcript_*.vtt"
+      file "chat_*.txt"
+      file "ai_summary_*.json"
+    }
+  }
+}
+
+cloud "インターネット" as Internet
+
+node "Zoom Cloud Platform" as ZoomCloud {
+  component "OAuth Server" as OAuthSrv {
+    interface "OAuth 2.0 API" as OAuthAPI
+  }
+  
+  component "Recording API Server" as RecordingSrv {
+    interface "REST API" as RecordingAPI
+    interface "Download API" as DownloadAPI
+  }
+  
+  database "Recording Storage" as RecordingStorage {
+    file "録画ファイル群"
+    file "AI要約データ"
+    file "メタデータ"
+  }
+}
+
+node "Microsoft Infrastructure" as MSInfra {
+  component "Windows OS Services" as WinOS {
+    interface "File System API" as FileAPI
+    interface "Network API" as NetAPI
+    interface "Crypto API" as CryptoAPI
+  }
+}
+
+' 通信関係
+App --> Internet : "HTTPS通信"
+Internet --> OAuthAPI : "認証要求"
+Internet --> RecordingAPI : "録画リスト取得"
+Internet --> DownloadAPI : "ファイルダウンロード"
+
+App --> ConfigDB : "設定読み書き"
+App --> DownloadFolder : "ファイル保存"
+
+App --> FileAPI : "ファイル操作"
+App --> NetAPI : "ネットワーク通信"
+App --> CryptoAPI : "暗号化処理"
+
+RecordingSrv --> RecordingStorage : "データアクセス"
+
+' セキュリティ境界
+rectangle "セキュリティ境界" {
+  WindowsPC
+  note bottom : "ローカル環境\n機密情報はAES-256で暗号化保存"
+}
+
+rectangle "外部サービス境界" {
+  ZoomCloud
+  note bottom : "Zoom管理環境\nOAuth認証・API制限適用"
+}
+
+' 品質属性
+note right of App
+  **性能要件**
+  - 同時ダウンロード: 5ファイル
+  - UI応答性: 高速
+  - メモリ使用量: 1GB以内
+end note
+
+note left of ZoomCloud
+  **制約事項**
+  - API Rate Limit: 10 req/sec
+  - OAuth 2.0必須
+  - HTTPS通信強制
+end note
+
+@enduml

@@ -1,0 +1,251 @@
+@startuml DetailedClassDiagram
+!theme plain
+title 詳細クラス図 - Zoom Video Mover 論理設計
+
+package "Domain Layer" {
+
+  package "Authentication" {
+    class User {
+      - userId: String
+      - email: String
+      - displayName: String
+      - accountType: AccountType
+      + authenticate(credentials: Credentials): Result<OAuth2Token, AuthError>
+      + isAuthenticated(): bool
+      + getDisplayName(): String
+    }
+    
+    class OAuth2Token {
+      - accessToken: String
+      - refreshToken: String
+      - tokenType: String
+      - expiresAt: DateTime
+      - scope: String
+      + isExpired(): bool
+      + refresh(client: OAuthClient): Result<OAuth2Token, AuthError>
+      + encrypt(key: &Key): Result<EncryptedToken, CryptoError>
+      + timeUntilExpiry(): Duration
+    }
+    
+    class ZoomAccount {
+      - accountId: String
+      - accountType: AccountType
+      - planType: PlanType
+      - maxCloudRecording: Option<u64>
+      + canAccessRecordings(): bool
+      + getRateLimits(): RateLimits
+    }
+  }
+  
+  package "Recording" {
+    class Meeting {
+      - meetingId: String
+      - uuid: String
+      - topic: String
+      - startTime: DateTime
+      - endTime: DateTime
+      - duration: Duration
+      - hostId: String
+      - hostName: String
+      - timezone: String
+      + getDuration(): Duration
+      + isRecorded(): bool
+      + getRecordings(): Vec<Recording>
+      + hasAISummary(): bool
+    }
+    
+    class Recording {
+      - recordingId: String
+      - meetingId: String
+      - fileType: FileType
+      - fileExtension: String
+      - downloadUrl: String
+      - playUrl: String
+      - fileSize: u64
+      - recordingStart: DateTime
+      - recordingEnd: DateTime
+      - status: RecordingStatus
+      + calculateDownloadTime(bandwidth: u64): Duration
+      + getFileName(): String
+      + isDownloadable(): bool
+      + validateChecksum(data: &[u8]): bool
+    }
+    
+    class AISummary {
+      - summaryId: String
+      - meetingId: String
+      - content: String
+      - language: String
+      - generatedAt: DateTime
+      - summaryType: SummaryType
+      - confidence: f64
+      + extractKeyPoints(): Vec<String>
+      + formatAsMarkdown(): String
+      + getWordCount(): usize
+    }
+  }
+  
+  package "Download" {
+    class DownloadTask {
+      - taskId: String
+      - recordingId: String
+      - targetPath: PathBuf
+      - status: DownloadStatus
+      - progress: f64
+      - bytesDownloaded: u64
+      - totalBytes: u64
+      - startedAt: DateTime
+      - estimatedCompletion: Option<DateTime>
+      - errorMessage: Option<String>
+      + start(): Result<(), DownloadError>
+      + pause(): Result<(), DownloadError>
+      + resume(): Result<(), DownloadError>
+      + cancel(): Result<(), DownloadError>
+      + updateProgress(bytes: u64): void
+      + calculateSpeed(): u64
+      + getETA(): Option<Duration>
+    }
+    
+    class ProgressTracker {
+      - totalTasks: usize
+      - completedTasks: usize
+      - totalBytes: u64
+      - downloadedBytes: u64
+      - startTime: DateTime
+      + addTask(task: DownloadTask): void
+      + updateTaskProgress(taskId: String, bytes: u64): void
+      + getOverallProgress(): f64
+      + getAverageSpeed(): u64
+      + getTimeRemaining(): Option<Duration>
+    }
+    
+    class LocalFile {
+      - filePath: PathBuf
+      - fileName: String
+      - fileSize: u64
+      - checksum: String
+      - createdAt: DateTime
+      - modifiedAt: DateTime
+      + exists(): bool
+      + verify(): Result<(), FileError>
+      + getMetadata(): Result<FileMetadata, FileError>
+      + move(newPath: PathBuf): Result<(), FileError>
+    }
+  }
+  
+  package "Configuration" {
+    class ApplicationConfig {
+      - clientId: String
+      - clientSecret: String
+      - redirectUri: String
+      - downloadPath: PathBuf
+      - maxConcurrentDownloads: usize
+      - retryAttempts: usize
+      - timeoutSeconds: u64
+      + validate(): Result<(), ConfigError>
+      + save(): Result<(), ConfigError>
+      + load(): Result<ApplicationConfig, ConfigError>
+      + getDownloadPath(): PathBuf
+    }
+    
+    class FilterCriteria {
+      - fromDate: Option<Date>
+      - toDate: Option<Date>
+      - includeTypes: Vec<FileType>
+      - excludeTypes: Vec<FileType>
+      - hostFilter: Option<String>
+      - topicFilter: Option<String>
+      - minDuration: Option<Duration>
+      - maxFileSize: Option<u64>
+      + matches(meeting: &Meeting): bool
+      + matches(recording: &Recording): bool
+      + isEmpty(): bool
+      + reset(): void
+    }
+  }
+}
+
+package "Application Services" {
+  interface AuthenticationService {
+    + authenticate(config: &ApplicationConfig): Result<OAuth2Token, AuthError>
+    + refreshToken(token: &OAuth2Token): Result<OAuth2Token, AuthError>
+    + validateToken(token: &OAuth2Token): bool
+    + logout(): Result<(), AuthError>
+  }
+  
+  interface RecordingService {
+    + getRecordings(criteria: &FilterCriteria): Result<Vec<Recording>, RecordingError>
+    + getMeetingDetails(meetingId: &str): Result<Meeting, RecordingError>
+    + getAISummary(meetingId: &str): Result<Option<AISummary>, RecordingError>
+  }
+  
+  interface DownloadService {
+    + downloadRecording(recording: &Recording): Result<DownloadTask, DownloadError>
+    + downloadMultiple(recordings: Vec<Recording>): Result<Vec<DownloadTask>, DownloadError>
+    + getActiveDownloads(): Vec<DownloadTask>
+    + pauseAll(): Result<(), DownloadError>
+    + resumeAll(): Result<(), DownloadError>
+  }
+  
+  interface ConfigService {
+    + loadConfig(): Result<ApplicationConfig, ConfigError>
+    + saveConfig(config: &ApplicationConfig): Result<(), ConfigError>
+    + saveFilter(criteria: &FilterCriteria): Result<(), ConfigError>
+    + loadFilter(): Result<FilterCriteria, ConfigError>
+  }
+}
+
+' 関係性
+User ||--|| OAuth2Token : "authenticated by"
+User ||--|| ZoomAccount : "has"
+ZoomAccount ||--o{ Meeting : "hosts"
+Meeting ||--o{ Recording : "generates"
+Meeting ||--o| AISummary : "may have"
+Recording ||--|| DownloadTask : "downloaded via"
+DownloadTask ||--|| LocalFile : "creates"
+DownloadTask }|--|| ProgressTracker : "tracked by"
+
+' サービス依存
+AuthenticationService ..> User : "manages"
+AuthenticationService ..> OAuth2Token : "handles"
+RecordingService ..> Meeting : "retrieves"
+RecordingService ..> Recording : "manages"
+RecordingService ..> AISummary : "fetches"
+DownloadService ..> DownloadTask : "orchestrates"
+DownloadService ..> ProgressTracker : "uses"
+ConfigService ..> ApplicationConfig : "manages"
+ConfigService ..> FilterCriteria : "persists"
+
+' 列挙型詳細
+enum FileType {
+  VIDEO_MP4
+  AUDIO_MP3
+  AUDIO_M4A
+  TRANSCRIPT_VTT
+  CHAT_TXT
+  CC_VTT
+}
+
+enum DownloadStatus {
+  PENDING
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum RecordingStatus {
+  PROCESSING
+  COMPLETED
+  UNAVAILABLE
+}
+
+enum AccountType {
+  BASIC
+  PRO
+  BUSINESS
+  ENTERPRISE
+}
+
+@enduml
