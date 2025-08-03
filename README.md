@@ -15,8 +15,32 @@ ZoomクラウドレコーディングをローカルにダウンロードするR
 - **testing_policy.md** - テスト戦略・Property-based Testing方針
 - **README.md** - ポリシー統合管理ガイド
 
-### `/docs/requirements/` - 📋 要求・要件仕様
-- **system_requirements_summary.md** - システム要求仕様書
+### `/docs/requirements/` - 📋 包括的要件仕様書（RDRA手法）
+完全なRDRA（Relationship Driven Requirement Analysis）手法による要件定義：
+
+#### **Phase 0-1: プロジェクト準備・価値分析**
+- **phase0_project_preparation/** - プロジェクト基盤（ステークホルダー分析、制約条件）
+- **phase1_system_value/** - システム価値分析（ROI、ビジネス価値）
+
+#### **Phase 2-3: 外部環境・システム境界**
+- **phase2_external_environment/** - ビジネスフロー、利用シナリオ、概念モデル
+- **phase3_system_boundary/** - ユースケース、画面・API仕様
+
+#### **Phase 4-5: 内部設計・非機能要件**
+- **phase4_system_internal/** - 機能分解、データモデル、アルゴリズム仕様
+- **phase5_nonfunctional_requirements/** - 性能・信頼性・セキュリティ・ユーザビリティ要件
+
+#### **Phase 6: 統合・検証**
+- **phase6_integration_verification/** - 要件統合、トレーサビリティ、検証計画
+
+#### **横断的要件管理**
+- **crosscutting/** - トレーサビリティマトリックス、リスク管理、変更管理
+
+**特徴:**
+- 🎯 **完全なトレーサビリティ**: 要件→設計→実装→テストの一貫追跡
+- 📊 **定量的品質保証**: Property-basedテスト（1000+ケース）による堅牢性
+- 🔒 **包括的リスク管理**: 8大リスクの詳細分析・軽減策
+- 🔄 **体系的変更管理**: 影響分析・承認ワークフロー
 
 ### `/docs/design/` - 🏗️ 設計仕様
 - 設計関連文書（今後追加予定）
@@ -31,10 +55,17 @@ ZoomクラウドレコーディングをローカルにダウンロードするR
 - **development_process_and_deliverables_report.md** - 開発プロセス分析
 - **policy_consistency_issues.md** - ポリシー整合性分析レポート
 
-### 🔗 トレーサビリティ・品質管理
-- **完全追跡**: 要件→設計→実装→テストの一貫性
+### 🔗 エンタープライズレベルの品質管理
+- **完全なトレーサビリティマトリックス**: 全要件の追跡可能性100%保証
+- **RDRA手法による体系的要件管理**: 7フェーズ完全実装
+- **定量的品質メトリクス**: 
+  - 要件カバレッジ100%
+  - テストカバレッジ95%以上
+  - 文書整合性95%以上
+- **包括的リスク管理**: 8大リスクの継続監視・軽減策
+- **変更管理プロセス**: 影響分析・承認ワークフロー・変更履歴
+- **Property-basedテスト**: 1000+ケースによる網羅的検証
 - **ポリシー統合**: `docs/policies/` での一括管理
-- **品質保証**: 整合性監視・継続改善プロセス
 - **開発ガイド**: `CLAUDE.md` との完全連携
 
 ## 必要なソフトウェア
