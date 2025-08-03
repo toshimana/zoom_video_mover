@@ -1,101 +1,117 @@
 # 設計プロセスフロー図（PFD） - Zoom Video Mover
 
-## 概要
+## PFD基本情報
 
-**目的**: 設計プロセスと成果物の対応関係を可視化  
-**対象**: V字モデルに基づく設計プロセス全体  
-**更新頻度**: 設計プロセス変更時  
-**活用用途**: プロセス管理・品質保証・進捗管理・新規メンバー教育  
+**プロセス名**: Zoom Video Mover 設計プロセス  
+**プロセス目的**: V字モデルに基づく段階的設計による高品質ソフトウェア開発  
+**プロセス範囲**: 要件定義完了 → 実装準備完了  
+**プロセス責任者**: システムアーキテクト  
+**最終更新**: 2025-08-03  
 
-## 全体設計プロセスフロー図
+### 入力（Input）
+- ✅ システム要件定義書
+- ✅ 機能要件定義書  
+- ✅ 非機能要件定義書
+- ✅ 制約要件定義書
 
-### 1. V字モデル対応設計プロセス全体図
+### 出力（Output）
+- 📄 システム設計文書（6文書）
+- 📄 コンポーネント設計文書（6文書）
+- 📋 実装準備完了判定
+
+### 制御（Control）
+- 🔍 設計品質ゲート基準
+- 📋 V字モデル設計標準
+- 🔄 トレーサビリティ管理要件
+
+### リソース（Resource）
+- 👥 システムアーキテクト・技術リーダー・専門エンジニア
+- ⏱️ 4-6週間、31-45人日
+- 🛠️ 設計ツール・レビューシステム
+
+## 標準PFD記法によるプロセスフロー
+
+### 1. 全体プロセスフロー（Level 0）
 
 ```mermaid
-graph TD
-    %% 要件定義
-    subgraph "要件定義フェーズ (Requirements)"
-        REQ_SYS[システム要件定義]
-        REQ_FUNC[機能要件定義]
-        REQ_NFR[非機能要件定義]
-        REQ_CONSTRAINT[制約要件定義]
-    end
+flowchart TD
+    %% 開始
+    START([設計プロセス開始])
+    
+    %% 入力データ
+    INPUT_DATA[/📋 要件定義書群\nシステム・機能・非機能・制約/]
     
     %% Phase 1: 全体アーキテクチャ設計
-    subgraph "Phase 1: 全体アーキテクチャ設計"
-        P1_1[1.1 データフロー分析・<br/>コンポーネント分割]
-        P1_2[1.2 システムアーキテクチャ設計]
-        P1_3[1.3 非機能アーキテクチャ設計]
-        
-        P1_1 --> P1_2
-        P1_2 --> P1_3
-    end
+    P1_PROCESS[🔧 Phase 1<br/>全体アーキテクチャ設計]
+    P1_CHECK{🔍 Phase 1<br/>品質ゲート}
+    P1_OUTPUT[/📄 アーキテクチャ<br/>基盤文書/]
     
-    %% Phase 2: システム基本設計統合
-    subgraph "Phase 2: システム基本設計統合"
-        P2_1[2.1 システム全体<br/>アーキテクチャ統合]
-        P2_2[2.2 非機能アーキテクチャ統合]
-        P2_3[2.3 外部システム連携設計]
-        
-        P2_1 --> P2_2
-        P2_2 --> P2_3
-    end
+    %% Phase 2: システム基本設計
+    P2_PROCESS[🔧 Phase 2<br/>システム基本設計統合]
+    P2_CHECK{🔍 Phase 2<br/>品質ゲート}
+    P2_OUTPUT[/📄 システム設計<br/>文書群/]
     
-    %% Phase 3: コンポーネント別詳細設計
-    subgraph "Phase 3: コンポーネント別詳細設計"
-        P3_1[3.1 認証コンポーネント<br/>詳細設計]
-        P3_2[3.2 API統合コンポーネント<br/>詳細設計]
-        P3_3[3.3 録画管理コンポーネント<br/>詳細設計]
-        P3_4[3.4 ダウンロードコンポーネント<br/>詳細設計]
-        P3_5[3.5 設定管理コンポーネント<br/>詳細設計]
-        P3_6[3.6 UI制御コンポーネント<br/>詳細設計]
-    end
+    %% Phase 3: コンポーネント詳細設計
+    P3_PROCESS[🔧 Phase 3<br/>コンポーネント詳細設計]
+    P3_CHECK{🔍 Phase 3<br/>品質ゲート}
+    P3_OUTPUT[/📄 コンポーネント<br/>設計文書群/]
     
-    %% 実装・テストフェーズ
-    subgraph "実装・テストフェーズ"
-        IMPL[実装フェーズ]
-        TEST_UNIT[単体テスト]
-        TEST_INT[統合テスト]
-        TEST_SYS[システムテスト]
-        
-        IMPL --> TEST_UNIT
-        TEST_UNIT --> TEST_INT
-        TEST_INT --> TEST_SYS
-    end
+    %% 最終検証・統合
+    FINAL_INTEGRATION[🔧 設計統合・整合性検証]
+    FINAL_CHECK{🔍 実装準備<br/>完了判定}
     
-    %% フェーズ間の流れ
-    REQ_SYS --> P1_1
-    REQ_FUNC --> P1_1
-    REQ_NFR --> P1_3
-    REQ_CONSTRAINT --> P1_3
+    %% 終了
+    END_SUCCESS([設計完了<br/>実装準備OK])
+    END_REWORK([設計見直し<br/>要求])
     
-    P1_3 --> P2_1
-    P2_3 --> P3_1
-    P2_3 --> P3_2
-    P2_3 --> P3_3
-    P2_3 --> P3_4
-    P2_3 --> P3_5
-    P2_3 --> P3_6
+    %% 並行活動
+    PARALLEL_TRACE[📊 継続的トレーサビリティ管理]
+    PARALLEL_REVIEW[👥 継続的設計レビュー]
     
-    P3_1 --> IMPL
-    P3_2 --> IMPL
-    P3_3 --> IMPL
-    P3_4 --> IMPL
-    P3_5 --> IMPL
-    P3_6 --> IMPL
+    %% フロー接続
+    START --> INPUT_DATA
+    INPUT_DATA --> P1_PROCESS
+    P1_PROCESS --> P1_CHECK
+    P1_CHECK -->|合格| P1_OUTPUT
+    P1_CHECK -->|不合格| P1_PROCESS
+    P1_OUTPUT --> P2_PROCESS
+    
+    P2_PROCESS --> P2_CHECK
+    P2_CHECK -->|合格| P2_OUTPUT
+    P2_CHECK -->|不合格| P2_PROCESS
+    P2_OUTPUT --> P3_PROCESS
+    
+    P3_PROCESS --> P3_CHECK
+    P3_CHECK -->|合格| P3_OUTPUT
+    P3_CHECK -->|不合格| P3_PROCESS
+    P3_OUTPUT --> FINAL_INTEGRATION
+    
+    FINAL_INTEGRATION --> FINAL_CHECK
+    FINAL_CHECK -->|合格| END_SUCCESS
+    FINAL_CHECK -->|不合格| END_REWORK
+    END_REWORK --> P1_PROCESS
+    
+    %% 並行活動接続
+    P1_PROCESS -.-> PARALLEL_TRACE
+    P2_PROCESS -.-> PARALLEL_TRACE
+    P3_PROCESS -.-> PARALLEL_TRACE
+    P1_PROCESS -.-> PARALLEL_REVIEW
+    P2_PROCESS -.-> PARALLEL_REVIEW
+    P3_PROCESS -.-> PARALLEL_REVIEW
     
     %% スタイル定義
-    classDef reqClass fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef phase1Class fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef phase2Class fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef phase3Class fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef implClass fill:#fce4ec,stroke:#ad1457,stroke-width:2px
+    classDef startEnd fill:#e1f5fe,stroke:#01579b,stroke-width:3px
+    classDef input fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef process fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef decision fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef output fill:#fce4ec,stroke:#ad1457,stroke-width:2px
+    classDef parallel fill:#f1f8e9,stroke:#33691e,stroke-width:1px,stroke-dasharray: 5 5
     
-    class REQ_SYS,REQ_FUNC,REQ_NFR,REQ_CONSTRAINT reqClass
-    class P1_1,P1_2,P1_3 phase1Class
-    class P2_1,P2_2,P2_3 phase2Class
-    class P3_1,P3_2,P3_3,P3_4,P3_5,P3_6 phase3Class
-    class IMPL,TEST_UNIT,TEST_INT,TEST_SYS implClass
+    class START,END_SUCCESS,END_REWORK startEnd
+    class INPUT_DATA,P1_OUTPUT,P2_OUTPUT,P3_OUTPUT input
+    class P1_PROCESS,P2_PROCESS,P3_PROCESS,FINAL_INTEGRATION process
+    class P1_CHECK,P2_CHECK,P3_CHECK,FINAL_CHECK decision
+    class PARALLEL_TRACE,PARALLEL_REVIEW parallel
 ```
 
 ## Phase別詳細プロセスフロー
@@ -234,86 +250,117 @@ graph TD
     class P2_1_ACT1,P2_1_ACT2,P2_1_ACT3,P2_2_ACT1,P2_2_ACT2,P2_2_ACT3,P2_3_ACT1,P2_3_ACT2,P2_3_ACT3 activityClass
 ```
 
-### 4. Phase 3: コンポーネント別詳細設計フロー
+### 4. Phase 3: コンポーネント別詳細設計フロー（Level 1）
 
 ```mermaid
-graph TD
-    %% 入力
-    INPUT_P3[📋 入力<br/>・Phase 2成果物<br/>・基本設計書<br/>・実装要件]
+flowchart TD
+    %% 開始・入力
+    START_P3([Phase 3 開始])
+    INPUT_P3[/📋 入力<br/>Phase 2成果物<br/>基本設計書<br/>実装要件/]
     
     %% 並列コンポーネント設計
-    subgraph "3.1 認証コンポーネント詳細設計"
-        P3_1_ACT[OAuth認証・トークン管理・<br/>セキュリティ詳細設計]
-    end
+    PARALLEL_START{🔀 並列処理開始}
     
-    subgraph "3.2 API統合コンポーネント詳細設計"
-        P3_2_ACT[Zoom API連携・レート制限・<br/>エラーハンドリング詳細設計]
-    end
+    P3_1_PROCESS[🔧 3.1 認証コンポーネント<br/>詳細設計]
+    P3_2_PROCESS[🔧 3.2 API統合コンポーネント<br/>詳細設計]
+    P3_3_PROCESS[🔧 3.3 録画管理コンポーネント<br/>詳細設計]
+    P3_4_PROCESS[🔧 3.4 ダウンロードコンポーネント<br/>詳細設計]
+    P3_5_PROCESS[🔧 3.5 設定管理コンポーネント<br/>詳細設計]
+    P3_6_PROCESS[🔧 3.6 UI制御コンポーネント<br/>詳細設計]
     
-    subgraph "3.3 録画管理コンポーネント詳細設計"
-        P3_3_ACT[録画メタデータ管理・<br/>フィルタリング・AI統合詳細設計]
-    end
-    
-    subgraph "3.4 ダウンロードコンポーネント詳細設計"
-        P3_4_ACT[並列ダウンロード・ファイル管理・<br/>進捗監視詳細設計]
-    end
-    
-    subgraph "3.5 設定管理コンポーネント詳細設計"
-        P3_5_ACT[設定永続化・バリデーション・<br/>設定管理詳細設計]
-    end
-    
-    subgraph "3.6 UI制御コンポーネント詳細設計"
-        P3_6_ACT[ユーザーインターフェース・<br/>イベント処理・状態管理詳細設計]
-    end
+    %% 個別品質チェック
+    P3_1_CHECK{🔍 3.1 品質確認}
+    P3_2_CHECK{🔍 3.2 品質確認}
+    P3_3_CHECK{🔍 3.3 品質確認}
+    P3_4_CHECK{🔍 3.4 品質確認}
+    P3_5_CHECK{🔍 3.5 品質確認}
+    P3_6_CHECK{🔍 3.6 品質確認}
     
     %% 成果物
-    P3_1_OUT[📄 auth_component_design.md]
-    P3_2_OUT[📄 api_component_design.md]
-    P3_3_OUT[📄 recording_component_design.md]
-    P3_4_OUT[📄 download_component_design.md]
-    P3_5_OUT[📄 config_component_design.md]
-    P3_6_OUT[📄 ui_component_design.md]
+    P3_1_OUTPUT[/📄 auth_component_design.md/]
+    P3_2_OUTPUT[/📄 api_component_design.md/]
+    P3_3_OUTPUT[/📄 recording_component_design.md/]
+    P3_4_OUTPUT[/📄 download_component_design.md/]
+    P3_5_OUTPUT[/📄 config_component_design.md/]
+    P3_6_OUTPUT[/📄 ui_component_design.md/]
     
     %% 統合・検証
-    INTEGRATION[設計統合・整合性検証]
-    FINAL_OUT[📄 最終成果物<br/>・全コンポーネント設計書<br/>・設計整合性レポート<br/>・実装準備完了]
+    PARALLEL_SYNC{🔀 並列処理同期}
+    INTEGRATION[🔧 設計統合・整合性検証]
+    INTEGRATION_CHECK{🔍 統合検証<br/>実装準備完了判定}
+    
+    %% 最終成果物
+    FINAL_OUTPUT[/📄 最終成果物<br/>全コンポーネント設計書<br/>設計整合性レポート<br/>実装準備完了判定/]
+    
+    %% 終了
+    P3_END([Phase 3 完了])
+    P3_REWORK([Phase 3 繰り返し])
     
     %% 流れ
-    INPUT_P3 --> P3_1_ACT
-    INPUT_P3 --> P3_2_ACT
-    INPUT_P3 --> P3_3_ACT
-    INPUT_P3 --> P3_4_ACT
-    INPUT_P3 --> P3_5_ACT
-    INPUT_P3 --> P3_6_ACT
+    START_P3 --> INPUT_P3
+    INPUT_P3 --> PARALLEL_START
     
-    P3_1_ACT --> P3_1_OUT
-    P3_2_ACT --> P3_2_OUT
-    P3_3_ACT --> P3_3_OUT
-    P3_4_ACT --> P3_4_OUT
-    P3_5_ACT --> P3_5_OUT
-    P3_6_ACT --> P3_6_OUT
+    %% 並列処理開始
+    PARALLEL_START --> P3_1_PROCESS
+    PARALLEL_START --> P3_2_PROCESS
+    PARALLEL_START --> P3_3_PROCESS
+    PARALLEL_START --> P3_4_PROCESS
+    PARALLEL_START --> P3_5_PROCESS
+    PARALLEL_START --> P3_6_PROCESS
     
-    P3_1_OUT --> INTEGRATION
-    P3_2_OUT --> INTEGRATION
-    P3_3_OUT --> INTEGRATION
-    P3_4_OUT --> INTEGRATION
-    P3_5_OUT --> INTEGRATION
-    P3_6_OUT --> INTEGRATION
+    %% 個別検証
+    P3_1_PROCESS --> P3_1_CHECK
+    P3_2_PROCESS --> P3_2_CHECK
+    P3_3_PROCESS --> P3_3_CHECK
+    P3_4_PROCESS --> P3_4_CHECK
+    P3_5_PROCESS --> P3_5_CHECK
+    P3_6_PROCESS --> P3_6_CHECK
     
-    INTEGRATION --> FINAL_OUT
+    %% 成果物出力
+    P3_1_CHECK -->|合格| P3_1_OUTPUT
+    P3_1_CHECK -->|不合格| P3_1_PROCESS
+    P3_2_CHECK -->|合格| P3_2_OUTPUT
+    P3_2_CHECK -->|不合格| P3_2_PROCESS
+    P3_3_CHECK -->|合格| P3_3_OUTPUT
+    P3_3_CHECK -->|不合格| P3_3_PROCESS
+    P3_4_CHECK -->|合格| P3_4_OUTPUT
+    P3_4_CHECK -->|不合格| P3_4_PROCESS
+    P3_5_CHECK -->|合格| P3_5_OUTPUT
+    P3_5_CHECK -->|不合格| P3_5_PROCESS
+    P3_6_CHECK -->|合格| P3_6_OUTPUT
+    P3_6_CHECK -->|不合格| P3_6_PROCESS
     
-    %% スタイル
-    classDef inputClass fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef outputClass fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef activityClass fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef integrationClass fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef finalClass fill:#fce4ec,stroke:#ad1457,stroke-width:2px
+    %% 並列処理同期
+    P3_1_OUTPUT --> PARALLEL_SYNC
+    P3_2_OUTPUT --> PARALLEL_SYNC
+    P3_3_OUTPUT --> PARALLEL_SYNC
+    P3_4_OUTPUT --> PARALLEL_SYNC
+    P3_5_OUTPUT --> PARALLEL_SYNC
+    P3_6_OUTPUT --> PARALLEL_SYNC
     
-    class INPUT_P3 inputClass
-    class P3_1_OUT,P3_2_OUT,P3_3_OUT,P3_4_OUT,P3_5_OUT,P3_6_OUT outputClass
-    class P3_1_ACT,P3_2_ACT,P3_3_ACT,P3_4_ACT,P3_5_ACT,P3_6_ACT activityClass
-    class INTEGRATION integrationClass
-    class FINAL_OUT finalClass
+    %% 統合・最終検証
+    PARALLEL_SYNC --> INTEGRATION
+    INTEGRATION --> INTEGRATION_CHECK
+    INTEGRATION_CHECK -->|合格| FINAL_OUTPUT
+    INTEGRATION_CHECK -->|不合格| P3_REWORK
+    FINAL_OUTPUT --> P3_END
+    P3_REWORK --> PARALLEL_START
+    
+    %% スタイル定義
+    classDef startEnd fill:#e1f5fe,stroke:#01579b,stroke-width:3px
+    classDef input fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef process fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef decision fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef output fill:#fce4ec,stroke:#ad1457,stroke-width:2px
+    classDef parallel fill:#f1f8e9,stroke:#33691e,stroke-width:2px
+    classDef integration fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    
+    class START_P3,P3_END,P3_REWORK startEnd
+    class INPUT_P3,P3_1_OUTPUT,P3_2_OUTPUT,P3_3_OUTPUT,P3_4_OUTPUT,P3_5_OUTPUT,P3_6_OUTPUT,FINAL_OUTPUT input
+    class P3_1_PROCESS,P3_2_PROCESS,P3_3_PROCESS,P3_4_PROCESS,P3_5_PROCESS,P3_6_PROCESS process
+    class P3_1_CHECK,P3_2_CHECK,P3_3_CHECK,P3_4_CHECK,P3_5_CHECK,P3_6_CHECK,INTEGRATION_CHECK decision
+    class PARALLEL_START,PARALLEL_SYNC parallel
+    class INTEGRATION integration
 ```
 
 ## プロセス・成果物対応マトリックス
@@ -335,51 +382,90 @@ graph TD
 | **P3.5** | 設定管理コンポーネント詳細設計 | ・永続化設計<br/>・バリデーション<br/>・設定管理 | ・P2全成果物 | ・設定管理コンポーネント設計書 | `config_component_design.md` | 1-2日 |
 | **P3.6** | UI制御コンポーネント詳細設計 | ・UI設計<br/>・イベント処理<br/>・状態管理 | ・P2全成果物 | ・UI制御コンポーネント設計書 | `ui_component_design.md` | 2-3日 |
 
-### 6. 品質ゲート・検証ポイント
+### 6. PFD品質評価チェックリスト
+
+#### 完全性（Completeness）
+- [x] すべての重要なプロセスステップが含まれている
+- [x] 入力・出力・制御が明確に定義されている  
+- [x] 例外処理・エラーハンドリングが考慮されている
+- [x] プロセスの境界が明確に設定されている
+
+#### 正確性（Accuracy）
+- [x] プロセスの流れが実際の設計プロセスと一致している
+- [x] シンボル・記法がPFD標準に準拠している
+- [x] 判断条件・分岐が論理的に正しい
+- [x] タイミング・順序が適切に表現されている
+
+#### 明確性（Clarity）
+- [x] 図面が読みやすく理解しやすい
+- [x] シンボル・用語が一貫して使用されている
+- [x] 適切な詳細レベルで表現されている
+- [x] 必要な説明・注釈が付与されている
+
+#### 実用性（Usability）
+- [x] 設計プロセス管理目的に適した内容・形式
+- [x] プロジェクトマネージャーが実際に活用できる
+- [x] メンテナンス・更新が容易
+- [x] 他の設計文書・トレーサビリティと連携している
+
+### 7. PFD品質ゲート・検証ポイント
 
 ```mermaid
-graph TD
-    %% Phase 1 品質ゲート
-    subgraph "Phase 1 品質ゲート"
-        P1_GATE[📋 Phase 1完了ゲート<br/>・全アーキテクチャ設計完了<br/>・技術選定妥当性確認<br/>・非機能要件マッピング完了]
-    end
+flowchart TD
+    %% 品質ゲート
+    QG_START([品質ゲート開始])
     
-    %% Phase 2 品質ゲート
-    subgraph "Phase 2 品質ゲート"
-        P2_GATE[📋 Phase 2完了ゲート<br/>・システム統合設計完了<br/>・インターフェース整合性確認<br/>・実装可能性検証完了]
-    end
+    %% Phase品質ゲート
+    P1_GATE{🔍 Phase 1 品質ゲート<br/>全アーキテクチャ設計完了<br/>技術選定妥当性確認<br/>非機能要件マッピング完了}
     
-    %% Phase 3 品質ゲート
-    subgraph "Phase 3 品質ゲート"
-        P3_GATE[📋 Phase 3完了ゲート<br/>・全コンポーネント設計完了<br/>・設計文書間整合性確認<br/>・実装準備完了確認]
-    end
+    P2_GATE{🔍 Phase 2 品質ゲート<br/>システム統合設計完了<br/>インターフェース整合性確認<br/>実装可能性検証完了}
     
-    %% 検証活動
-    subgraph "継続的検証活動"
-        TRACE_CHECK[トレーサビリティ検証]
-        CONSISTENCY_CHECK[整合性検証]
-        REVIEW[設計レビュー]
-        APPROVAL[承認プロセス]
-        
-        TRACE_CHECK --> CONSISTENCY_CHECK
-        CONSISTENCY_CHECK --> REVIEW
-        REVIEW --> APPROVAL
-    end
+    P3_GATE{🔍 Phase 3 品質ゲート<br/>全コンポーネント設計完了<br/>設計文書間整合性確認<br/>実装準備完了確認}
+    
+    %% 継続的検証活動
+    TRACE_CHECK[📊 トレーサビリティ検証]
+    CONSISTENCY_CHECK[⚖️ 整合性検証]
+    REVIEW[👥 設計レビュー]
+    APPROVAL[✅ 承認プロセス]
+    
+    %% 最終判定
+    FINAL_APPROVAL{🏁 最終承認<br/>設計完了判定}
+    SUCCESS([設計プロセス完了])
+    REWORK([設計プロセス見直し])
     
     %% 流れ
-    P1_GATE --> P2_GATE
-    P2_GATE --> P3_GATE
+    QG_START --> P1_GATE
+    P1_GATE -->|合格| P2_GATE
+    P1_GATE -->|不合格| REWORK
+    P2_GATE -->|合格| P3_GATE  
+    P2_GATE -->|不合格| REWORK
+    P3_GATE -->|合格| FINAL_APPROVAL
+    P3_GATE -->|不合格| REWORK
     
+    %% 並行検証活動
     P1_GATE -.-> TRACE_CHECK
     P2_GATE -.-> TRACE_CHECK
     P3_GATE -.-> TRACE_CHECK
     
-    %% スタイル
-    classDef gateClass fill:#ffebee,stroke:#c62828,stroke-width:2px
-    classDef verifyClass fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    TRACE_CHECK --> CONSISTENCY_CHECK
+    CONSISTENCY_CHECK --> REVIEW
+    REVIEW --> APPROVAL
+    APPROVAL --> FINAL_APPROVAL
     
-    class P1_GATE,P2_GATE,P3_GATE gateClass
-    class TRACE_CHECK,CONSISTENCY_CHECK,REVIEW,APPROVAL verifyClass
+    FINAL_APPROVAL -->|合格| SUCCESS
+    FINAL_APPROVAL -->|不合格| REWORK
+    REWORK --> QG_START
+    
+    %% スタイル定義
+    classDef startEnd fill:#e1f5fe,stroke:#01579b,stroke-width:3px
+    classDef gate fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef verify fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    classDef approval fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class QG_START,SUCCESS,REWORK startEnd
+    class P1_GATE,P2_GATE,P3_GATE,FINAL_APPROVAL gate
+    class TRACE_CHECK,CONSISTENCY_CHECK verify
+    class REVIEW,APPROVAL approval
 ```
 
 ## 工数・スケジュール管理
