@@ -727,6 +727,162 @@ pub mod test_utils {
 }
 ```
 
+#### Property-basedテスト戦略（基盤テスト）
+
+Property-basedテストは、本プロジェクトの**品質保証の基盤戦略**として位置づけられます。
+
+##### 基本方針
+- **位置づけ**: 品質保証の基盤戦略
+- **実行規模**: 1000ケース以上の自動検証
+- **適用領域**: データ整合性・境界値・異常系の完全検証
+- **効果**: 手動テストでは困難な網羅的品質保証を実現
+
+##### 使用フレームワーク
+```rust
+// Cargo.toml
+[dev-dependencies]
+proptest = "1.3"
+proptest-derive = "0.4"
+quickcheck = "1.0"
+
+// src/lib.rs でテスト時のみ公開
+#[cfg(test)]
+pub mod proptest_generators;
+```
+
+##### 実装パターン
+
+**1. ラウンドトリップ性質検証**
+```rust
+use proptest::prelude::*;
+
+proptest! {
+    /// 設定データのシリアライゼーション↔デシリアライゼーション可逆性
+    #[test]
+    fn config_toml_roundtrip(config in arb_config()) {
+        let toml_str = toml::to_string(&config)?;
+        let parsed: Config = toml::from_str(&toml_str)?;
+        prop_assert_eq!(config, parsed);
+    }
+}
+
+// 任意値生成器
+prop_compose! {
+    fn arb_config()
+        (client_id in "[a-zA-Z0-9]{10,50}",
+         client_secret in "[a-zA-Z0-9]{20,100}",
+         output_dir in prop::collection::vec("[a-zA-Z0-9_-]{1,20}", 1..5))
+        -> Config
+    {
+        Config {
+            client_id,
+            client_secret,
+            output_dir: PathBuf::from(output_dir.join("/")),
+        }
+    }
+}
+```
+
+**2. 不変条件検証**
+```rust
+proptest! {
+    /// ダウンロード進捗の不変条件保持
+    #[test]
+    fn download_progress_invariants(
+        completed in 0u64..=1000,
+        total in 1u64..=1000
+    ) {
+        let progress = DownloadProgress::new(total)?;
+        let updated = progress.update_completed(completed.min(total))?;
+        
+        // 不変条件: completed <= total
+        prop_assert!(updated.completed() <= updated.total());
+        
+        // 不変条件: percentage <= 100.0
+        prop_assert!(updated.percentage() <= 100.0);
+        
+        // 不変条件: is_complete ⇔ completed == total
+        prop_assert_eq!(updated.is_complete(), updated.completed() == updated.total());
+    }
+}
+```
+
+**3. 境界値・エラー条件検証**
+```rust
+proptest! {
+    /// 日付範囲フィルタの境界値処理
+    #[test]
+    fn date_filter_boundary_conditions(
+        year in 2020i32..=2030,
+        month in 1u32..=12,
+        day_offset in 0u32..31
+    ) {
+        let max_day = match month {
+            2 => if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) { 29 } else { 28 },
+            4 | 6 | 9 | 11 => 30,
+            _ => 31,
+        };
+        let day = (day_offset % max_day) + 1;
+        
+        let filter = DateFilter::new(year, month, day)?;
+        let parsed = filter.to_string().parse::<DateFilter>()?;
+        
+        prop_assert_eq!(filter, parsed);
+        prop_assert!(filter.is_valid_date());
+    }
+}
+```
+
+**4. 並行性・競合状態検証**
+```rust
+proptest! {
+    /// 並列ダウンロードの競合状態検証
+    #[test]
+    fn concurrent_download_safety(
+        file_urls in prop::collection::vec("https://[a-z]{5,15}\\.com/[a-z0-9]{10,20}", 1..10)
+    ) {
+        let runtime = tokio::runtime::Runtime::new()?;
+        runtime.block_on(async {
+            let downloader = MockDownloader::new();
+            let handles: Vec<_> = file_urls.into_iter()
+                .map(|url| downloader.download_async(url))
+                .collect();
+            
+            let results = futures::future::join_all(handles).await;
+            
+            // 不変条件: 全ダウンロードが完了または明確なエラー
+            for result in results {
+                prop_assert!(result.is_ok() || result.unwrap_err().is_retryable());
+            }
+            
+            // 不変条件: リソースリークなし
+            prop_assert_eq!(downloader.active_connections(), 0);
+        });
+    }
+}
+```
+
+##### テスト実行・デバッグ
+```bash
+# Property-basedテストのみ実行
+cargo test --test property_tests
+
+# 失敗ケースの最小化・デバッグ
+PROPTEST_VERBOSE=1 cargo test --test property_tests
+
+# テスト数設定
+PROPTEST_CASES=2000 cargo test --test property_tests
+
+# 再現可能なシード固定
+PROPTEST_RNG_SEED=12345 cargo test --test property_tests
+```
+
+##### 品質基準
+- **テストケース数**: 1000ケース以上/プロパティ
+- **成功率**: 99.5%以上
+- **カバレッジ**: 全純粋関数・データ変換処理
+- **実行時間**: CI環境で5分以内完了
+
 ## 関数設計・実装規約
 
 ### 関数コメント規約（必須）
