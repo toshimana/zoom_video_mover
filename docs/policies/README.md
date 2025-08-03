@@ -6,27 +6,41 @@
 
 ### 🎯 ポリシー構成
 
-#### 1. 要件管理ポリシー
+#### 1. 汎用ポリシー（技術要素に依存しない）
 - **[requirements_policy.md](requirements_policy.md)** - 要件定義方針・RDRAプロセス・品質基準
-- **[functional_requirements.md](functional_requirements.md)** - 機能要件詳細・依存関係・実装優先度
+- **[design_policy.md](design_policy.md)** - 汎用設計方針・アーキテクチャガイドライン
+- **[testing_policy.md](testing_policy.md)** - 汎用テスト戦略・品質方針
 
-#### 2. 設計ポリシー  
-- **[design_policy.md](design_policy.md)** - システム設計方針・アーキテクチャガイドライン
-
-#### 3. 実装ポリシー
-- **[implementation_policy.md](implementation_policy.md)** - コーディング規約・実装方針
-
-#### 4. テストポリシー
-- **[testing_policy.md](testing_policy.md)** - テスト戦略・Property-basedテスト方針
+#### 2. 技術固有ポリシー（特定技術要素に依存）
+**📁 [technology-specific/](technology-specific/)**
+- **[rust_implementation_policy.md](technology-specific/rust_implementation_policy.md)** - Rust実装方針・コーディング規約
+- **[rust_tokio_egui_design_policy.md](technology-specific/rust_tokio_egui_design_policy.md)** - Rust/tokio/eGUI技術設計
+- **[rust_proptest_testing_policy.md](technology-specific/rust_proptest_testing_policy.md)** - Rust/proptest/cargoテスト実装
+- **[zoom_oauth_functional_requirements.md](technology-specific/zoom_oauth_functional_requirements.md)** - Zoom API/OAuth機能要件
 
 ## 🔗 ポリシー間の関係性
 
-### 縦断的フロー
+### 汎用・技術固有分離アーキテクチャ
 ```
-要件定義 → 設計 → 実装 → テスト
-    ↓        ↓      ↓       ↓
-要件ポリシー → 設計ポリシー → 実装ポリシー → テストポリシー
+汎用ポリシー層 (技術要素に依存しない)
+├── 要件定義 → 設計 → テスト
+│
+技術固有ポリシー層 (特定技術要素に依存)
+├── Zoom/OAuth → Rust実装 → Rust/tokio/eGUI設計 → Rust/proptest テスト
 ```
+
+### 縦断的フロー（汎用 + 技術固有）
+```
+汎用要件定義 → 汎用設計 → 汎用テスト戦略
+    ↓             ↓           ↓
+Zoom API要件 → Rust技術設計 → Rust/proptestテスト
+```
+
+### 分離の利点
+- **再利用性**: 汎用ポリシーは他プロジェクトでも利用可能
+- **保守性**: 技術変更時は技術固有ポリシーのみ更新
+- **明確性**: 技術依存性が明示され、影響範囲が明確
+- **拡張性**: 新技術導入時の影響が限定的
 
 ### 横断的品質保証
 - **RDRA手法**: 全ポリシーで一貫した要件分析アプローチ
@@ -48,17 +62,28 @@
 ## 🎯 利用ガイド
 
 ### 新規開発者向け
+**汎用ポリシーの理解:**
 1. **[requirements_policy.md](requirements_policy.md)** で要件定義プロセスを理解
-2. **[functional_requirements.md](functional_requirements.md)** で具体的機能要件を確認
-3. **[design_policy.md](design_policy.md)** でアーキテクチャ方針を把握
-4. **[implementation_policy.md](implementation_policy.md)** でコーディング規約を確認
-5. **[testing_policy.md](testing_policy.md)** でテスト戦略を理解
+2. **[design_policy.md](design_policy.md)** で汎用設計方針を把握
+3. **[testing_policy.md](testing_policy.md)** で汎用テスト戦略を理解
+
+**技術固有ポリシーの習得:**
+4. **[technology-specific/zoom_oauth_functional_requirements.md](technology-specific/zoom_oauth_functional_requirements.md)** で具体的機能要件を確認
+5. **[technology-specific/rust_implementation_policy.md](technology-specific/rust_implementation_policy.md)** でRustコーディング規約を確認
+6. **[technology-specific/rust_tokio_egui_design_policy.md](technology-specific/rust_tokio_egui_design_policy.md)** で技術固有設計を理解
+7. **[technology-specific/rust_proptest_testing_policy.md](technology-specific/rust_proptest_testing_policy.md)** でRust/proptestテスト実装を学習
 
 ### 機能追加・変更時
+**汎用ポリシーの適用:**
 1. **要件変更**: requirements_policy.md の変更管理プロセスに従う
-2. **設計変更**: design_policy.md のアーキテクチャ原則を遵守
-3. **実装**: implementation_policy.md の規約・品質基準を適用
-4. **テスト**: testing_policy.md のProperty-basedテスト戦略を実施
+2. **設計変更**: design_policy.md の汎用アーキテクチャ原則を遵守
+3. **テスト戦略**: testing_policy.md の汎用テスト方針を適用
+
+**技術固有ポリシーの実装:**
+4. **Zoom API変更**: technology-specific/zoom_oauth_functional_requirements.md の要件に従う
+5. **Rust実装**: technology-specific/rust_implementation_policy.md の規約・品質基準を適用
+6. **技術設計**: technology-specific/rust_tokio_egui_design_policy.md の技術パターンを使用
+7. **テスト実装**: technology-specific/rust_proptest_testing_policy.md のProperty-basedテスト戦略を実施
 
 ### レビュー・承認時
 1. **ポリシー準拠**: 各ポリシーの品質基準をチェック

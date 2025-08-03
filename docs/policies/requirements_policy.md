@@ -37,7 +37,7 @@
 
 ### 機能要件（Functional Requirements）
 
-機能要件の詳細は、別文書 **`functional_requirements.md`** に分離されています。
+機能要件の詳細は、技術要素固有の別文書 **`technology-specific/zoom_oauth_functional_requirements.md`** に分離されています。
 
 **機能要件概要**:
 - **FR001**: 認証・設定管理（OAuth 2.0、設定管理、トークン管理）
@@ -48,7 +48,7 @@
 - **FR006**: コマンドライン対応（CLI実行機能）
 
 詳細な機能要件、受け入れ基準、依存関係については、
-**📋 `functional_requirements.md`** を参照してください。
+**📋 `technology-specific/zoom_oauth_functional_requirements.md`** を参照してください。
 
 ### 非機能要件（Non-Functional Requirements）
 

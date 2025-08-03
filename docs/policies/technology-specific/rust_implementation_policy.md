@@ -1,6 +1,13 @@
-# 実装方針 - Zoom Video Mover
+# Rust実装方針 - Zoom Video Mover
 
-## 実装の基本方針
+**技術要素**: Rust プログラミング言語  
+**依存関係**: 
+- Rust 1.70+
+- tokio 非同期ランタイム
+- egui/eframe GUI フレームワーク
+- reqwest HTTP クライアント
+
+## Rust実装の基本方針
 
 ### 実装哲学・原則
 - **Safety First**: Rustの型安全性・メモリ安全性を最大限活用

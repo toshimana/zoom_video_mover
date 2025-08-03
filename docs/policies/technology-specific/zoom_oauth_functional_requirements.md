@@ -1,9 +1,16 @@
-# 機能要件仕様書 - Zoom Video Mover
+# Zoom API・OAuth機能要件仕様書 - Zoom Video Mover
+
+**技術要素**: Zoom API, OAuth 2.0  
+**依存関係**: 
+- Zoom Cloud Recording API
+- OAuth 2.0 認証プロトコル
+- Zoom Marketplace アプリケーション
+- HTTP/HTTPS 通信プロトコル
 
 ## 概要
 
-本文書は、Zoom Video Moverプロジェクトの機能要件（Functional Requirements）を定義します。
-各機能要件は、システムが提供すべき具体的な機能とその詳細を記述しており、要件定義方針に基づいて体系的に整理されています。
+本文書は、Zoom API および OAuth 2.0 に特化した機能要件（Functional Requirements）を定義します。
+各機能要件は、Zoom 固有のAPIやOAuth認証フローに基づく具体的な機能とその詳細を記述しており、汎用的な要件定義方針に基づいて体系的に整理されています。
 
 ## 機能要件分類体系
 
