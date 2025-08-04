@@ -168,7 +168,9 @@ async fn authenticate_user(client_id: &str, client_secret: &str) -> Result<AuthT
 
 ## テスト戦略
 
-### Property-Based Testing（プロパティベーステスト）
+### Property-Based Testing（プロパティベーステスト）- 品質保証の基盤戦略
+**位置づけ**: プロジェクト品質保証の基盤戦略として、手動テストでは困難な網羅的品質保証を実現
+
 関数の性質（プロパティ）を定義し、多数のランダム入力で検証する手法：
 
 #### 使用フレームワーク
@@ -266,7 +268,7 @@ proptest! {
 }
 ```
 
-#### テスト実行とデバッグ
+#### テスト実行規模・基盤戦略としての位置づけ
 ```bash
 # Property-basedテストのみ実行（統合テスト）
 cargo test --test property_tests
@@ -274,12 +276,18 @@ cargo test --test property_tests
 # ライブラリのテストのみ実行
 cargo test --lib
 
+# 基盤戦略として1000ケース以上の自動検証を実行
+PROPTEST_CASES=1000 cargo test --test property_tests
+
 # 失敗ケースの最小化表示
 PROPTEST_VERBOSE=1 cargo test --test property_tests
-
-# 特定のテスト数で実行
-PROPTEST_CASES=1000 cargo test --test property_tests
 ```
+
+**基盤戦略としての特徴**:
+- **実行規模**: 1000ケース以上の自動検証
+- **適用領域**: データ整合性・境界値・異常系の完全検証
+- **効果**: 手動テストでは困難な網羅的品質保証を実現
+- **優先度**: 品質保証の最重要基盤として位置づけ
 
 ### 日時・日付の検証規約
 

@@ -75,7 +75,7 @@ end
 
 app --> runner : SearchResults(recordings)
 
-== Property-based Download Test ==
+== Property-based Download Test (品質保証基盤戦略) ==
 
 runner -> harness : run_property_download_test()
 
@@ -170,11 +170,16 @@ runner -> runner : generate_coverage_report()
 runner -> runner : validate_performance_metrics()
 
 note right of runner
-  **Test Quality Metrics:**
-  - Property Test Coverage: 1000 cases
+  **品質保証基盤戦略としてのメトリクス:**
+  - Property Test Coverage: 1000 cases (基盤要件)
   - Error Scenario Coverage: 15 types
-  - Concurrency Test Coverage: 10 levels
+  - Concurrency Test Coverage: 10 levels  
   - Integration Coverage: 95%+ code paths
+  
+  **基盤戦略位置づけ:**
+  - 手動テスト困難領域の完全自動化
+  - データ整合性・境界値・異常系の網羅検証
+  - 品質保証の最重要基盤として実装
 end note
 
 @enduml

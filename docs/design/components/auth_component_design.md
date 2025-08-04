@@ -157,6 +157,12 @@ pub enum AuthState {
         expires_at: chrono::DateTime<chrono::Utc>,
     },
     
+    /// トークンリフレッシュ中
+    Refreshing {
+        user_id: String,
+        refresh_started_at: chrono::DateTime<chrono::Utc>,
+    },
+    
     /// トークン期限切れ
     TokenExpired {
         can_refresh: bool,
@@ -543,7 +549,12 @@ impl ZoomAuthClient {
             return Err(AuthError::RefreshTokenExpired);
         }
         
-        // 4. トークン更新リクエスト
+        // 4. 状態をリフレッシュ中に変更
+        if let AuthState::Authenticated { user_id, .. } = self.get_auth_state() {
+            self.state_manager.set_refreshing(user_id).await;
+        }
+        
+        // 5. トークン更新リクエスト
         let refresh_request = RefreshTokenRequest {
             grant_type: "refresh_token".to_string(),
             refresh_token: refresh_token.token.clone(),
@@ -551,28 +562,47 @@ impl ZoomAuthClient {
             client_secret: self.config.client_secret.clone(),
         };
         
-        // 5. Zoom API コール
+        // 6. Zoom API コール
         let response = self.http_client
             .post(&self.config.token_endpoint)
             .json(&refresh_request)
             .send()
-            .await?;
+            .await;
         
-        // 6. 新しいトークン取得
-        let token_response: TokenResponse = response.json().await?;
-        let new_access_token = self.parse_access_token(token_response)?;
-        
-        // 7. 認証情報更新・保存
-        let updated_credentials = AuthCredentials {
-            access_token: new_access_token.clone(),
-            refresh_token: Some(refresh_token),
-            user_info: current_credentials.user_info,
-        };
-        
-        self.secure_storage.save_credentials(&updated_credentials).await?;
-        self.state_manager.update_authenticated_state(updated_credentials).await;
-        
-        Ok(new_access_token)
+        // 7. 結果に応じた状態変更
+        match response {
+            Ok(resp) if resp.status().is_success() => {
+                // 成功: 新しいトークン取得
+                let token_response: TokenResponse = resp.json().await?;
+                let new_access_token = self.parse_access_token(token_response)?;
+                
+                // 認証情報更新・保存
+                let updated_credentials = AuthCredentials {
+                    access_token: new_access_token.clone(),
+                    refresh_token: Some(refresh_token),
+                    user_info: current_credentials.user_info,
+                };
+                
+                self.secure_storage.save_credentials(&updated_credentials).await?;
+                self.state_manager.set_authenticated(updated_credentials).await;
+                
+                Ok(new_access_token)
+            },
+            Ok(resp) => {
+                // API エラー: トークン期限切れ状態に変更
+                let error_response: OAuthErrorResponse = resp.json().await?;
+                self.state_manager.set_token_expired(false).await;
+                Err(AuthError::OAuthError(error_response))
+            },
+            Err(e) => {
+                // ネットワークエラー: 元の認証済み状態に戻す
+                if let AuthState::Refreshing { user_id, .. } = self.get_auth_state() {
+                    let expires_at = current_credentials.access_token.expires_at;
+                    self.state_manager.set_authenticated_with_expiry(user_id, expires_at).await;
+                }
+                Err(AuthError::NetworkError(e))
+            }
+        }
     }
 }
 ```
