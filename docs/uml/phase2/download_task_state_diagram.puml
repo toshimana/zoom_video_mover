@@ -1,109 +1,257 @@
 @startuml DownloadTaskStateDiagram
 !theme plain
-title 状態遷移図 - DownloadTask状態管理
+title 状態遷移図 - DownloadTask状態管理（詳細設計対応版）
 
-[*] --> PENDING : タスク作成
+[*] --> Pending : タスク作成
 
-state PENDING {
-  PENDING : entry / validateTarget()
-  PENDING : exit / prepareDownload()
+state Pending {
+  Pending : entry / validateTarget()
+  Pending : entry / assignTaskId()
+  Pending : do / waitForSlot()
+  Pending : do / checkPrerequisites()
+  Pending : exit / prepareDownload()
 }
 
-PENDING --> IN_PROGRESS : start() / beginDownload()
-PENDING --> CANCELLED : cancel() / cleanup()
+Pending --> InProgress : start() / beginDownload()
+Pending --> Cancelled : cancel() / cleanup()
 
-state IN_PROGRESS {
-  IN_PROGRESS : entry / openStream()
-  IN_PROGRESS : do / downloadChunks()
-  IN_PROGRESS : do / updateProgress()
-  IN_PROGRESS : exit / closeStream()
+state InProgress {
+  started_at: DateTime<Utc>
+  worker_id: String
   
-  state DOWNLOADING {
-    DOWNLOADING : do / receiveData()
-    DOWNLOADING : do / writeToFile()
-    DOWNLOADING : do / updateBytes()
+  InProgress : entry / acquireSemaphore()
+  InProgress : entry / openHttpStream()
+  InProgress : entry / createChunks()
+  InProgress : do / downloadParallelChunks()
+  InProgress : do / updateProgressContinuous()
+  InProgress : exit / releaseResources()
+  
+  state ChunkDownloading {
+    ChunkDownloading : do / receiveStreamData()
+    ChunkDownloading : do / writeChunkToFile()
+    ChunkDownloading : do / updateChunkProgress()
+    ChunkDownloading : do / handleRangeRequests()
   }
   
-  state VERIFYING {
-    VERIFYING : entry / calculateChecksum()
-    VERIFYING : do / compareHashes()
+  state IntegrityVerification {
+    IntegrityVerification : entry / calculateSHA256()
+    IntegrityVerification : do / compareWithExpected()
+    IntegrityVerification : do / validateFileSize()
   }
   
-  DOWNLOADING --> VERIFYING : downloadComplete()
-}
-
-IN_PROGRESS --> PAUSED : pause() / suspendDownload()
-IN_PROGRESS --> CANCELLED : cancel() / abortDownload()
-IN_PROGRESS --> FAILED : error() / logError()
-IN_PROGRESS --> COMPLETED : verificationSuccess() / finalizeFile()
-
-state PAUSED {
-  PAUSED : entry / saveState()
-  PAUSED : do / maintainPartialFile()
-}
-
-PAUSED --> IN_PROGRESS : resume() / restoreState()
-PAUSED --> CANCELLED : cancel() / cleanupPartial()
-PAUSED --> FAILED : timeout() / expireTask()
-
-state FAILED {
-  FAILED : entry / logError()
-  FAILED : do / prepareRetry()
-}
-
-FAILED --> PENDING : retry() [retryCount < maxRetries] / incrementRetry()
-FAILED --> CANCELLED : retry() [retryCount >= maxRetries] / giveUp()
-FAILED --> CANCELLED : cancel() / cleanup()
-
-state COMPLETED {
-  COMPLETED : entry / notifyCompletion()
-  COMPLETED : do / updateHistory()
-}
-
-state CANCELLED {
-  CANCELLED : entry / cleanup()
-  CANCELLED : do / removePartialFiles()
-}
-
-COMPLETED --> [*] : cleanup()
-CANCELLED --> [*] : cleanup()
-
-' イベント定義
-note right of PENDING
-  **Events:**
-  - start(): ダウンロード開始
-  - cancel(): キャンセル
+  state ChunkMerging {
+    ChunkMerging : entry / sortChunksByOffset()
+    ChunkMerging : do / mergeChunksSequentially()
+    ChunkMerging : do / deleteTemporaryChunks()
+  }
   
-  **Guards:**
-  - targetPathValid
-  - networkAvailable
-  - spaceAvailable
+  ChunkDownloading --> ChunkMerging : allChunksComplete()
+  ChunkMerging --> IntegrityVerification : mergeComplete()
+}
+
+InProgress --> Paused : pause() / suspendAndSaveState()
+InProgress --> Cancelled : cancel() / abortAllChunks()
+InProgress --> Failed : error() / logError()
+InProgress --> Completed : verificationSuccess() / finalizeFile()
+
+state Paused {
+  paused_at: DateTime<Utc>
+  reason: PauseReason
+  
+  Paused : entry / saveResumeInfo()
+  Paused : entry / pauseActiveChunks()
+  Paused : do / maintainPartialFiles()
+  Paused : do / monitorStorageSpace()
+  
+  state UserPaused {
+    UserPaused : do / showResumeOption()
+  }
+  
+  state SystemPaused {
+    SystemPaused : do / monitorSystemResources()
+    SystemPaused : do / autoResumeWhenReady()
+  }
+  
+  state NetworkPaused {
+    NetworkPaused : do / monitorNetworkStatus()
+    NetworkPaused : do / reconnectWhenAvailable()
+  }
+  
+  Paused --> UserPaused : [reason=UserRequested]
+  Paused --> SystemPaused : [reason=ResourceLimited]
+  Paused --> NetworkPaused : [reason=NetworkUnavailable]
+}
+
+Paused --> InProgress : resume() / restoreChunkStates()
+Paused --> Cancelled : cancel() / cleanupPartialFiles()
+Paused --> Failed : timeout() / expireTask()
+
+state Completed {
+  completed_at: DateTime<Utc>
+  verification_result: VerificationResult
+  
+  Completed : entry / notifyCompletion()
+  Completed : entry / recordStatistics()
+  Completed : do / updateDownloadHistory()
+  Completed : do / cleanupTemporaryFiles()
+  
+  state VerificationPassed {
+    VerificationPassed : do / moveToFinalLocation()
+    VerificationPassed : do / updateMetadata()
+  }
+  
+  state VerificationSkipped {
+    VerificationSkipped : do / logWarning()
+    VerificationSkipped : do / acceptWithoutVerification()
+  }
+  
+  Completed --> VerificationPassed : [verification_result=Passed]
+  Completed --> VerificationSkipped : [verification_result=Skipped]
+}
+
+state Failed {
+  failed_at: DateTime<Utc>
+  error: DownloadError
+  retry_count: u32
+  
+  Failed : entry / analyzeError()
+  Failed : entry / determineRecoveryStrategy()
+  Failed : do / logDetailedError()
+  Failed : do / prepareRetryIfPossible()
+  
+  state RecoverableFailure {
+    RecoverableFailure : do / calculateBackoffDelay()
+    RecoverableFailure : do / showRetryOption()
+  }
+  
+  state PermanentFailure {
+    PermanentFailure : do / markAsUnrecoverable()
+    PermanentFailure : do / notifyUser()
+  }
+  
+  state ResourceFailure {
+    ResourceFailure : do / checkDiskSpace()
+    ResourceFailure : do / requestResourceCleanup()
+  }
+  
+  Failed --> RecoverableFailure : [error.is_recoverable()=true]
+  Failed --> PermanentFailure : [error.is_recoverable()=false]
+  Failed --> ResourceFailure : [error=InsufficientResources]
+}
+
+Failed --> Pending : retry() [retry_count < max_retries] / incrementRetryCount()
+Failed --> Cancelled : retry() [retry_count >= max_retries] / giveUpRetry()
+Failed --> Cancelled : cancel() / cleanupAndCancel()
+
+state Cancelled {  
+  cancelled_at: DateTime<Utc>
+  reason: CancellationReason
+  
+  Cancelled : entry / stopAllChunks()
+  Cancelled : entry / releaseAllResources()
+  Cancelled : do / cleanupPartialFiles()
+  Cancelled : do / recordCancellation()
+  
+  state UserCancelled {
+    UserCancelled : do / notifyUserCancellation()
+  }
+  
+  state SystemCancelled {
+    SystemCancelled : do / logSystemCancellation()
+  }
+  
+  state ErrorCancelled {
+    ErrorCancelled : do / logErrorCancellation()
+  }
+  
+  Cancelled --> UserCancelled : [reason=UserRequested]
+  Cancelled --> SystemCancelled : [reason=SystemShutdown]
+  Cancelled --> ErrorCancelled : [reason=UnrecoverableError]
+}
+
+' 最終状態
+Completed --> [*] : finalCleanup()
+Cancelled --> [*] : finalCleanup()
+
+' 状態詳細仕様
+note right of Pending
+  **待機中状態管理:**
+  - タスクID生成・重複チェック
+  - ダウンロード対象URL検証
+  - 出力パス・権限確認
+  - 並列度制御セマフォ待機
+  
+  **前提条件:**
+  - ネットワーク接続利用可能
+  - 十分なディスク容量
+  - 書き込み権限
 end note
 
-note right of IN_PROGRESS
-  **Events:**
-  - pause(): 一時停止
-  - cancel(): キャンセル
-  - error(): エラー発生
-  - downloadComplete(): 完了
+note left of InProgress
+  **並列ダウンロード制御:**
+  - started_at: 開始時刻記録
+  - worker_id: 実行ワーカー識別
+  - チャンク並列ダウンロード
+  - リアルタイム進捗更新
   
-  **Actions:**
-  - updateProgress()
-  - notifyProgress()
-  - writeChunk()
+  **品質管理:**
+  - SHA-256整合性検証
+  - チャンク境界管理
+  - ストリーミング処理
 end note
 
-note bottom of FAILED
-  **Error Types:**
-  - NetworkError: 通信エラー
-  - FileSystemError: ファイル操作エラー
-  - AuthenticationError: 認証エラー
-  - ChecksumError: 整合性エラー
+note bottom of Paused
+  **一時停止種別管理:**
+  - paused_at: 停止時刻
+  - reason: 停止理由分類
+  - レジューム情報保存
+  - 部分ファイル維持
   
-  **Retry Strategy:**
-  - 指数バックオフ
-  - 最大3回リトライ
-  - エラー種別別戦略
+  **一時停止理由:**
+  - UserRequested: ユーザー要求
+  - ResourceLimited: リソース不足
+  - NetworkUnavailable: ネットワーク断
+end note
+
+note right of Failed
+  **エラー分析・回復戦略:**
+  - failed_at: 失敗時刻
+  - error: 詳細エラー情報
+  - retry_count: 再試行回数
+  - 自動回復可能性判定
+  
+  **エラー種別:**
+  - NetworkError: 通信エラー (指数バックオフ)
+  - HttpStatusError: HTTP状態エラー (即座再試行)
+  - FileOperationError: ファイル操作エラー (権限確認)
+  - IntegrityVerificationFailed: 整合性エラー (再ダウンロード)
+  - InsufficientResourcesError: リソース不足 (待機・クリーンアップ)
+end note
+
+note left of Completed
+  **完了状態管理:**
+  - completed_at: 完了時刻
+  - verification_result: 検証結果
+  - 統計情報記録
+  - 一時ファイルクリーンアップ
+  
+  **完了後処理:**
+  - ファイナルファイル配置
+  - メタデータ更新
+  - ダウンロード履歴記録
+end note
+
+note bottom of Cancelled
+  **キャンセル理由管理:**
+  - cancelled_at: キャンセル時刻
+  - reason: キャンセル理由
+  - 即座リソース解放
+  - 部分ファイル削除
+  
+  **キャンセル種別:**
+  - UserRequested: ユーザー要求
+  - SystemShutdown: システム終了
+  - UnrecoverableError: 回復不可能エラー
 end note
 
 @enduml
