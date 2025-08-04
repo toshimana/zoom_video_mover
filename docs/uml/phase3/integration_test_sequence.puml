@@ -100,7 +100,7 @@ loop Property Test Iterations (1000x)
         
         app -> mockfs : write_chunk(data)
         mockfs --> app : bytes_written
-    and
+    else
         app -> mockapi : GET /download/file2
         note right : 並列ダウンロード
     end

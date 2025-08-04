@@ -70,7 +70,7 @@ par Download Task 1
     
     deactivate spawn1
     
-and Download Task 2 (並列実行)
+else Download Task 2 (並列実行)
     svc -> spawn2 : tokio::spawn(download_single(task2))
     activate spawn2
     

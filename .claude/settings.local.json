@@ -25,7 +25,8 @@
       "WebFetch(domain:www.rdra.jp)",
       "WebFetch(domain:qiita.com)",
       "WebFetch(domain:tech.layerx.co.jp)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(java:*)"
     ],
     "deny": []
   }

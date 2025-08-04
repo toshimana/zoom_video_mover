@@ -29,10 +29,10 @@ package "Authentication Module" <<crate>> {
     + time_until_expiry(&self) -> Duration
   }
   
-  trait OAuthClient: Send + Sync {
-    + async fn exchange_code(&self, code: &str) -> Result<OAuth2Token, AuthError>
-    + async fn refresh_token(&self, token: &OAuth2Token) -> Result<OAuth2Token, AuthError>
-    + async fn validate_token(&self, token: &OAuth2Token) -> Result<bool, AuthError>
+  interface OAuthClient <<trait>> {
+    + {abstract} exchange_code(code: &str) -> Result<OAuth2Token, AuthError>
+    + {abstract} refresh_token(token: &OAuth2Token) -> Result<OAuth2Token, AuthError>
+    + {abstract} validate_token(token: &OAuth2Token) -> Result<bool, AuthError>
   }
   
   struct ZoomOAuthClient {
@@ -77,10 +77,9 @@ package "Download Module" <<crate>> {
     + fn subscribe_progress(&self) -> broadcast::Receiver<ProgressUpdate>
   }
   
-  trait DownloadEngine: Send + Sync {
-    + async fn download_file(&self, url: &str, path: &Path) -> Result<(), DownloadError>
-    + async fn download_with_progress(&self, url: &str, path: &Path, 
-                                    progress: Arc<dyn ProgressReporter>) -> Result<(), DownloadError>
+  interface DownloadEngine <<trait>> {
+    + {abstract} download_file(url: &str, path: &Path) -> Result<(), DownloadError>
+    + {abstract} download_with_progress(url: &str, path: &Path, progress: Arc<dyn ProgressReporter>) -> Result<(), DownloadError>
   }
   
   struct ParallelDownloader {
@@ -92,10 +91,10 @@ package "Download Module" <<crate>> {
 }
 
 package "Storage Module" <<crate>> {
-  trait SecureStorage: Send + Sync {
-    + async fn store_encrypted(&self, key: &str, data: &[u8]) -> Result<(), StorageError>
-    + async fn load_encrypted(&self, key: &str) -> Result<Vec<u8>, StorageError>
-    + async fn delete(&self, key: &str) -> Result<(), StorageError>
+  interface SecureStorage <<trait>> {
+    + {abstract} store_encrypted(key: &str, data: &[u8]) -> Result<(), StorageError>
+    + {abstract} load_encrypted(key: &str) -> Result<Vec<u8>, StorageError>
+    + {abstract} delete(key: &str) -> Result<(), StorageError>
   }
   
   struct AesGcmStorage {
@@ -104,9 +103,9 @@ package "Storage Module" <<crate>> {
     - cipher: Aes256Gcm
   }
   
-  trait ConfigRepository: Send + Sync {
-    + async fn save_config(&self, config: &ApplicationConfig) -> Result<(), ConfigError>
-    + async fn load_config(&self) -> Result<ApplicationConfig, ConfigError>
+  interface ConfigRepository <<trait>> {
+    + {abstract} save_config(config: &ApplicationConfig) -> Result<(), ConfigError>
+    + {abstract} load_config() -> Result<ApplicationConfig, ConfigError>
   }
   
   struct TomlConfigRepository {
@@ -116,10 +115,10 @@ package "Storage Module" <<crate>> {
 }
 
 package "HTTP Module" <<crate>> {
-  trait HttpClient: Send + Sync {
-    + async fn get(&self, url: &str) -> Result<Response, HttpError>
-    + async fn post(&self, url: &str, body: &[u8]) -> Result<Response, HttpError>
-    + async fn download_stream(&self, url: &str) -> Result<ByteStream, HttpError>
+  interface HttpClient <<trait>> {
+    + {abstract} get(url: &str) -> Result<Response, HttpError>
+    + {abstract} post(url: &str, body: &[u8]) -> Result<Response, HttpError>
+    + {abstract} download_stream(url: &str) -> Result<ByteStream, HttpError>
   }
   
   struct ReqwestClient {
@@ -162,8 +161,8 @@ package "Error Handling" <<crate>> {
 
 ' Rust特有の関係性
 User --> OAuth2Token : "owns"
-DownloadTask --> "Arc<RwLock<DownloadStatus>>" : "thread-safe state"
-ProgressTracker --> "Arc<AtomicU64>" : "atomic counters"
+DownloadTask --> DownloadStatus : "thread-safe state"
+ProgressTracker --> DownloadTask : "manages"
 ZoomOAuthClient ..|> OAuthClient : "implements"
 ParallelDownloader ..|> DownloadEngine : "implements"
 AesGcmStorage ..|> SecureStorage : "implements"

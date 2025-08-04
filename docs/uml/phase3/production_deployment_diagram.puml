@@ -39,21 +39,9 @@ node "Windows 10/11 Environment" as Windows {
   }
   
   node "Rust Runtime Dependencies" as RustDeps {
-    artifact "reqwest.dll" as Reqwest {
-      dependency "hyper" as Hyper
-      dependency "rustls" as RustTLS
-      dependency "tokio" as Tokio
-    }
-    
-    artifact "egui_dependencies" as EguiDeps {
-      dependency "wgpu" as WGPU
-      dependency "winit" as Winit
-    }
-    
-    artifact "crypto_dependencies" as CryptoDeps {
-      dependency "aes-gcm" as AesGcm
-      dependency "ring" as Ring
-    }
+    artifact "reqwest.dll" as Reqwest
+    artifact "egui_dependencies" as EguiDeps
+    artifact "crypto_dependencies" as CryptoDeps
   }
 }
 
@@ -152,19 +140,10 @@ note bottom of SystemLibs
 end note
 
 ' セキュリティ境界
-rectangle "Encrypted Storage Boundary" {
-  Tokens
-  note bottom : AES-256-GCM encrypted
-}
+note right of Tokens : "AES-256-GCM encrypted"
 
-rectangle "Network Security Boundary" {
-  Internet
-  note top : TLS 1.3, Certificate Pinning
-}
+note top of Internet : "TLS 1.3, Certificate Pinning"
 
-rectangle "Process Isolation Boundary" {
-  UserSpace
-  note right : Process-level isolation
-}
+note right of UserSpace : "Process-level isolation"
 
 @enduml

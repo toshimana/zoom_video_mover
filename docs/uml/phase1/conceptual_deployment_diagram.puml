@@ -61,15 +61,9 @@ App --> CryptoAPI : "暗号化処理"
 RecordingSrv --> RecordingStorage : "データアクセス"
 
 ' セキュリティ境界
-rectangle "セキュリティ境界" {
-  WindowsPC
-  note bottom : "ローカル環境\n機密情報はAES-256で暗号化保存"
-}
+note right of WindowsPC : "ローカル環境\n機密情報はAES-256で暗号化保存"
 
-rectangle "外部サービス境界" {
-  ZoomCloud
-  note bottom : "Zoom管理環境\nOAuth認証・API制限適用"
-}
+note right of ZoomCloud : "Zoom管理環境\nOAuth認証・API制限適用"
 
 ' 品質属性
 note right of App

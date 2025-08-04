@@ -69,7 +69,7 @@ par 並列ダウンロード1
     task1 -> task1 : setStatus(COMPLETED)
     task1 -> tracker : taskCompleted(taskId)
     
-and 並列ダウンロード2
+else 並列ダウンロード2
     download -> task2 : start()
     activate task2
     
