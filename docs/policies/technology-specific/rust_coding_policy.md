@@ -1,4 +1,4 @@
-# Rustコーディング方針 - Zoom Video Mover
+# Rustコーディング規約 - Zoom Video Mover
 
 **技術要素**: Rust 1.70+  
 **適用範囲**: 全Rustコード（src/, tests/, benches/）
