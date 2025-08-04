@@ -68,7 +68,7 @@ note right of ZoomCloud : "Zoom管理環境\nOAuth認証・API制限適用"
 ' 品質属性
 note right of App
   **性能要件**
-  - 同時ダウンロード: 5ファイル
+  - 同時ダウンロード: 5ファイル（設定可能: 1-10）
   - UI応答性: 高速
   - メモリ使用量: 1GB以内
 end note

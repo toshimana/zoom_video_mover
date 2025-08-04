@@ -4,76 +4,76 @@ title 概念クラス図 - Zoom Video Mover ドメインモデル
 
 package "認証ドメイン" {
   class User {
-    + userId: String
+    + user_id: String
     + email: String
   }
   
   class OAuth2Token {
-    + accessToken: String
-    + refreshToken: String
-    + expiresAt: DateTime
+    + access_token: String
+    + refresh_token: String
+    + expires_at: DateTime
   }
   
   class ZoomAccount {
-    + accountId: String
-    + accountType: String
+    + account_id: String
+    + account_type: String
   }
 }
 
 package "会議録画ドメイン" {
   class Meeting {
-    + meetingId: String
+    + meeting_id: String
     + topic: String
-    + startTime: DateTime
+    + start_time: DateTime
     + duration: Duration
-    + hostId: String
+    + host_id: String
   }
   
   class Recording {
-    + recordingId: String
-    + fileType: FileType
-    + downloadUrl: String
-    + fileSize: Long
-    + recordingType: RecordingType
+    + recording_id: String
+    + file_type: FileType
+    + download_url: String
+    + file_size: Long
+    + recording_type: RecordingType
   }
   
   class AISummary {
-    + summaryId: String
+    + summary_id: String
     + content: String
     + language: String
-    + generatedAt: DateTime
+    + generated_at: DateTime
   }
 }
 
 package "ダウンロードドメイン" {
   class DownloadTask {
-    + taskId: String
+    + task_id: String
     + status: DownloadStatus
     + progress: Percentage
-    + startedAt: DateTime
+    + started_at: DateTime
   }
   
   class LocalFile {
-    + filePath: Path
-    + fileName: String
+    + file_path: Path
+    + file_name: String
     + checksum: String
-    + createdAt: DateTime
+    + created_at: DateTime
   }
 }
 
 package "設定ドメイン" {
   class ApplicationConfig {
-    + clientId: String
-    + clientSecret: String
-    + redirectUri: String
-    + downloadPath: Path
+    + client_id: String
+    + client_secret: String
+    + redirect_uri: String
+    + download_path: Path
   }
   
   class FilterCriteria {
-    + fromDate: Date
-    + toDate: Date
-    + includeTypes: List<FileType>
-    + hostFilter: String
+    + from_date: Date
+    + to_date: Date
+    + include_types: List<FileType>
+    + host_filter: String
   }
 }
 

@@ -201,7 +201,7 @@ pub struct DownloadConfig {
     /// 出力ディレクトリ
     pub output_directory: PathBuf,
     
-    /// 同時ダウンロード数
+    /// 同時ダウンロード数（デフォルト: 5）
     pub concurrent_downloads: u32,
     
     /// チャンクサイズ（MB）
@@ -334,7 +334,7 @@ pub enum ValidationSeverity {
 /// 設定値制約
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigConstraints {
-    /// 並列ダウンロード数制限
+    /// 並列ダウンロード数制限（最大: 10）
     pub max_concurrent_downloads: u32,
     
     /// チャンクサイズ制限（MB）
@@ -433,6 +433,32 @@ pub enum ChangeSource {
         tool_name: String,
         tool_version: String,
     },
+}
+
+/// デフォルト値実装
+impl Default for DownloadConfig {
+    fn default() -> Self {
+        Self {
+            output_directory: PathBuf::from("./downloads"),
+            concurrent_downloads: 5,  // デフォルト: 5ファイル同時
+            chunk_size_mb: 8,
+            retry_config: RetryConfig::default(),
+            post_download_actions: PostDownloadActions::default(),
+            filename_template: "{date}_{topic}_{type}".to_string(),
+            duplicate_handling: DuplicateHandling::Rename,
+        }
+    }
+}
+
+impl Default for ConfigConstraints {
+    fn default() -> Self {
+        Self {
+            max_concurrent_downloads: 10,  // 最大: 10ファイル同時
+            max_chunk_size_mb: 64,
+            max_path_length: 260,
+            min_disk_space_mb: 1024,
+        }
+    }
 }
 
 /// 設定バックアップ情報

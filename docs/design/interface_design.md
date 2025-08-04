@@ -43,6 +43,52 @@
 
 ## コンポーネント間インターフェース
 
+### API境界定義
+
+#### コンポーネント境界マッピング
+各コンポーネント間の明確な境界とAPIエンドポイントを定義：
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     API Boundary Matrix                        │
+├─────────────────────────────────────────────────────────────────┤
+│ GUI Layer          → Service Layer                             │
+│ ├── MainWindow     → AuthService::get_auth_status()            │
+│ ├── SettingsDialog → ConfigService::update_config()            │
+│ └── ProgressPanel  → DownloadService::get_progress()           │
+├─────────────────────────────────────────────────────────────────┤
+│ Service Layer      → Repository Layer                          │
+│ ├── AuthService    → SecureStorage::load_credentials()         │
+│ ├── RecordingService → ApiClient::fetch_recordings()           │
+│ └── DownloadService → FileManager::create_file()              │
+├─────────────────────────────────────────────────────────────────┤
+│ Repository Layer   → Infrastructure Layer                      │
+│ ├── ApiClient      → HttpClient::get()                        │
+│ ├── FileManager    → std::fs::File                            │
+│ └── SecureStorage  → crypto::encrypt()                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### API仕様詳細
+
+##### 1. GUI → Service API仕様
+- **プロトコル**: 直接関数呼び出し（同一プロセス内）
+- **データ形式**: Rust構造体（serde対応）
+- **エラーハンドリング**: `Result<T, ServiceError>`型
+- **並行性**: Arc<RwLock<T>>による読み書き制御
+
+##### 2. Service → Repository API仕様
+- **プロトコル**: trait object経由のインターフェース呼び出し
+- **データ形式**: ドメインオブジェクト ↔ DTO変換
+- **エラーハンドリング**: 階層化エラー型（Repository → Service）
+- **トランザクション**: Repository層でのatomic操作保証
+
+##### 3. Repository → Infrastructure API仕様
+- **プロトコル**: HTTP/HTTPS（外部API）、ファイルI/O（ローカル）
+- **データ形式**: JSON（API）、暗号化バイナリ（ローカル）
+- **エラーハンドリング**: Infrastructure → Repository エラー変換
+- **再試行**: 指数バックオフによる自動再試行
+
 ### サービス層インターフェース
 
 #### 1. 認証サービスインターフェース
