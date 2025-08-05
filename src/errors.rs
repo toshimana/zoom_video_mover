@@ -145,6 +145,17 @@ impl AppError {
     }
 
     /// バリデーションエラーを作成
+    /// 
+    /// # 事前条件
+    /// - message は空でない有効なエラーメッセージである
+    /// 
+    /// # 事後条件
+    /// - バリデーションエラーのAppErrorインスタンスが生成される
+    /// - field が指定された場合は対象フィールド名が設定される
+    /// 
+    /// # 不変条件
+    /// - message の内容は変更されない
+    /// - field の内容は変更されない
     pub fn validation(message: impl Into<String>, field: Option<String>) -> Self {
         Self::Validation {
             message: message.into(),
@@ -164,6 +175,17 @@ impl AppError {
     }
 
     /// エラーが回復可能かどうかを判定
+    /// 
+    /// # 事前条件
+    /// - self は有効なAppErrorインスタンスである
+    /// 
+    /// # 事後条件
+    /// - 回復可能な場合は true を返す
+    /// - 回復不可能な場合は false を返す
+    /// 
+    /// # 不変条件
+    /// - self の状態は変更されない
+    /// - 判定ロジックは一貫している
     pub fn is_recoverable(&self) -> bool {
         match self {
             Self::Network { .. } => true,
@@ -174,6 +196,17 @@ impl AppError {
     }
 
     /// リトライ推奨待機時間を取得（秒）
+    /// 
+    /// # 事前条件
+    /// - self は有効なAppErrorインスタンスである
+    /// 
+    /// # 事後条件
+    /// - リトライ推奨時間がある場合は Some(秒数) を返す
+    /// - リトライ推奨時間がない場合は None を返す
+    /// 
+    /// # 不変条件
+    /// - self の状態は変更されない
+    /// - 返される時間は0以上の妥当な値である
     pub fn retry_after(&self) -> Option<u64> {
         match self {
             Self::RateLimit { retry_after, .. } => *retry_after,

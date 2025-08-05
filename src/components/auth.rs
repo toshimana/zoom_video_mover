@@ -14,7 +14,7 @@ use chrono::{DateTime, Utc, Duration};
 use oauth2::{
     basic::BasicClient, AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl,
     AuthorizationCode, CsrfToken, PkceCodeChallenge, PkceCodeVerifier, Scope,
-    TokenResponse, AccessToken, RefreshToken,
+    TokenResponse, RefreshToken,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

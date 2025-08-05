@@ -13,7 +13,7 @@ pub mod download;
 pub mod ui;
 
 // 共通トレイトとタイプ定義
-use crate::errors::{AppError, AppResult};
+use crate::errors::AppResult;
 use async_trait::async_trait;
 
 /// コンポーネントの基本ライフサイクル管理

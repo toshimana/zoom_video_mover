@@ -8,7 +8,7 @@
 pub mod config_properties;
 pub mod auth_properties;
 pub mod date_properties;
-pub mod error_properties;
+pub mod errors_properties;
 
 use proptest::prelude::*;
 

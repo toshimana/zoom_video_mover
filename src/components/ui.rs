@@ -5,7 +5,7 @@
 /// - イベント処理
 /// - 画面遷移制御
 
-use crate::errors::{AppError, AppResult};
+use crate::errors::AppResult;
 use crate::components::ComponentLifecycle;
 use async_trait::async_trait;
 
