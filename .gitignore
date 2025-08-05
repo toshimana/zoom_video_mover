@@ -48,3 +48,17 @@ debug_responses/
 
 # Test coverage
 tarpaulin-report.html
+
+# Temporary workspace - contents can be deleted anytime
+temp_workspace/notes/*
+temp_workspace/drafts/*
+temp_workspace/test_data/*
+temp_workspace/experiments/*
+temp_workspace/references/*
+
+# Keep the directory structure but ignore contents
+!temp_workspace/notes/.gitkeep
+!temp_workspace/drafts/.gitkeep
+!temp_workspace/test_data/.gitkeep
+!temp_workspace/experiments/.gitkeep
+!temp_workspace/references/.gitkeep
