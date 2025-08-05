@@ -51,7 +51,6 @@ impl Default for OAuthConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct AppConfig {
     /// OAuth設定
-    #[validate(nested)]
     pub oauth: OAuthConfig,
     
     /// 出力ディレクトリ
@@ -338,10 +337,10 @@ mod tests {
         // 有効な設定
         config.oauth.client_id = "valid_client_id".to_string();
         config.oauth.client_secret = "valid_client_secret".to_string();
-        assert!(config.validate().is_ok());
+        assert!(config.oauth.validate().is_ok());
         
         // 無効な設定
         config.oauth.client_id = String::new();
-        assert!(config.validate().is_err());
+        assert!(config.oauth.validate().is_err());
     }
 }

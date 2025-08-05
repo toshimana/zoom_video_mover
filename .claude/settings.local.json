@@ -27,7 +27,8 @@
       "WebFetch(domain:tech.layerx.co.jp)",
       "Bash(ls:*)",
       "Bash(java:*)",
-      "Bash(touch:*)"
+      "Bash(touch:*)",
+      "Bash(PROPTEST_VERBOSE=1 cargo test --test property_tests_integration -- --nocapture)"
     ],
     "deny": []
   }

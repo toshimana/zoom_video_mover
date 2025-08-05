@@ -79,14 +79,48 @@ pub fn parse_datetime(datetime_str: &str) -> DateTime<Utc> {
     
     chrono::DateTime::parse_from_rfc3339(datetime_str)
         .unwrap_or_else(|_| {
-            chrono::DateTime::parse_from_str("2025-01-01T00:00:00Z", "%Y-%m-%dT%H:%M:%SZ")
+            // フォールバック: 2025年1月1日のUTC時刻
+            chrono::DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
                 .expect("Default datetime should be valid")
         })
         .with_timezone(&chrono::Utc)
 }
 
-// レガシー型の互換性維持
-pub use components::config::AppConfig as Config;
+// レガシー型の互換性維持のため、旧Config構造体を実装
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Config {
+    pub client_id: String,
+    pub client_secret: String,
+    pub redirect_uri: Option<String>,
+}
+
+impl Config {
+    pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        use std::fs;
+        let content = fs::read_to_string(path)?;
+        let config: Config = toml::from_str(&content)?;
+        Ok(config)
+    }
+    
+    pub fn create_sample_file(path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        use std::fs;
+        let sample_config = Config {
+            client_id: "your_zoom_client_id".to_string(),
+            client_secret: "your_zoom_client_secret".to_string(),
+            redirect_uri: Some("http://localhost:8080/callback".to_string()),
+        };
+        let content = toml::to_string_pretty(&sample_config)?;
+        fs::write(path, content)?;
+        Ok(())
+    }
+    
+    pub fn save_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        use std::fs;
+        let content = toml::to_string_pretty(self)?;
+        fs::write(path, content)?;
+        Ok(())
+    }
+}
 
 // レガシーAPI構造体（最小限）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,7 +159,7 @@ pub struct RecordingResponse {
     pub meetings: Vec<MeetingRecording>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MeetingRecording {
     pub uuid: String,
     pub id: u64,
@@ -156,18 +190,31 @@ pub struct ZoomRecordingDownloader {
 }
 
 impl ZoomRecordingDownloader {
-    pub fn new(client_id: String, client_secret: String, _redirect_uri: String) -> Self {
+    pub fn new(_client_id: String, _client_secret: String, _redirect_uri: String) -> Self {
         Self {}
     }
     
-    pub fn new_with_token(client_id: String, client_secret: String, access_token: String) -> Self {
+    pub fn new_with_token(_client_id: String, _client_secret: String, _access_token: String) -> Self {
         Self {}
+    }
+    
+    pub async fn get_recordings(&mut self, _user_id: Option<&str>, _from_date: &str, _to_date: &str, _page_size: Option<u32>) -> Result<RecordingResponse, Box<dyn std::error::Error + Send + Sync>> {
+        // スタブ実装 - 空のレスポンスを返す
+        Ok(RecordingResponse {
+            from: _from_date.to_string(),
+            to: _to_date.to_string(),
+            page_count: 1,
+            page_size: 30,
+            total_records: 0,
+            meetings: vec![],
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Datelike;
 
     #[test]
     fn test_sanitize_filename() {

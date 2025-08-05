@@ -90,7 +90,7 @@ impl AuthToken {
 }
 
 /// OAuth認証フロー状態
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct AuthFlowState {
     /// 状態ID
     pub state_id: String,
@@ -191,7 +191,7 @@ impl AuthComponent {
     /// - 失敗時: 適切なエラーが返される
     pub fn generate_auth_url(&mut self) -> AppResult<(String, String)> {
         let oauth_client = self.oauth_client.as_ref()
-            .ok_or_else(|| AppError::authentication("OAuth client not initialized", None))?;
+            .ok_or_else(|| AppError::authentication("OAuth client not initialized", None::<std::io::Error>))?;
         
         let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
         let csrf_token = CsrfToken::new_random();
@@ -244,13 +244,13 @@ impl AuthComponent {
         assert!(!state_id.is_empty(), "state_id must not be empty");
         
         let oauth_client = self.oauth_client.as_ref()
-            .ok_or_else(|| AppError::authentication("OAuth client not initialized", None))?;
+            .ok_or_else(|| AppError::authentication("OAuth client not initialized", None::<std::io::Error>))?;
         
         let flow_state = self.pending_flows.remove(state_id)
-            .ok_or_else(|| AppError::authentication("Invalid or expired state", None))?;
+            .ok_or_else(|| AppError::authentication("Invalid or expired state", None::<std::io::Error>))?;
         
         if !flow_state.is_valid() {
-            return Err(AppError::authentication("Authentication flow expired", None));
+            return Err(AppError::authentication("Authentication flow expired", None::<std::io::Error>));
         }
         
         let token_result = oauth_client
@@ -298,13 +298,13 @@ impl AuthComponent {
     /// - 失敗時: 適切なエラーが返される
     pub async fn refresh_token(&mut self) -> AppResult<AuthToken> {
         let oauth_client = self.oauth_client.as_ref()
-            .ok_or_else(|| AppError::authentication("OAuth client not initialized", None))?;
+            .ok_or_else(|| AppError::authentication("OAuth client not initialized", None::<std::io::Error>))?;
         
         let current_token = self.current_token.as_ref()
-            .ok_or_else(|| AppError::authentication("No current token available", None))?;
+            .ok_or_else(|| AppError::authentication("No current token available", None::<std::io::Error>))?;
         
         let refresh_token = current_token.refresh_token.as_ref()
-            .ok_or_else(|| AppError::authentication("No refresh token available", None))?;
+            .ok_or_else(|| AppError::authentication("No refresh token available", None::<std::io::Error>))?;
         
         let token_result = oauth_client
             .exchange_refresh_token(&RefreshToken::new(refresh_token.clone()))

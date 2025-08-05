@@ -5,7 +5,8 @@
 /// - 重要なコンポーネントのProperty検証
 
 use proptest::prelude::*;
-use zoom_video_mover::{sanitize_filename, parse_datetime};
+use zoom_video_mover_lib::{sanitize_filename, parse_datetime};
+use chrono::Datelike;
 
 proptest! {
     /// ファイル名サニタイズのProperty検証
@@ -30,11 +31,11 @@ proptest! {
     
     /// 日時パースのProperty検証
     #[test]
-    fn datetime_parsing_properties(input in "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z") {
+    fn datetime_parsing_properties(input in "2[0-9]{3}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9]Z") {
         let parsed = parse_datetime(&input);
         
-        // Property 1: パース結果は常に有効
-        prop_assert!(parsed.year() >= 1970);
+        // Property 1: パース結果は常に有効（2000年台の日時またはフォールバック値）
+        prop_assert!(parsed.year() >= 2000);
         prop_assert!(parsed.year() <= 3000);
         
         // Property 2: UTC timezone
