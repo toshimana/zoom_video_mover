@@ -11,6 +11,7 @@ pub mod api;
 pub mod recording;
 pub mod download;
 pub mod ui;
+pub mod integration;
 
 // 共通トレイトとタイプ定義
 use crate::errors::AppResult;

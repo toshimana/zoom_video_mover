@@ -173,6 +173,48 @@ impl AppError {
             source: source.map(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>),
         }
     }
+    
+    /// レート制限エラーを作成
+    pub fn rate_limit(message: impl Into<String>) -> Self {
+        Self::RateLimit {
+            message: message.into(),
+            retry_after: None,
+        }
+    }
+    
+    /// リソースが見つからないエラーを作成
+    pub fn not_found(message: impl Into<String>) -> Self {
+        Self::Validation {
+            message: format!("Not found: {}", message.into()),
+            field: None,
+        }
+    }
+    
+    /// IOエラーを作成（file_systemのエイリアス）
+    pub fn io<E>(message: impl Into<String>, source: Option<E>) -> Self 
+    where 
+        E: std::error::Error + Send + Sync + 'static 
+    {
+        Self::file_system(message, source)
+    }
+    
+    /// データ形式エラーを作成
+    pub fn data_format<E>(message: impl Into<String>, source: Option<E>) -> Self 
+    where 
+        E: std::error::Error + Send + Sync + 'static 
+    {
+        Self::serialization(message, source)
+    }
+    
+    /// 外部サービスエラーを作成
+    pub fn external_service(message: impl Into<String>) -> Self {
+        Self::api(503, message, None::<std::io::Error>)
+    }
+    
+    /// データ整合性エラーを作成
+    pub fn data_integrity(message: impl Into<String>) -> Self {
+        Self::validation(message, None)
+    }
 
     /// エラーが回復可能かどうかを判定
     /// 

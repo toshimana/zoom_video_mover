@@ -73,6 +73,33 @@ pub struct AppConfig {
     
     /// ログレベル
     pub log_level: String,
+    
+    /// API設定
+    pub api: ApiSettings,
+}
+
+/// API設定
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiSettings {
+    /// ベースURL
+    pub base_url: String,
+    /// タイムアウト（秒）
+    pub timeout_seconds: u64,
+    /// リトライ回数
+    pub max_retries: u32,
+    /// ページサイズ
+    pub default_page_size: u32,
+}
+
+impl Default for ApiSettings {
+    fn default() -> Self {
+        Self {
+            base_url: "https://api.zoom.us/v2".to_string(),
+            timeout_seconds: 30,
+            max_retries: 3,
+            default_page_size: 30,
+        }
+    }
 }
 
 impl Default for AppConfig {
@@ -85,12 +112,68 @@ impl Default for AppConfig {
             rate_limit_per_second: 10,
             debug_mode: false,
             log_level: "info".to_string(),
+            api: ApiSettings::default(),
         }
     }
 }
 
+impl AppConfig {
+    /// 設定ファイルから読み込み
+    pub fn load_from_file(config_path: impl AsRef<Path>) -> AppResult<Self> {
+        let config_path = config_path.as_ref();
+        
+        if !config_path.exists() {
+            // デフォルト設定を返す
+            return Ok(Self::default());
+        }
+        
+        let content = std::fs::read_to_string(config_path)
+            .map_err(|e| AppError::file_system("Failed to read config file", Some(e)))?;
+            
+        let config: AppConfig = toml::from_str(&content)
+            .map_err(|e| AppError::configuration("Failed to parse config file", Some(e)))?;
+            
+        // バリデーション実行
+        config.validate()
+            .map_err(|e| AppError::validation(format!("Config validation failed: {}", e), None))?;
+            
+        Ok(config)
+    }
+}
+
 /// 設定管理コンポーネント
-pub struct ConfigManager {
+pub struct ConfigComponent {
+    manager: ConfigManager,
+}
+
+impl ConfigComponent {
+    pub fn new(config_path: String) -> Self {
+        Self {
+            manager: ConfigManager::new(config_path),
+        }
+    }
+    
+    pub fn get_app_config(&self) -> &AppConfig {
+        self.manager.get_config()
+    }
+}
+
+#[async_trait]
+impl ComponentLifecycle for ConfigComponent {
+    async fn initialize(&mut self) -> AppResult<()> {
+        self.manager.initialize().await
+    }
+    
+    async fn shutdown(&mut self) -> AppResult<()> {
+        self.manager.shutdown().await
+    }
+    
+    async fn health_check(&self) -> bool {
+        self.manager.health_check().await
+    }
+}
+
+struct ConfigManager {
     /// 現在の設定
     config: AppConfig,
     /// 設定ファイルパス

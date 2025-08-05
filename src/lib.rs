@@ -23,16 +23,19 @@ use chrono::{DateTime, Utc};
 /// ファイル名のサニタイズ
 /// 
 /// # 事前条件
-/// - input は空でない文字列である
+/// - なし（空文字列も許可）
 /// 
 /// # 事後条件
 /// - Windows/Linux/macOSで使用可能なファイル名が返される
 /// - 特殊文字が適切に置換される
 /// 
 /// # 不変条件
-/// - 入力文字列の意味は保たれる
+/// - 入力文字列の意味は可能な限り保たれる
 pub fn sanitize_filename(input: &str) -> String {
-    assert!(!input.is_empty(), "input must not be empty");
+    // 空文字列の早期処理
+    if input.is_empty() {
+        return "unnamed".to_string();
+    }
     
     let mut result = input
         .replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_")
@@ -51,10 +54,20 @@ pub fn sanitize_filename(input: &str) -> String {
         result = "unnamed".to_string();
     }
     
-    // 長すぎる場合の切り詰め
+    // 長すぎる場合の切り詰め（文字境界を考慮）
     if result.len() > 200 {
-        result.truncate(200);
+        // 文字境界を考慮した切り詰め
+        let mut end = 200;
+        while end > 0 && !result.is_char_boundary(end) {
+            end -= 1;
+        }
+        result.truncate(end);
         result = result.trim_end().to_string();
+        
+        // 切り詰め後に空になった場合の処理
+        if result.is_empty() {
+            result = "unnamed".to_string();
+        }
     }
     
     debug_assert!(!result.is_empty(), "sanitized filename must not be empty");
