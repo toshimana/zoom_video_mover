@@ -84,6 +84,21 @@ impl AuthToken {
     }
     
     /// トークンの残り有効時間を秒で取得
+    /// 
+    /// # 副作用
+    /// - なし（純粋関数）
+    /// 
+    /// # 事前条件
+    /// - expires_at が有効な DateTime<Utc> である
+    /// 
+    /// # 事後条件
+    /// - 残り時間が秒単位で返される
+    /// - 期限切れの場合は 0 が返される
+    /// - 負の値は返されない
+    /// 
+    /// # 不変条件
+    /// - self の状態は変更されない
+    /// - システムの現在時刻が基準となる
     pub fn remaining_seconds(&self) -> i64 {
         (self.expires_at - Utc::now()).num_seconds().max(0)
     }
@@ -106,6 +121,20 @@ pub struct AuthFlowState {
 
 impl AuthFlowState {
     /// 認証フロー状態が有効か確認（10分間有効）
+    /// 
+    /// # 副作用
+    /// - なし（純粋関数）
+    /// 
+    /// # 事前条件
+    /// - created_at が有効な DateTime<Utc> である
+    /// 
+    /// # 事後条件
+    /// - 作成から10分以内の場合 true を返す
+    /// - 10分を超過している場合 false を返す
+    /// 
+    /// # 不変条件
+    /// - self の状態は変更されない
+    /// - 10分の有効期限は固定値として維持される
     pub fn is_valid(&self) -> bool {
         let now = Utc::now();
         let expiry = self.created_at + Duration::minutes(10);
@@ -124,6 +153,7 @@ pub struct AuthComponent {
     /// 進行中の認証フロー
     pending_flows: HashMap<String, AuthFlowState>,
     /// HTTPクライアント
+    #[allow(dead_code)]
     http_client: reqwest::Client,
 }
 
@@ -367,6 +397,20 @@ impl AuthComponent {
     }
     
     /// トークンが自動更新可能か確認する
+    /// 
+    /// # 副作用
+    /// - なし（純粋関数）
+    /// 
+    /// # 事前条件
+    /// - なし
+    /// 
+    /// # 事後条件
+    /// - リフレッシュトークンが存在する場合 true を返す
+    /// - 現在のトークンが存在しない、またはリフレッシュトークンが存在しない場合 false を返す
+    /// 
+    /// # 不変条件
+    /// - self の状態は変更されない
+    /// - トークンの構造は変更されない
     pub fn can_auto_refresh(&self) -> bool {
         self.current_token.as_ref()
             .and_then(|t| t.refresh_token.as_ref())

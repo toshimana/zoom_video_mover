@@ -9,10 +9,8 @@
 use crate::errors::{AppError, AppResult};
 use crate::components::{ComponentLifecycle, Configurable};
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock, mpsc};
 use tokio::fs::File;
@@ -204,6 +202,19 @@ impl DownloadComponent {
     }
     
     /// イベントリスナーを設定
+    /// 
+    /// # 副作用
+    /// - 内部の event_sender が更新される
+    /// 
+    /// # 事前条件
+    /// - sender は有効な UnboundedSender である
+    /// 
+    /// # 事後条件
+    /// - イベント通知が有効になる
+    /// - 以降のダウンロード進捗がイベントとして送信される
+    /// 
+    /// # 不変条件
+    /// - コンポーネントの他の設定は変更されない
     pub fn set_event_listener(&mut self, sender: mpsc::UnboundedSender<DownloadEvent>) {
         self.event_sender = Some(sender);
     }
@@ -395,7 +406,7 @@ impl DownloadComponent {
         http_client: &Client,
         task: &mut DownloadTask,
         event_sender: &Option<mpsc::UnboundedSender<DownloadEvent>>,
-        config: &DownloadConfig,
+        _config: &DownloadConfig,
     ) -> AppResult<()> {
         // 出力ディレクトリの作成
         if let Some(parent) = task.output_path.parent() {
@@ -492,13 +503,29 @@ impl DownloadComponent {
     
     /// 全体進捗を更新
     async fn update_overall_progress(
-        active_tasks: &Arc<RwLock<HashMap<String, DownloadTask>>>,
-        event_sender: &Option<mpsc::UnboundedSender<DownloadEvent>>,
+        _active_tasks: &Arc<RwLock<HashMap<String, DownloadTask>>>,
+        _event_sender: &Option<mpsc::UnboundedSender<DownloadEvent>>,
     ) {
         // TODO: 全体進捗の計算・通知
     }
     
     /// ダウンロードを停止
+    /// 
+    /// # 副作用
+    /// - shutdown_signal が true に設定される
+    /// - ログ出力が実行される
+    /// - 実行中のダウンロードワーカーが停止される
+    /// 
+    /// # 事前条件
+    /// - コンポーネントが初期化されている
+    /// 
+    /// # 事後条件
+    /// - 成功時: ダウンロードが停止される
+    /// - 新しいダウンロードが開始されなくなる
+    /// - 実行中のダウンロードは完了まで継続される
+    /// 
+    /// # 不変条件
+    /// - 既存のタスクキューは保持される
     pub async fn stop_downloads(&self) -> AppResult<()> {
         *self.shutdown_signal.write().await = true;
         log::info!("Download component shutdown initiated");
@@ -568,15 +595,31 @@ mod tests {
     fn test_download_progress_calculation() {
         let mut progress = DownloadProgress::new();
         
-        // 進捗更新テスト
+        // 初期状態テスト
+        assert_eq!(progress.downloaded_bytes, 0);
+        assert_eq!(progress.percentage, 0.0);
+        assert!(progress.eta.is_none());
+        
+        // 進捗更新テスト（50%完了）
         progress.update(50, Some(100), 1000.0);
         assert_eq!(progress.percentage, 0.5);
         assert_eq!(progress.downloaded_bytes, 50);
         assert_eq!(progress.current_speed, 1000.0);
         
-        // ETA計算テスト
+        // ETA計算テスト（残り50バイト、速度1000.0 = 0.05秒）
         if let Some(eta) = progress.eta {
-            assert!(eta.as_secs() > 0);
+            // 残り時間は0.05秒なので、ミリ秒単位で確認
+            assert!(eta.as_millis() >= 50); // 少なくとも50ms
+        }
+        
+        // 完了状態テスト
+        progress.update(100, Some(100), 1000.0);
+        assert_eq!(progress.percentage, 1.0);
+        assert_eq!(progress.downloaded_bytes, 100);
+        
+        // 完了時はETAが0になる
+        if let Some(eta) = progress.eta {
+            assert_eq!(eta.as_secs(), 0);
         }
     }
     

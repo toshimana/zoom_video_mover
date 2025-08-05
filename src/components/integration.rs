@@ -6,8 +6,8 @@
 /// - イベントの仲介
 /// - エラーハンドリングの統合
 
-use crate::errors::{AppError, AppResult};
-use crate::components::{ComponentLifecycle, Configurable};
+use crate::errors::AppResult;
+use crate::components::ComponentLifecycle;
 use crate::components::auth::{AuthComponent, AuthToken};
 use crate::components::api::{ApiComponent, ApiConfig, RecordingSearchRequest, MeetingRecording};
 use crate::components::download::{DownloadComponent, DownloadConfig, DownloadEvent};
@@ -15,7 +15,6 @@ use crate::components::config::{AppConfig, OAuthConfig};
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 use chrono::NaiveDate;
-use std::sync::Arc;
 use std::path::PathBuf;
 use log;
 
@@ -48,6 +47,7 @@ impl Default for IntegrationConfig {
 /// 統合コンポーネント
 pub struct IntegrationComponent {
     /// ファイルパス
+    #[allow(dead_code)]
     config_path: String,
     /// 認証管理
     auth_component: AuthComponent,
@@ -318,8 +318,8 @@ mod tests {
     #[tokio::test]
     async fn test_integration_component_lifecycle() {
         // テスト用の設定ファイルパス
-        let config_path = "test_config.toml";
-        let integration_config = IntegrationConfig::default();
+        let _config_path = "test_config.toml";
+        let _integration_config = IntegrationConfig::default();
         
         // TODO: テスト用の設定ファイルを作成
         

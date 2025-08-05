@@ -11,7 +11,6 @@ use zoom_video_mover_lib::components::{
     api::{ApiComponent, ApiConfig, RecordingSearchRequest},
     download::{DownloadComponent, DownloadConfig},
     config::{AppConfig, OAuthConfig, ApiSettings},
-    integration::{IntegrationComponent, IntegrationConfig},
 };
 use zoom_video_mover_lib::errors::AppResult;
 use chrono::{NaiveDate, Utc, Duration, Datelike};
@@ -19,6 +18,7 @@ use tempfile::TempDir;
 use tokio;
 
 /// テスト用のモック設定を作成
+#[allow(dead_code)]
 fn create_test_config() -> AppConfig {
     AppConfig {
         oauth: OAuthConfig {

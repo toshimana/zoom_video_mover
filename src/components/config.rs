@@ -287,6 +287,7 @@ impl ConfigManager {
     }
     
     /// 設定が変更されているかチェック
+    #[allow(dead_code)]
     pub fn is_modified(&self) -> bool {
         self.is_modified
     }
@@ -299,6 +300,7 @@ impl ConfigManager {
     /// # 事後条件
     /// - OAuth設定が更新される
     /// - バリデーションエラーの場合はエラーが返される
+    #[allow(dead_code)]
     pub fn update_oauth_config(&mut self, oauth_config: OAuthConfig) -> AppResult<()> {
         oauth_config.validate()
             .map_err(|e| AppError::validation(format!("OAuth config validation failed: {}", e), None))?;
@@ -315,6 +317,7 @@ impl ConfigManager {
     /// 
     /// # 事後条件
     /// - 出力ディレクトリが更新される
+    #[allow(dead_code)]
     pub fn update_output_directory<P: AsRef<Path>>(&mut self, output_dir: P) -> AppResult<()> {
         let path_str = output_dir.as_ref().to_string_lossy().to_string();
         

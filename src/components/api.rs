@@ -11,7 +11,7 @@ use crate::errors::{AppError, AppResult};
 use crate::components::{ComponentLifecycle, Configurable};
 use crate::components::auth::AuthToken;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc, NaiveDate};
+use chrono::NaiveDate;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -465,6 +465,20 @@ impl ApiComponent {
     }
     
     /// API統計情報を取得
+    /// 
+    /// # 副作用
+    /// - 内部メトリクスデータの読み取り（非破壊的）
+    /// 
+    /// # 事前条件
+    /// - コンポーネントが初期化されている
+    /// 
+    /// # 事後条件
+    /// - 現在のAPI統計情報が返される
+    /// - メトリクスの値は呼び出し時点でのスナップショット
+    /// 
+    /// # 不変条件
+    /// - 内部のメトリクスデータは変更されない
+    /// - コンポーネントの状態は保持される
     pub async fn get_metrics(&self) -> ApiCallMetrics {
         let metrics = self.metrics.lock().await;
         metrics.clone()
