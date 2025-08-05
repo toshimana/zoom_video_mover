@@ -30,7 +30,9 @@
       "Bash(touch:*)",
       "Bash(PROPTEST_VERBOSE=1 cargo test --test property_tests_integration -- --nocapture)",
       "Bash(PROPTEST_VERBOSE=1 cargo test property_tests -- --nocapture)",
-      "Bash(PROPTEST_VERBOSE=1 cargo test --test property_tests_extended -- --nocapture)"
+      "Bash(PROPTEST_VERBOSE=1 cargo test --test property_tests_extended -- --nocapture)",
+      "Bash(PROPTEST_CASES=1000 cargo test --test property_tests_extended -- --nocapture)",
+      "Bash(PROPTEST_CASES=1000 cargo test --test property_tests_integration)"
     ],
     "deny": []
   }
