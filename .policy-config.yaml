@@ -1,0 +1,57 @@
+# ポリシーテンプレート設定ファイル
+# このファイルの値でテンプレート内の変数を置換します
+
+project:
+  name: "Zoom Video Mover"
+  type: "gui-application"
+  description: "ZoomクラウドレコーディングをローカルにダウンロードするGUIアプリケーション"
+
+technology:
+  language: "Rust"
+  test_framework: "proptest"
+  build_tool: "cargo"
+  build_output_dir: "target"
+  package_manager: "cargo"
+  
+frameworks:
+  - name: "tokio"
+    purpose: "非同期処理"
+  - name: "egui"
+    purpose: "GUI"
+  - name: "reqwest"
+    purpose: "HTTP通信"
+
+quality:
+  test_cases: 1000
+  coverage_target: 80
+  load_test_users: 100
+  load_test_duration: "10分"
+
+api:
+  provider: "Zoom"
+  auth_type: "OAuth 2.0"
+  scopes:
+    - "recording:read"
+    - "user:read"
+    - "meeting:read"
+
+commands:
+  test_command: "cargo test"
+  lint_command: "cargo clippy"
+  format_command: "cargo fmt"
+  build_command: "cargo build"
+  run_command: "cargo run"
+
+team:
+  size: "1-5"
+  review_requirement: 1
+  
+schedule:
+  policy_effective_date: "2025-08-06"
+  review_cycle: "quarterly"
+
+# カスタマイズ可能な項目のデフォルト値
+customizable:
+  branch_naming_convention: "feature/, fix/, hotfix/, refactor/, docs/"
+  commit_message_format: "conventional-commits"
+  required_approvals: 1
