@@ -7,10 +7,9 @@
 ```
 policies-template/
 ├── universal/           # 技術・業界非依存の汎用ポリシー
-├── domain-specific/     # 業界・分野別ポリシー
-│   ├── oauth-apps/     # OAuth認証アプリケーション向け
-│   └── gui-apps/       # GUIアプリケーション向け
-└── tech-specific/       # 技術スタック別ポリシー
+├── project-generic/     # プロジェクト汎用ポリシー
+├── project-specific/    # プロジェクト固有ポリシー  
+└── technology-specific/ # 技術スタック別ポリシー
     ├── rust/           # Rust言語固有
     ├── python/         # Python言語固有
     └── typescript/     # TypeScript言語固有
@@ -23,12 +22,17 @@ policies-template/
 - どんな技術スタックでも利用可能
 - 例：Gitワークフロー、コードレビュー基準
 
-### Domain-Specific（業界・分野別）
-- 特定の分野向けにカスタマイズ
-- 技術スタックは問わない
-- 例：OAuth認証フロー、GUI設計原則
+### Project-Generic（プロジェクト汎用）
+- 特定プロジェクト向けだが技術非依存
+- 業務ルール・ドメイン知識を含む
+- 例：ビジネスルール、用語集
 
-### Tech-Specific（技術固有）
+### Project-Specific（プロジェクト固有）
+- 特定プロジェクト・技術に完全依存
+- 実装詳細を含む
+- 例：API統合仕様、実装ガイド
+
+### Technology-Specific（技術固有）
 - 特定の言語・フレームワーク向け
 - 技術的な詳細を含む
 - 例：Rustコーディング規約、Pythonテスト戦略
