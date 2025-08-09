@@ -1,5 +1,19 @@
 # Zoom API仕様書 - Zoom Video Mover プロジェクト用
 
+**文書情報**:
+- バージョン: v2.1
+- 作成日: 2025-01-31  
+- 最終更新: 2025-08-09
+- 作成者: 開発チーム
+- レビュー状況: ドラフト
+- レビュー期限: 2025-08-16
+
+**関連文書**:
+- [設計ポリシー](../../policies/universal/design_policy.md)
+- [セキュリティポリシー](../../policies/universal/security_policy.md)
+- [システムアーキテクチャ設計](./system_architecture.md)
+- [セキュリティ設計](./security_design.md)
+
 本書は、Zoom Video Moverプロジェクトで使用するZoom APIの仕様をまとめたものです。
 
 ## 重要な注記

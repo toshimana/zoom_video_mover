@@ -1,10 +1,24 @@
 # インターフェース設計書 - Zoom Video Mover
 
+**文書情報**:
+- バージョン: v1.1
+- 作成日: 2025-08-03  
+- 最終更新: 2025-08-09
+- 作成者: 開発チーム
+- レビュー状況: ドラフト
+- レビュー期限: 2025-08-16
+
+**関連文書**:
+- [設計ポリシー](../../policies/universal/design_policy.md)
+- [セキュリティポリシー](../../policies/universal/security_policy.md)
+- [システムアーキテクチャ設計](./system_architecture.md)
+- [API仕様書](./api_specifications.md)
+
 ## 文書概要
 **文書ID**: DES-INTERFACE-001  
 **作成日**: 2025-08-03  
   
-**バージョン**: 1.0  
+**バージョン**: 1.1  
 
 ## インターフェース設計概要
 
