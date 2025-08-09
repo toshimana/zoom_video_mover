@@ -12,6 +12,7 @@ pub mod recording;
 pub mod download;
 pub mod ui;
 pub mod integration;
+pub mod crypto;
 
 // 共通トレイトとタイプ定義
 use crate::errors::AppResult;

@@ -11,6 +11,10 @@ pub enum AppMessage {
     RecordingsLoaded(RecordingResponse),
     DownloadProgress(String),
     DownloadComplete(Vec<String>),
+    DownloadPaused,
+    DownloadResumed,
+    DownloadCancelled,
+    LogExported(String),
     Error(String),
 }
 
@@ -38,6 +42,8 @@ pub struct ZoomDownloaderApp {
     auth_url: Option<String>,
     is_authenticating: bool,
     is_downloading: bool,
+    is_download_paused: bool,
+    download_can_resume: bool,
     access_token: Option<String>,
     
     // Recordings Data
@@ -54,9 +60,28 @@ pub struct ZoomDownloaderApp {
     error_message: String,
     error_details: String,
     
+    // Logging
+    log_entries: Vec<LogEntry>,
+    
     // Communication
     receiver: mpsc::Receiver<AppMessage>,
     sender: mpsc::Sender<AppMessage>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LogEntry {
+    pub timestamp: chrono::DateTime<chrono::Local>,
+    pub level: LogLevel,
+    pub message: String,
+    pub details: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum LogLevel {
+    Info,
+    Warning,
+    Error,
+    Debug,
 }
 
 impl Default for ZoomDownloaderApp {
@@ -72,7 +97,7 @@ impl Default for ZoomDownloaderApp {
     fn default() -> Self {
         let (sender, receiver) = mpsc::channel();
         
-        Self {
+        let mut app = Self {
             current_screen: AppScreen::Config,
             client_id: String::new(),
             client_secret: String::new(),
@@ -84,6 +109,8 @@ impl Default for ZoomDownloaderApp {
             auth_url: None,
             is_authenticating: false,
             is_downloading: false,
+            is_download_paused: false,
+            download_can_resume: false,
             access_token: None,
             recordings: None,
             selected_recordings: std::collections::HashSet::new(),
@@ -93,13 +120,171 @@ impl Default for ZoomDownloaderApp {
             progress_percentage: 0.0,
             error_message: String::new(),
             error_details: String::new(),
+            log_entries: Vec::new(),
             receiver,
             sender,
-        }
+        };
+        
+        // 初期ログエントリを追加
+        app.add_log_entry(LogLevel::Info, "Application started".to_string(), None);
+        app
     }
 }
 
 impl ZoomDownloaderApp {
+    /// ログエントリを追加する
+    /// 
+    /// # 事前条件
+    /// - level は有効なLogLevelである
+    /// - message は空でない文字列である
+    /// 
+    /// # 事後条件
+    /// - 新しいログエントリがlog_entriesに追加される
+    /// - タイムスタンプが自動で設定される
+    fn add_log_entry(&mut self, level: LogLevel, message: String, details: Option<String>) {
+        let entry = LogEntry {
+            timestamp: chrono::Local::now(),
+            level,
+            message,
+            details,
+        };
+        self.log_entries.push(entry);
+        
+        // ログエントリ数制限（最大1000件）
+        if self.log_entries.len() > 1000 {
+            self.log_entries.remove(0);
+        }
+    }
+    
+    /// ログをファイルにエクスポートする
+    /// 
+    /// # 事前条件
+    /// - output_dir が有効なディレクトリパスである
+    /// 
+    /// # 事後条件
+    /// - ログファイルが指定ディレクトリに作成される
+    /// - 成功時はファイルパスが返される
+    fn export_logs(&self) -> Result<String, String> {
+        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+        let filename = format!("zoom_video_mover_log_{}.txt", timestamp);
+        let filepath = std::path::Path::new(&self.output_dir).join(&filename);
+        
+        let mut log_content = String::new();
+        log_content.push_str("=== Zoom Video Mover Log Export ===\n");
+        log_content.push_str(&format!("Export Time: {}\n", chrono::Local::now().format("%Y-%m-%d %H:%M:%S")));
+        log_content.push_str(&format!("Total Entries: {}\n", self.log_entries.len()));
+        log_content.push_str("=====================================\n\n");
+        
+        for entry in &self.log_entries {
+            log_content.push_str(&format!(
+                "[{}] {} - {}\n",
+                entry.timestamp.format("%Y-%m-%d %H:%M:%S"),
+                match entry.level {
+                    LogLevel::Info => "INFO ",
+                    LogLevel::Warning => "WARN ",
+                    LogLevel::Error => "ERROR",
+                    LogLevel::Debug => "DEBUG",
+                },
+                entry.message
+            ));
+            
+            if let Some(details) = &entry.details {
+                log_content.push_str(&format!("  Details: {}\n", details));
+            }
+            log_content.push('\n');
+        }
+        
+        // 現在のアプリ状態も追加
+        log_content.push_str("\n=== Current Application State ===\n");
+        log_content.push_str(&format!("Current Screen: {:?}\n", self.current_screen));
+        log_content.push_str(&format!("Config Loaded: {}\n", self.config_loaded));
+        log_content.push_str(&format!("Is Authenticating: {}\n", self.is_authenticating));
+        log_content.push_str(&format!("Is Downloading: {}\n", self.is_downloading));
+        log_content.push_str(&format!("Is Download Paused: {}\n", self.is_download_paused));
+        log_content.push_str(&format!("Access Token Present: {}\n", self.access_token.is_some()));
+        log_content.push_str(&format!("Selected Recordings: {}\n", self.selected_recordings.len()));
+        log_content.push_str(&format!("Progress: {:.1}%\n", self.progress_percentage));
+        
+        match std::fs::write(&filepath, log_content) {
+            Ok(_) => Ok(filepath.to_string_lossy().to_string()),
+            Err(e) => Err(format!("Failed to write log file: {}", e)),
+        }
+    }
+    
+    /// ダウンロードを一時停止する
+    /// 
+    /// # 副作用
+    /// - ダウンロード状態の更新
+    /// - ログエントリの追加
+    /// 
+    /// # 事前条件
+    /// - is_downloading が true である
+    /// 
+    /// # 事後条件
+    /// - is_download_paused が true になる
+    /// - download_can_resume が true になる
+    fn pause_download(&mut self) {
+        if self.is_downloading && !self.is_download_paused {
+            self.is_download_paused = true;
+            self.download_can_resume = true;
+            self.status_message = "Download paused by user".to_string();
+            self.add_log_entry(LogLevel::Info, "Download paused".to_string(), Some("User requested pause".to_string()));
+            
+            // バックグラウンドタスクに一時停止メッセージを送信
+            let _ = self.sender.send(AppMessage::DownloadPaused);
+        }
+    }
+    
+    /// ダウンロードを再開する
+    /// 
+    /// # 副作用
+    /// - ダウンロード状態の更新
+    /// - ログエントリの追加
+    /// 
+    /// # 事前条件
+    /// - is_download_paused が true である
+    /// 
+    /// # 事後条件
+    /// - is_download_paused が false になる
+    /// - ダウンロードが再開される
+    fn resume_download(&mut self) {
+        if self.is_download_paused && self.download_can_resume {
+            self.is_download_paused = false;
+            self.status_message = "Download resumed".to_string();
+            self.add_log_entry(LogLevel::Info, "Download resumed".to_string(), Some("User requested resume".to_string()));
+            
+            // バックグラウンドタスクに再開メッセージを送信
+            let _ = self.sender.send(AppMessage::DownloadResumed);
+        }
+    }
+    
+    /// ダウンロードをキャンセルする
+    /// 
+    /// # 副作用
+    /// - ダウンロード状態のリセット
+    /// - ログエントリの追加
+    /// 
+    /// # 事前条件
+    /// - is_downloading が true である
+    /// 
+    /// # 事後条件
+    /// - ダウンロード関連の状態がリセットされる
+    /// - 録画リスト画面に戻る
+    fn cancel_download(&mut self) {
+        if self.is_downloading {
+            self.is_downloading = false;
+            self.is_download_paused = false;
+            self.download_can_resume = false;
+            self.progress_percentage = 0.0;
+            self.current_screen = AppScreen::Recordings;
+            self.status_message = "Download cancelled by user".to_string();
+            self.add_log_entry(LogLevel::Warning, "Download cancelled".to_string(), Some("User requested cancellation".to_string()));
+            
+            // バックグラウンドタスクにキャンセルメッセージを送信
+            let _ = self.sender.send(AppMessage::DownloadCancelled);
+        }
+    }
+    
     /// メッセージを処理する（複雑度削減版）
     /// 
     /// 事前条件:
@@ -140,6 +325,26 @@ impl ZoomDownloaderApp {
                     self.status_message = format!("Download completed: {} files", files.len());
                     self.download_progress.push(format!("Completed: Downloaded {} files", files.len()));
                 }
+                AppMessage::DownloadPaused => {
+                    self.is_download_paused = true;
+                    self.download_can_resume = true;
+                    self.add_log_entry(LogLevel::Info, "Download paused by background task".to_string(), None);
+                }
+                AppMessage::DownloadResumed => {
+                    self.is_download_paused = false;
+                    self.add_log_entry(LogLevel::Info, "Download resumed by background task".to_string(), None);
+                }
+                AppMessage::DownloadCancelled => {
+                    self.is_downloading = false;
+                    self.is_download_paused = false;
+                    self.download_can_resume = false;
+                    self.current_screen = AppScreen::Recordings;
+                    self.add_log_entry(LogLevel::Warning, "Download cancelled by background task".to_string(), None);
+                }
+                AppMessage::LogExported(filepath) => {
+                    self.add_log_entry(LogLevel::Info, format!("Log exported to: {}", filepath), None);
+                    self.status_message = format!("Log exported successfully: {}", filepath);
+                }
                 AppMessage::Error(err) => {
                     self.is_authenticating = false;
                     self.is_downloading = false;
@@ -147,6 +352,7 @@ impl ZoomDownloaderApp {
                     self.error_details = format!("Timestamp: {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
                     self.current_screen = AppScreen::Error;
                     self.status_message = format!("Error: {}", err);
+                    self.add_log_entry(LogLevel::Error, err, Some("Application error occurred".to_string()));
                 }
             }
         }
@@ -574,13 +780,27 @@ impl ZoomDownloaderApp {
         
         // PR004 & PR005: 制御ボタン
         ui.horizontal(|ui| {
-            if ui.button("一時停止").clicked() {
-                // TODO: 一時停止機能実装
+            // 一時停止/再開ボタン
+            if self.is_download_paused {
+                let resume_button = egui::Button::new("再開")
+                    .fill(egui::Color32::from_rgb(46, 139, 87));
+                if ui.add_sized([80.0, 30.0], resume_button).clicked() {
+                    self.resume_download();
+                }
+            } else {
+                let pause_button = egui::Button::new("一時停止")
+                    .fill(egui::Color32::from_rgb(255, 165, 0));
+                if ui.add_sized([80.0, 30.0], pause_button).clicked() {
+                    self.pause_download();
+                }
             }
             
-            if ui.button("キャンセル").clicked() {
-                self.is_downloading = false;
-                self.current_screen = AppScreen::Recordings;
+            ui.add_space(10.0);
+            
+            let cancel_button = egui::Button::new("キャンセル")
+                .fill(egui::Color32::from_rgb(220, 20, 60));
+            if ui.add_sized([80.0, 30.0], cancel_button).clicked() {
+                self.cancel_download();
             }
         });
         
@@ -680,10 +900,18 @@ impl ZoomDownloaderApp {
                 self.current_screen = AppScreen::Config;
             }
             
-            if ui.button("ログ出力").clicked() {
-                // TODO: ログファイル出力機能実装
-                println!("Error: {}", self.error_message);
-                println!("Details: {}", self.error_details);
+            let log_button = egui::Button::new("ログ出力")
+                .fill(egui::Color32::from_rgb(70, 130, 180));
+            if ui.add_sized([80.0, 30.0], log_button).clicked() {
+                // ログファイル出力機能を実装
+                match self.export_logs() {
+                    Ok(filepath) => {
+                        let _ = self.sender.send(AppMessage::LogExported(filepath));
+                    }
+                    Err(error_msg) => {
+                        let _ = self.sender.send(AppMessage::Error(format!("Failed to export log: {}", error_msg)));
+                    }
+                }
             }
         });
     }

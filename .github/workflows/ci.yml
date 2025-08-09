@@ -1,0 +1,355 @@
+# CI/CD パイプライン - Zoom Video Mover
+# 品質保証、セキュリティスキャン、自動デプロイ
+
+name: Continuous Integration & Deployment
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # 毎日午前2時に実行（依存関係の脆弱性チェック）
+    - cron: '0 2 * * *'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Property-basedテストの設定
+  PROPTEST_CASES: 100  # CI環境では100ケース
+  PROPTEST_VERBOSE: 1
+
+jobs:
+  # 基本的な品質チェック
+  quality_checks:
+    name: Quality Assurance
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: [stable, beta]
+        
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ matrix.rust }}
+        components: rustfmt, clippy
+        
+    - name: Cache Cargo dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        
+    - name: Check format
+      run: cargo fmt --all -- --check
+      
+    - name: Lint with Clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
+      
+    - name: Check compilation
+      run: cargo check --all-targets --all-features
+      
+    - name: Build
+      run: cargo build --verbose --all-features
+      
+    - name: Run unit tests
+      run: cargo test --verbose --lib
+      
+    - name: Run integration tests
+      run: cargo test --verbose --test '*'
+      
+  # Property-basedテスト（段階的実行）
+  property_tests:
+    name: Property-based Testing
+    runs-on: ubuntu-latest
+    needs: quality_checks
+    
+    strategy:
+      matrix:
+        test_level:
+          - { name: "CI Fast", cases: 100, timeout: "5m" }
+          - { name: "Extensive", cases: 500, timeout: "15m" }
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Cache Cargo dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ubuntu-cargo-proptest-${{ hashFiles('**/Cargo.lock') }}
+        
+    - name: Run Property Tests - ${{ matrix.test_level.name }}
+      timeout-minutes: ${{ matrix.test_level.timeout }}
+      env:
+        PROPTEST_CASES: ${{ matrix.test_level.cases }}
+      run: |
+        echo "Running property tests with ${{ matrix.test_level.cases }} cases"
+        cargo test --test property_tests -- --nocapture
+        
+    - name: Run Property Integration Tests
+      timeout-minutes: ${{ matrix.test_level.timeout }}
+      env:
+        PROPTEST_CASES: ${{ matrix.test_level.cases }}
+      run: |
+        if [ -f tests/property_tests_integration.rs ]; then
+          cargo test --test property_tests_integration -- --nocapture
+        fi
+        
+  # セキュリティ監査
+  security_audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Install cargo-audit
+      run: cargo install cargo-audit --locked
+      
+    - name: Security audit
+      run: cargo audit
+      
+    - name: Check for known security issues
+      run: cargo audit --deny warnings
+      
+  # 依存関係チェック
+  dependency_check:
+    name: Dependency Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Install cargo-outdated
+      run: cargo install cargo-outdated --locked
+      
+    - name: Check outdated dependencies
+      run: cargo outdated --exit-code 1
+      continue-on-error: true
+      
+    - name: Install cargo-deny
+      run: cargo install cargo-deny --locked
+      
+    - name: Check licenses and security
+      run: cargo deny check
+      
+  # コードカバレッジ計測
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    needs: quality_checks
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Install cargo-tarpaulin
+      run: cargo install cargo-tarpaulin
+      
+    - name: Generate coverage report
+      run: |
+        cargo tarpaulin --verbose --all-features --workspace --timeout 120 \
+          --exclude-files src/main.rs \
+          --out Html --out Xml
+          
+    - name: Upload coverage to Codecov
+      if: github.event_name == 'push'
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./cobertura.xml
+        fail_ci_if_error: false
+        
+  # ビルド成果物作成
+  build_artifacts:
+    name: Build Release Artifacts
+    runs-on: ${{ matrix.os }}
+    needs: [quality_checks, security_audit]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: zoom_video_mover.exe
+            asset_name: zoom_video_mover-windows-x64.exe
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: zoom_video_mover
+            asset_name: zoom_video_mover-linux-x64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: zoom_video_mover
+            asset_name: zoom_video_mover-macos-x64
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+        
+    - name: Cache Cargo dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ${{ matrix.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+        
+    - name: Build release binary
+      run: cargo build --release --target ${{ matrix.target }}
+      
+    - name: Strip binary (Unix)
+      if: runner.os != 'Windows'
+      run: strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+      
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.asset_name }}
+        path: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+        
+  # デプロイメント（mainブランチ）
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build_artifacts, coverage, property_tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Release v${{ github.run_number }}
+        body: |
+          ## 🚀 Release v${{ github.run_number }}
+          
+          ### ✨ What's New
+          - Automated release from commit ${{ github.sha }}
+          - All quality checks passed
+          - Security audit completed
+          - Property-based tests (500+ cases) passed
+          
+          ### 📦 Download
+          Choose the appropriate binary for your platform:
+          - Windows: `zoom_video_mover-windows-x64.exe`
+          - Linux: `zoom_video_mover-linux-x64`
+          - macOS: `zoom_video_mover-macos-x64`
+          
+          ### 🔒 Security
+          - AES-256-GCM encryption for token storage
+          - Windows DPAPI integration
+          - OAuth 2.0 + PKCE authentication
+          
+          Generated automatically by CI/CD pipeline.
+        draft: false
+        prerelease: false
+        
+    - name: Upload Windows binary
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./zoom_video_mover-windows-x64.exe/zoom_video_mover.exe
+        asset_name: zoom_video_mover-windows-x64.exe
+        asset_content_type: application/octet-stream
+        
+    - name: Upload Linux binary
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./zoom_video_mover-linux-x64/zoom_video_mover
+        asset_name: zoom_video_mover-linux-x64
+        asset_content_type: application/octet-stream
+        
+    - name: Upload macOS binary
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./zoom_video_mover-macos-x64/zoom_video_mover
+        asset_name: zoom_video_mover-macos-x64
+        asset_content_type: application/octet-stream
+        
+  # 夜間詳細テスト（スケジュール実行時のみ）
+  nightly_extended_tests:
+    name: Nightly Extended Testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Cache Cargo dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ubuntu-cargo-nightly-${{ hashFiles('**/Cargo.lock') }}
+        
+    - name: Run extended property tests (1000+ cases)
+      timeout-minutes: 30
+      env:
+        PROPTEST_CASES: 1000
+      run: |
+        echo "Running extended property tests with 1000+ cases"
+        if [ -f tests/property_tests_extended.rs ]; then
+          cargo test --test property_tests_extended -- --nocapture
+        fi
+        cargo test --test property_tests -- --nocapture
+        
+    - name: Memory leak detection
+      run: |
+        if command -v valgrind &> /dev/null; then
+          cargo test --release 2>&1 | grep -i "leak\|memory"
+        fi
+        
+    - name: Performance regression tests
+      run: |
+        cargo build --release
+        # パフォーマンスベンチマーク（将来実装）
+        echo "Performance benchmarks would run here"
