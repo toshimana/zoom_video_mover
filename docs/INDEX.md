@@ -12,7 +12,7 @@
 ### 🟡 機能開発時に参照
 - **[プロジェクト機能仕様](../PROJECT_FEATURES.md)** - 全機能の詳細仕様
 - **[Rust開発環境](../RUST_DEVELOPMENT.md)** - Rust固有の開発ガイド
-- **[システムアーキテクチャ](design/system_architecture.md)** - 全体設計
+- **[システムアーキテクチャ](artifacts/architecture/system_architecture.md)** - 全体設計
 - **[テスト戦略](policies/testing_strategy_policy.md)** - Property-basedテスト
 
 ### 🟢 必要に応じて参照
@@ -39,24 +39,27 @@
 - **[リスク管理](01-requirements/crosscutting/risk_management.md)** - リスク対応
 
 ### 🏗️ 設計 (18文書)
-**メインディレクトリ**: `02-design/`
+**メインディレクトリ**: `artifacts/` (アーキテクチャ・コンポーネント・実装別に分割)
 
-#### アーキテクチャ設計
-- **[システムアーキテクチャ](02-design/system_architecture.md)** - 全体構成
-- **[データモデル設計](02-design/data_model_design.md)** - データ構造
-- **[インターフェース設計](02-design/interface_design.md)** - API・UI設計
-- **[セキュリティ設計](02-design/security_design.md)** - セキュリティ対策
+#### アーキテクチャ設計 (`artifacts/architecture/`)
+- **[システムアーキテクチャ](artifacts/architecture/system_architecture.md)** - 全体構成
+- **[データモデル設計](artifacts/architecture/data_model_design.md)** - データ構造
+- **[インターフェース設計](artifacts/architecture/interface_design.md)** - API・UI設計
+- **[セキュリティ設計](artifacts/architecture/security_design.md)** - セキュリティ対策
+- **[パフォーマンス設計](artifacts/architecture/performance_design.md)** - 性能設計
+- **[API仕様書](artifacts/architecture/api_specifications.md)** - API詳細仕様
 
-#### コンポーネント設計
-- **[認証コンポーネント](02-design/components/auth_component_design.md)** - OAuth認証
-- **[ダウンロードコンポーネント](02-design/components/download_component_design.md)** - ファイルダウンロード
-- **[UIコンポーネント](02-design/components/ui_component_design.md)** - GUI実装
-- **[APIコンポーネント](02-design/components/api_component_design.md)** - Zoom API連携
+#### コンポーネント設計 (`artifacts/components/`)
+- **[認証コンポーネント](artifacts/components/design/auth_component_design.md)** - OAuth認証
+- **[ダウンロードコンポーネント](artifacts/components/design/download_component_design.md)** - ファイルダウンロード
+- **[UIコンポーネント](artifacts/components/design/ui_component_design.md)** - GUI実装
+- **[APIコンポーネント](artifacts/components/design/api_component_design.md)** - Zoom API連携
+- **[エラーハンドリング設計](artifacts/components/error_handling_design.md)** - エラー処理
 
 #### UML図・図表
-- **[Phase 1: 概念設計](02-design/diagrams/phase1/)** - ユースケース図、概念クラス図
-- **[Phase 2: 詳細設計](02-design/diagrams/phase2/)** - 詳細クラス図、シーケンス図
-- **[Phase 3: 実装設計](02-design/diagrams/phase3/)** - Rust実装クラス図、デプロイ図
+- **[アーキテクチャ図面](artifacts/architecture/diagrams/)** - システムコンテキスト、概念設計
+- **[コンポーネント詳細図面](artifacts/components/diagrams/)** - 詳細クラス図、シーケンス図
+- **[実装設計図面](artifacts/implementation/diagrams/)** - Rust実装クラス図、デプロイ図
 
 ### 💻 開発 (24文書)
 **メインディレクトリ**: `03-development/`
@@ -98,10 +101,10 @@
 ## 🔍 ドキュメント検索
 
 ### よく使用される検索キーワード
-- **OAuth認証**: `02-design/components/auth_component_design.md`, `03-development/policies/technology-specific/zoom_oauth_functional_requirements.md`
-- **ダウンロード機能**: `02-design/components/download_component_design.md`, `02-design/components/recording_component_design.md`
-- **テスト**: `03-development/policies/testing_strategy_policy.md`, `03-development/policies/technology-specific/rust_proptest_testing_policy.md`
-- **エラーハンドリング**: `02-design/error_handling_design.md`, `03-development/policies/technology-specific/thiserror_error_policy.md`
+- **OAuth認証**: `artifacts/components/design/auth_component_design.md`, `policies/technology-specific/zoom_oauth_functional_requirements.md`
+- **ダウンロード機能**: `artifacts/components/design/download_component_design.md`, `artifacts/components/design/recording_component_design.md`
+- **テスト**: `policies/testing_strategy_policy.md`, `policies/technology-specific/rust_proptest_testing_policy.md`
+- **エラーハンドリング**: `artifacts/components/error_handling_design.md`, `policies/technology-specific/thiserror_error_policy.md`
 - **Windows対応**: `03-development/policies/technology-specific/windows_specific_policy.md`
 
 ### ファイル名で検索
@@ -132,8 +135,8 @@ find docs -name "*design*" -type f
 3. [03-development/policies/README.md](03-development/policies/README.md) で必須ポリシー確認
 
 ### Week 2: 詳細理解
-1. [システムアーキテクチャ](02-design/system_architecture.md) で全体設計理解
-2. [02-design/components/](02-design/components/) で担当領域の詳細確認
+1. [システムアーキテクチャ](artifacts/architecture/system_architecture.md) で全体設計理解
+2. [artifacts/components/design/](artifacts/components/design/) で担当領域の詳細確認
 3. [DEVELOPMENT_CHECKLIST.md](../DEVELOPMENT_CHECKLIST.md) で開発フロー習得
 
 ### Week 3以降: 実践

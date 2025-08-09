@@ -1,45 +1,72 @@
-# 🏗️ 設計ドキュメント
+# 設計成果物 (Design Artifacts) - 移行済み
 
-## 目的  
-システム設計に関する全ドキュメントとUML図を集約
+**⚠️ 重要通知**: 本ディレクトリの設計成果物は、以下のディレクトリに分類・移行されました。
 
-## 📂 構成
+## 移行先ディレクトリ
 
-### アーキテクチャ設計
-- **[system_architecture.md](system_architecture.md)** - システム全体構成
-- **[data_model_design.md](data_model_design.md)** - データモデル
-- **[interface_design.md](interface_design.md)** - API・UI設計
-- **[security_design.md](security_design.md)** - セキュリティ設計
-- **[performance_design.md](performance_design.md)** - 性能設計
-- **[error_handling_design.md](error_handling_design.md)** - エラーハンドリング
+### 🏗️ アーキテクチャ設計 → `../architecture/`
+システム全体の構造設計、非機能要件対応：
+- システムアーキテクチャ設計
+- セキュリティ設計  
+- パフォーマンス設計
+- インターフェース設計
+- データモデル設計
+- API仕様書
+- 設計プロセス・手法文書
+- アーキテクチャレベル図面
 
-### コンポーネント設計
-- **[components/](components/)** - 各コンポーネントの詳細設計
-  - 認証・ダウンロード・UI・API・設定・録画コンポーネント
+### 🧩 コンポーネント設計 → `../components/`
+個別コンポーネントの詳細設計：
+- UI仕様書
+- エラーハンドリング設計
+- 各コンポーネント詳細設計（認証・API・ダウンロード等）
+- コンポーネント間相互作用図面
 
-### 図表・UML
-- **[diagrams/](diagrams/)** - UML図・PlantUML図
-  - phase1/: 概念設計図
-  - phase2/: 詳細設計図  
-  - phase3/: 実装設計図
+### 🔧 実装設計 → `../implementation/`
+実装レベルの詳細設計：
+- 実装アーキテクチャ図面（Phase3）
+- デプロイメント設計
+- 実装進捗管理
 
-### プロセス・手順
-- **[design_process_flow_diagram.md](design_process_flow_diagram.md)** - 設計プロセス
-- **[design_traceability_matrix.md](design_traceability_matrix.md)** - 設計トレーサビリティ
-- **[change_impact_analysis_procedure.md](change_impact_analysis_procedure.md)** - 変更影響分析
+## 新しいディレクトリ構造の利点
 
-## 🎯 使い方
+1. **設計レベル別分離**: アーキテクチャ・コンポーネント・実装の明確な分離
+2. **関心事の分離**: 各ディレクトリが特定の設計側面に特化
+3. **保守性向上**: 設計成果物の発見・更新が容易
+4. **トレーサビリティ**: 要件-設計-実装間の関係性が明確
 
-### アーキテクト・設計者
-1. system_architecture.md で全体像把握
-2. components/ で担当領域の詳細確認
-3. diagrams/ で視覚的理解
+## 旧ファイル配置と新しい配置の対応
 
-### 実装者
-1. 該当コンポーネント設計文書を確認
-2. diagrams/ で実装対象の詳細図を参照
-3. interface_design.md でAPI仕様確認
+| 旧パス | 新パス | 分類理由 |
+|--------|--------|----------|
+| `design/system_architecture.md` | `architecture/system_architecture.md` | システム全体構造 |
+| `design/security_design.md` | `architecture/security_design.md` | 横断的セキュリティ |
+| `design/components/` | `components/design/` | コンポーネント詳細 |
+| `design/diagrams/phase1/` | `architecture/diagrams/phase1/` | 概念アーキテクチャ |
+| `design/diagrams/phase2/` | `components/diagrams/` | 詳細コンポーネント |
+| `design/diagrams/phase3/` | `implementation/diagrams/` | 実装詳細 |
+
+## 参照更新について
+
+既存文書で本ディレクトリ内のファイルを参照している場合は、新しいパスに更新してください。
+
+### 例：参照パス更新
+```markdown
+# 旧参照
+[システムアーキテクチャ](design/system_architecture.md)
+
+# 新参照  
+[システムアーキテクチャ](architecture/system_architecture.md)
+```
+
+## 今後の運用
+
+- **新規作成**: 適切な分類ディレクトリに直接作成
+- **既存更新**: 移行先ディレクトリで更新
+- **本ディレクトリ**: 段階的に廃止予定
 
 ---
-**総ファイル数**: 18文書 + UML図  
-**更新頻度**: 設計変更時
+
+**移行完了日**: 2025-08-09  
+**移行理由**: 設計成果物の分類整理・保守性向上  
+**影響範囲**: 設計文書の参照パス（自動更新対象）
