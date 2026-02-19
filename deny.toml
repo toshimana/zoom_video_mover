@@ -1,0 +1,84 @@
+# cargo-deny設定
+# セキュリティ・ライセンス・依存関係チェック
+
+[advisories]
+# セキュリティアドバイザリチェック
+vulnerability = "deny"
+unmaintained = "warn"
+yanked = "deny"
+notice = "warn"
+ignore = [
+    # 無視するアドバイザリID（必要に応じて追加）
+]
+
+[licenses]
+# ライセンスポリシー
+unlicensed = "deny"
+copyleft = "warn"
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause", 
+    "ISC",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+]
+deny = [
+    "GPL-2.0",
+    "GPL-3.0",
+    "AGPL-3.0",
+]
+confidence-threshold = 0.8
+
+[[licenses.exceptions]]
+# 特定クレートのライセンス例外
+allow = ["GPL-3.0"]
+name = "example-gpl-crate"  # 実際のクレート名に置換
+
+[bans]
+# 禁止されたクレート・バージョン
+multiple-versions = "warn"
+wildcards = "warn"
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+
+deny = [
+    # セキュリティ上問題のあるクレート
+    { name = "openssl", version = "*" },  # rustls-tlsを使用
+    
+    # 非推奨・メンテナンス停止クレート
+    { name = "time", version = "<0.3.0" },  # chronoを使用
+    { name = "chrono", version = "<0.4.20" },  # 脆弱性のあるバージョン
+]
+
+skip = [
+    # 複数バージョン許可するクレート
+    { name = "windows_x86_64_msvc" },  # Windowsバイナリ
+    { name = "syn" },  # マクロ処理で複数バージョン必要
+]
+
+skip-tree = [
+    # 特定クレートの依存ツリー全体をスキップ
+    { name = "windows" },  # Windows固有の依存関係
+]
+
+[sources]
+# 許可されたソース
+unknown-registry = "warn"
+unknown-git = "warn"
+
+allow-registry = [
+    "https://github.com/rust-lang/crates.io-index"
+]
+
+allow-git = [
+    # 信頼できるGitリポジトリ
+    "https://github.com/rust-lang/",
+    "https://github.com/tokio-rs/",
+    "https://github.com/serde-rs/",
+    "https://github.com/dtolnay/",
+    "https://github.com/emilk/egui",
+]

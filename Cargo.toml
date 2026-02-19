@@ -49,6 +49,10 @@ async-trait = "0.1"
 # Configuration validation
 validator = { version = "0.16", features = ["derive"] }
 
+# Cryptographic dependencies for AES-256-GCM
+aes-gcm = { version = "0.10", features = ["aes", "alloc"] }
+zeroize = { version = "1.7", features = ["derive"] }
+
 [dev-dependencies]
 # Property-based testing framework
 proptest = "1.4"
@@ -76,3 +80,4 @@ path = "src/main.rs"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["Win32_System_Console", "Win32_Foundation"] }
+winapi = { version = "0.3", features = ["dpapi", "wincrypt", "winbase"] }

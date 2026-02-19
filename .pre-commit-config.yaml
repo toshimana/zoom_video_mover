@@ -1,0 +1,150 @@
+# Pre-commit フック設定
+# コミット前の自動品質チェック
+
+repos:
+  # Rust関連チェック
+  - repo: local
+    hooks:
+      # セキュリティ事前チェック
+      - id: security-check
+        name: Security Check
+        entry: bash
+        language: system
+        args:
+          - -c
+          - |
+            # 機密情報検知
+            if git diff --cached | grep -E -i "(password|api[_-]?key|secret|token|private[_-]?key)" | grep -v "test\|example\|placeholder"; then
+              echo "⚠️ 機密情報検知 - コミットを中止します"
+              echo "検出された内容:"
+              git diff --cached | grep -E -i "(password|api[_-]?key|secret|token|private[_-]?key)" | grep -v "test\|example\|placeholder"
+              exit 1
+            fi
+            
+      # Rustフォーマット
+      - id: rust-fmt
+        name: Rust Format
+        entry: cargo
+        language: system
+        args: [fmt, --all, --]
+        types: [rust]
+        
+      # Clippy lint
+      - id: rust-clippy
+        name: Rust Clippy
+        entry: cargo
+        language: system
+        args: [clippy, --all-targets, --all-features, --, -D, warnings]
+        types: [rust]
+        pass_filenames: false
+        
+      # コンパイルチェック
+      - id: rust-check
+        name: Rust Check
+        entry: cargo
+        language: system
+        args: [check, --all-targets, --all-features]
+        types: [rust]
+        pass_filenames: false
+        
+      # 単体テスト実行
+      - id: rust-test
+        name: Rust Unit Tests
+        entry: cargo
+        language: system
+        args: [test, --lib]
+        types: [rust]
+        pass_filenames: false
+        
+      # Property-basedテスト（高速モード）
+      - id: rust-property-test
+        name: Property Tests (Fast)
+        entry: bash
+        language: system
+        args:
+          - -c
+          - |
+            export PROPTEST_CASES=100
+            export PROPTEST_VERBOSE=1
+            if [ -f tests/property_tests.rs ]; then
+              cargo test --test property_tests -- --nocapture
+            else
+              echo "Property tests not found, skipping"
+            fi
+        types: [rust]
+        pass_filenames: false
+        
+      # TODOコメント検知
+      - id: todo-check
+        name: TODO Comment Check
+        entry: bash
+        language: system
+        args:
+          - -c
+          - |
+            TODO_COUNT=$(git diff --cached --name-only | xargs grep -n "TODO\|FIXME\|HACK" 2>/dev/null | wc -l)
+            if [ $TODO_COUNT -gt 0 ]; then
+              echo "⚠️ 新しいTODO/FIXME/HACKコメントが検出されました:"
+              git diff --cached --name-only | xargs grep -n "TODO\|FIXME\|HACK" 2>/dev/null || true
+              echo "本当にコミットしますか？（品質ポリシーではTODOの迅速な解決を推奨）"
+              read -p "Continue? (y/N): " -n 1 -r
+              echo
+              if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                exit 1
+              fi
+            fi
+        pass_filenames: false
+
+  # 汎用ファイルチェック
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      # 基本的なファイルチェック
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-xml
+      
+      # 大きなファイルの検出
+      - id: check-added-large-files
+        args: ['--maxkb=1024']  # 1MB制限
+        
+      # マージコンフリクトマーカー検出
+      - id: check-merge-conflict
+      
+      # ファイル名チェック
+      - id: check-case-conflict
+      
+  # コミットメッセージ検証
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v2.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [--strict, --force-scope]
+
+  # ドキュメント品質チェック
+  - repo: local
+    hooks:
+      - id: doc-link-check
+        name: Documentation Link Check
+        entry: bash
+        language: system
+        args:
+          - -c
+          - |
+            # Markdownファイル内のリンクチェック（簡易版）
+            find docs -name "*.md" -exec grep -l "http\|\.md" {} \; | while read file; do
+              echo "Checking links in $file"
+              # 実際のリンクチェックは将来実装
+            done
+        files: '\.md$'
+        pass_filenames: false
+
+# 設定
+ci:
+  autofix_prs: false
+  autoupdate_schedule: weekly
