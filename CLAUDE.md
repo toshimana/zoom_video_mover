@@ -16,7 +16,7 @@ ZoomクラウドレコーディングをローカルにダウンロードするG
 
 ## Rust開発環境
 Rust固有の開発環境、ビルド手順、コーディング規約については以下を参照：
-**📘 [RUST_DEVELOPMENT.md](RUST_DEVELOPMENT.md)**
+**📘 [rust_development_guide.md](docs/policies/technology-specific/rust/rust_development_guide.md)**
 
 含まれる内容：
 - プロジェクト構造
@@ -31,41 +31,41 @@ Rust固有の開発環境、ビルド手順、コーディング規約につい�
 詳細な開発ポリシーは以下の専用ファイルを参照：
 
 ### 開発規約
-**Rust開発**: [RUST_DEVELOPMENT.md](RUST_DEVELOPMENT.md) - Rust固有の開発ガイド
+**Rust開発**: [rust_development_guide.md](docs/policies/technology-specific/rust/rust_development_guide.md) - Rust固有の開発ガイド
 **汎用規約**: `docs/policies/` フォルダ内の各ポリシー文書を参照
 
 ### テスト戦略
-**参照**: `docs/policies/testing_strategy_policy.md`
+**参照**: `docs/policies/universal/testing_strategy_policy.md`
 - Property-basedテスト基盤戦略（1000ケース以上）
 - 日時・日付検証規約
 - 品質保証指標
 
 ### Git ワークフロー
-**参照**: `docs/policies/git_workflow_policy.md`
+**参照**: `docs/policies/universal/git_workflow_policy.md`
 - 必須コミット規則（やりとり完了時の自動コミット必須）
 - コミットメッセージテンプレート
 - 品質チェック基準
 
 ### トレーサビリティ管理
-**参照**: `docs/policies/traceability_management_policy.md`
+**参照**: `docs/policies/universal/traceability_management_policy.md`
 - 二層トレーサビリティ管理体制
 - 要件プロセス内・プロセス間トレーサビリティ
 - 変更管理プロセス
 
 ### 人の判断ガイドライン
-**参照**: `docs/policies/human_judgment_guidelines.md`
+**参照**: `docs/policies/universal/human_judgment_guidelines.md`
 - Claude Code Assistant支援時の判断基準
 - 自動判断可能事項・人間判断必須事項の区分
 - 効果的な指示のコツ
 
 ### PlantUML構文チェック
-**参照**: `docs/policies/plantuml_validation_policy.md`
+**参照**: `docs/policies/technology-specific/plantuml/plantuml_validation_policy.md`
 - 構文チェック環境・コマンド
 - 一般的なエラーと対策
 - 品質保証基準
 
 ### プロジェクト品質管理
-**参照**: `docs/policies/project_quality_management_policy.md`
+**参照**: `docs/policies/universal/project_quality_management_policy.md`
 - 矛盾・不整合の自動検出・報告プロセス
 - 品質保証基盤（Property-basedテスト戦略）
 - 継続的品質改善
@@ -113,12 +113,12 @@ Rust固有の開発環境、ビルド手順、コーディング規約につい�
 詳細なトレーサビリティ情報は以下の専用ファイルを参照：
 
 **要件プロセス内トレーサビリティ**:
-- `docs/requirements/crosscutting/requirements_traceability_matrix.md`
+- `docs/artifacts/requirements/crosscutting/requirements_traceability_matrix.md`
 - Phase0-6内の成果物間関係性
 - 要件変更の要件プロセス内影響分析
 
 **プロセス間トレーサビリティ**:
-- `docs/requirements/crosscutting/overall_traceability_matrix.md`
+- `docs/artifacts/requirements/crosscutting/overall_traceability_matrix.md`
 - 要件→設計→実装→テストの完全トレース
 - プロセス間変更影響の全体分析
 
@@ -129,9 +129,9 @@ Rust固有の開発環境、ビルド手順、コーディング規約につい�
 3. **実装変更時**: 事前条件・事後条件・不変条件の維持 → テスト更新
 
 詳細な変更管理手順は以下を参照：
-- `docs/requirements/crosscutting/change_management.md`
+- `docs/artifacts/requirements/crosscutting/change_management.md`
 
 ## トラブルシューティング
 - **詳細ガイド**: README.md のトラブルシューティングセクション
 - **機能仕様**: [PROJECT_FEATURES.md](PROJECT_FEATURES.md)
-- **技術実装**: [RUST_DEVELOPMENT.md](RUST_DEVELOPMENT.md)
+- **技術実装**: [rust_development_guide.md](docs/policies/technology-specific/rust/rust_development_guide.md)

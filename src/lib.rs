@@ -8,6 +8,8 @@
 
 pub mod errors;
 pub mod components;
+pub mod services;
+pub mod services_impl;
 pub mod gui;
 pub mod windows_console;
 

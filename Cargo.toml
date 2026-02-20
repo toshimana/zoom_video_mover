@@ -5,6 +5,10 @@ edition = "2021"
 rust-version = "1.70"
 build = "build.rs"
 
+[features]
+default = []
+test-support = ["mockall"]
+
 [lib]
 name = "zoom_video_mover_lib"
 path = "src/lib.rs"
@@ -53,6 +57,9 @@ validator = { version = "0.16", features = ["derive"] }
 aes-gcm = { version = "0.10", features = ["aes", "alloc"] }
 zeroize = { version = "1.7", features = ["derive"] }
 
+# Mock library (optional, enabled by test-support feature)
+mockall = { version = "0.11", optional = true }
+
 [dev-dependencies]
 # Property-based testing framework
 proptest = "1.4"
@@ -71,8 +78,6 @@ rstest = "0.18"
 wiremock = "0.5"
 # Serial test execution
 serial_test = "3.0"
-# Mock library for trait mocking
-mockall = "0.11"
 
 [[bin]]
 name = "zoom_video_mover"

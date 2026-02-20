@@ -14,6 +14,7 @@ use aes_gcm::{
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 use std::fmt;
+use std::path::PathBuf;
 
 /// 暗号化されたデータ構造
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -248,20 +249,22 @@ impl CryptoComponent {
     /// Windows DPAPI暗号化
     #[cfg(target_os = "windows")]
     fn dpapi_encrypt(data: &[u8]) -> AppResult<Vec<u8>> {
-        use winapi::um::dpapi::{CryptProtectData, CRYPTOAPI_BLOB};
-        use winapi::um::wincrypt::{CRYPTPROTECT_UI_FORBIDDEN, CRYPTPROTECT_LOCAL_MACHINE};
+        use winapi::um::dpapi::CryptProtectData;
+        use winapi::um::wincrypt::DATA_BLOB;
         use std::ptr;
-        
-        let mut data_in = CRYPTOAPI_BLOB {
+
+        const CRYPTPROTECT_UI_FORBIDDEN: u32 = 0x1;
+
+        let mut data_in = DATA_BLOB {
             cbData: data.len() as u32,
             pbData: data.as_ptr() as *mut u8,
         };
         
-        let mut data_out = CRYPTOAPI_BLOB {
+        let mut data_out = DATA_BLOB {
             cbData: 0,
             pbData: ptr::null_mut(),
         };
-        
+
         let success = unsafe {
             CryptProtectData(
                 &mut data_in,
@@ -293,15 +296,16 @@ impl CryptoComponent {
     /// Windows DPAPI復号化
     #[cfg(target_os = "windows")]
     fn dpapi_decrypt(encrypted_data: &[u8]) -> AppResult<Vec<u8>> {
-        use winapi::um::dpapi::{CryptUnprotectData, CRYPTOAPI_BLOB};
+        use winapi::um::dpapi::CryptUnprotectData;
+        use winapi::um::wincrypt::DATA_BLOB;
         use std::ptr;
-        
-        let mut data_in = CRYPTOAPI_BLOB {
+
+        let mut data_in = DATA_BLOB {
             cbData: encrypted_data.len() as u32,
             pbData: encrypted_data.as_ptr() as *mut u8,
         };
-        
-        let mut data_out = CRYPTOAPI_BLOB {
+
+        let mut data_out = DATA_BLOB {
             cbData: 0,
             pbData: ptr::null_mut(),
         };
@@ -360,7 +364,7 @@ impl CryptoComponent {
         
         // 暗号化実行
         let ciphertext = cipher.encrypt(&nonce, data.expose_secret())
-            .map_err(|e| AppError::authentication("Encryption failed", Some(e)))?;
+            .map_err(|_| AppError::authentication("Encryption failed", None::<std::io::Error>))?;
         
         let encrypted_data = EncryptedData {
             ciphertext,
@@ -407,7 +411,7 @@ impl CryptoComponent {
         
         // 復号化実行（認証タグ検証込み）
         let plaintext = cipher.decrypt(nonce, encrypted_data.ciphertext.as_ref())
-            .map_err(|e| AppError::authentication("Decryption failed (data may be corrupted)", Some(e)))?;
+            .map_err(|_| AppError::authentication("Decryption failed (data may be corrupted)", None::<std::io::Error>))?;
         
         log::debug!("Data decrypted successfully ({} bytes -> {} bytes)", 
                    encrypted_data.ciphertext.len(), plaintext.len());

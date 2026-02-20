@@ -51,7 +51,9 @@ redirect_uri = "http://localhost:8080/callback"
 |---------|------|--------------|
 | `cargo run` | アプリケーション実行 | 開発・デバッグ時 |
 | `cargo build --release` | リリースビルド | 配布用バイナリ作成時 |
-| `cargo test` | 全テスト実行 | コミット前 |
+| `cargo test` | 基本テスト実行（lib + integration） | コミット前 |
+| `cargo test --features test-support` | 全テスト実行（GUI含む） | コミット前 |
+| `cargo test --test gui_tests --features test-support` | GUIテストのみ | GUI変更時 |
 | `cargo fmt` | コードフォーマット | コード変更後 |
 | `cargo clippy` | 静的解析 | コミット前 |
 | `cargo check` | 型チェック | コンパイルエラー確認時 |
@@ -99,14 +101,14 @@ PROPTEST_CASES=10 cargo test
 ## 📚 詳細ドキュメント
 
 ### 必須（初日に読む）
-- 🔴 **[DEVELOPMENT_CHECKLIST.md](DEVELOPMENT_CHECKLIST.md)** - 開発フローチェックリスト
-- 🔴 **[docs/policies/git_workflow_policy.md](docs/policies/git_workflow_policy.md)** - Gitワークフロー
-- 🔴 **[docs/policies/rust_coding_standards.md](docs/policies/rust_coding_standards.md)** - コーディング規約
+- 🔴 **[development_checklist.md](docs/policies/universal/development_checklist.md)** - 開発フローチェックリスト
+- 🔴 **[git_workflow_policy.md](docs/policies/universal/git_workflow_policy.md)** - Gitワークフロー
+- 🔴 **[rust_coding_standards.md](docs/policies/technology-specific/rust/rust_coding_standards.md)** - コーディング規約
 
 ### 機能開発時
 - 🟡 **[PROJECT_FEATURES.md](PROJECT_FEATURES.md)** - 機能仕様詳細
-- 🟡 **[RUST_DEVELOPMENT.md](RUST_DEVELOPMENT.md)** - Rust開発環境詳細
-- 🟡 **[docs/policies/testing_strategy_policy.md](docs/policies/testing_strategy_policy.md)** - テスト戦略
+- 🟡 **[rust_development_guide.md](docs/policies/technology-specific/rust/rust_development_guide.md)** - Rust開発環境詳細
+- 🟡 **[testing_strategy_policy.md](docs/policies/universal/testing_strategy_policy.md)** - テスト戦略
 
 ### 必要に応じて参照
 - 🟢 **[CLAUDE.md](CLAUDE.md)** - プロジェクト全体の構成
@@ -155,7 +157,7 @@ cargo test test_oauth_flow
 
 開発環境のセットアップが完了したら：
 
-1. **[DEVELOPMENT_CHECKLIST.md](DEVELOPMENT_CHECKLIST.md)** で開発フローを確認
+1. **[development_checklist.md](docs/policies/universal/development_checklist.md)** で開発フローを確認
 2. 簡単な機能追加やバグ修正から始める
 3. PRを作成して他の開発者からフィードバックを得る
 

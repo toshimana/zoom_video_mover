@@ -35,7 +35,9 @@
       "Bash(PROPTEST_CASES=1000 cargo test --test property_tests_integration)",
       "Bash(tree:*)",
       "Bash(git rm:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(git push:*)",
+      "Bash(test:*)"
     ],
     "deny": []
   }
