@@ -37,7 +37,10 @@
       "Bash(git rm:*)",
       "Bash(true)",
       "Bash(git push:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(wc -l \"C:\\\\Users\\\\toshi\\\\Documents\\\\project\\\\zoom_video_mover/docs/artifacts/requirements\"/**/*.md)",
+      "Bash(du:*)",
+      "Bash(wc:*)"
     ],
     "deny": []
   }

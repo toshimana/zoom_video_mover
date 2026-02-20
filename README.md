@@ -2,76 +2,23 @@
 
 ZoomクラウドレコーディングをローカルにダウンロードするRustアプリケーション
 
-## 📚 ドキュメント構成
+## ドキュメント構成
 
-プロジェクトドキュメントは以下のフォルダに整理されています：
+### `docs/policies/` - 開発ポリシー（5ファイル）
+- **rust_development.md** - Rust開発ガイド・コーディング規約
+- **testing_strategy.md** - テスト戦略（Property-basedテスト）
+- **git_workflow.md** - Gitワークフロー・コミット規則
+- **human_judgment_guidelines.md** - 人の判断ガイドライン
+- **development_checklist.md** - 開発チェックリスト
 
-### `/docs/policies/` - 📋 統合ポリシー管理
-汎用・技術固有ポリシーの分離管理：
-
-#### **汎用ポリシー（技術要素に依存しない）**
-- **requirements_policy.md** - 要件定義方針・RDRAプロセス
-- **design_policy.md** - 汎用設計方針・アーキテクチャガイドライン
-- **testing_policy.md** - 汎用テスト戦略・品質方針
-
-#### **技術固有ポリシー（`technology-specific/`）**
-- **rust_implementation_policy.md** - Rust実装方針・コーディング規約
-- **rust_tokio_egui_design_policy.md** - Rust/tokio/eGUI技術設計
-- **rust_proptest_testing_policy.md** - Rust/proptest/cargoテスト実装
-- **zoom_oauth_functional_requirements.md** - Zoom API/OAuth機能要件
-
-### `/docs/requirements/` - 📋 包括的要件仕様書（RDRA手法）
-完全なRDRA（Relationship Driven Requirement Analysis）手法による要件定義：
-
-#### **Phase 0-1: プロジェクト準備・価値分析**
-- **phase0_project_preparation/** - プロジェクト基盤（ステークホルダー分析、制約条件）
-- **phase1_system_value/** - システム価値分析（ROI、ビジネス価値）
-
-#### **Phase 2-3: 外部環境・システム境界**
-- **phase2_external_environment/** - ビジネスフロー、利用シナリオ、概念モデル
-- **phase3_system_boundary/** - ユースケース、画面・API仕様
-
-#### **Phase 4-5: 内部設計・非機能要件**
-- **phase4_system_internal/** - 機能分解、データモデル、アルゴリズム仕様
-- **phase5_nonfunctional_requirements/** - 性能・信頼性・セキュリティ・ユーザビリティ要件
-
-#### **Phase 6: 統合・検証**
-- **phase6_integration_verification/** - 要件統合、トレーサビリティ、検証計画
-
-#### **横断的要件管理**
-- **crosscutting/** - 要件プロセス内・プロセス間トレーサビリティ、リスク管理、変更管理
-
-**特徴:**
-- 🎯 **完全なトレーサビリティ**: 要件→設計→実装→テストの一貫追跡
-- 📊 **定量的品質保証**: Property-basedテスト（1000+ケース）による堅牢性
-- 🔒 **包括的リスク管理**: 8大リスクの詳細分析・軽減策
-- 🔄 **体系的変更管理**: 影響分析・承認ワークフロー
-
-### `/docs/design/` - 🏗️ 設計仕様
-- 設計関連文書（今後追加予定）
-
-### `/docs/implementation/` - ⚙️ 実装仕様  
-- 実装関連文書（今後追加予定）
-
-### `/docs/testing/` - 🧪 テスト仕様
-- テスト関連文書（今後追加予定）
-
-### `/docs/analysis/` - 📊 分析・レポート
-- **development_process_and_deliverables_report.md** - 開発プロセス分析
-- **policy_consistency_issues.md** - ポリシー整合性分析レポート
-
-### 🔗 エンタープライズレベルの品質管理
-- **完全なトレーサビリティマトリックス**: 全要件の追跡可能性100%保証
-- **RDRA手法による体系的要件管理**: 7フェーズ完全実装
-- **定量的品質メトリクス**: 
-  - 要件カバレッジ100%
-  - テストカバレッジ95%以上
-  - 文書整合性95%以上
-- **包括的リスク管理**: 8大リスクの継続監視・軽減策
-- **変更管理プロセス**: 影響分析・承認ワークフロー・変更履歴
-- **Property-basedテスト**: 1000+ケースによる網羅的検証
-- **ポリシー統合**: `docs/policies/` での一括管理
-- **開発ガイド**: `CLAUDE.md` との完全連携
+### `docs/requirements/` - 要件定義（RDRA手法、13ファイル）
+- **phase0〜phase6** - RDRA Phase別要件（各1ファイルに統合）
+- **system_requirements.md** - システム要件
+- **project_features_detailed.md** - 機能仕様詳細
+- **rdra_analysis_models.md** - RDRA分析モデル
+- **rdra_sheets.md** - RDRAシート集
+- **traceability_matrix.md** - トレーサビリティマトリックス
+- **change_management.md** - 変更管理
 
 ## 必要なソフトウェア
 
