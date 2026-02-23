@@ -1,0 +1,458 @@
+// Zoom Video Mover - テスト観点図 DAG
+// 層1: doubleoctagon (ダークネイビー)
+// 層2: box太枠 (機能別カラー)
+// 層3: 角丸box (淡色)
+// 層4通常: 白楕円
+// 層4共有: グレー楕円+太枠+<<共有>>
+
+digraph TestViewpointDiagram {
+    // === グラフ全体設定 ===
+    rankdir=TB;
+    fontname="Helvetica";
+    fontsize=11;
+    nodesep=0.3;
+    ranksep=0.8;
+    compound=true;
+    label="Zoom Video Mover テスト観点図\n82ユニーク因子 / 延べ98出現 / 共有15ノード";
+    labelloc=t;
+    fontsize=16;
+
+    // === 層1: ルート ===
+    ZVM [
+        label="ZVM\nZoom Video Mover"
+        shape=doubleoctagon
+        style="filled,bold"
+        fillcolor="#1a237e"
+        fontcolor=white
+        fontsize=14
+        penwidth=3
+    ];
+
+    // === 層2: サブシステム ===
+    SS1 [label="SS1: 認証\nauth.rs" shape=box style="filled,bold" fillcolor="#ef5350" fontcolor=white penwidth=3 fontsize=12];
+    SS2 [label="SS2: API通信\napi.rs" shape=box style="filled,bold" fillcolor="#1e88e5" fontcolor=white penwidth=3 fontsize=12];
+    SS3 [label="SS3: ダウンロード\ndownload.rs, lib.rs" shape=box style="filled,bold" fillcolor="#43a047" fontcolor=white penwidth=3 fontsize=12];
+    SS4 [label="SS4: 設定管理\nconfig.rs" shape=box style="filled,bold" fillcolor="#fb8c00" fontcolor=white penwidth=3 fontsize=12];
+    SS5 [label="SS5: セキュリティ\ncrypto.rs" shape=box style="filled,bold" fillcolor="#8e24aa" fontcolor=white penwidth=3 fontsize=12];
+    SS6 [label="SS6: GUI/UI\ngui.rs, main.rs" shape=box style="filled,bold" fillcolor="#00897b" fontcolor=white penwidth=3 fontsize=12];
+    SS7 [label="SS7: 統合\nintegration.rs" shape=box style="filled,bold" fillcolor="#546e7a" fontcolor=white penwidth=3 fontsize=12];
+
+    // 層1→層2
+    ZVM -> SS1;
+    ZVM -> SS2;
+    ZVM -> SS3;
+    ZVM -> SS4;
+    ZVM -> SS5;
+    ZVM -> SS6;
+    ZVM -> SS7;
+
+    // === 層3: 構成要素 ===
+
+    // -- SS1 構成要素 (赤系淡色) --
+    SS1_C1 [label="SS1-C1\nOAuthフロー" shape=box style="filled,rounded" fillcolor="#ffcdd2" fontsize=10];
+    SS1_C2 [label="SS1-C2\nトークン管理" shape=box style="filled,rounded" fillcolor="#ffcdd2" fontsize=10];
+    SS1_C3 [label="SS1-C3\nトークン永続化" shape=box style="filled,rounded" fillcolor="#ffcdd2" fontsize=10];
+    SS1_C4 [label="SS1-C4\n認証フロー状態" shape=box style="filled,rounded" fillcolor="#ffcdd2" fontsize=10];
+
+    SS1 -> SS1_C1;
+    SS1 -> SS1_C2;
+    SS1 -> SS1_C3;
+    SS1 -> SS1_C4;
+
+    // -- SS2 構成要素 (青系淡色) --
+    SS2_C1 [label="SS2-C1\nHTTP通信基盤" shape=box style="filled,rounded" fillcolor="#bbdefb" fontsize=10];
+    SS2_C2 [label="SS2-C2\nレート制限" shape=box style="filled,rounded" fillcolor="#bbdefb" fontsize=10];
+    SS2_C3 [label="SS2-C3\n録画検索API" shape=box style="filled,rounded" fillcolor="#bbdefb" fontsize=10];
+    SS2_C4 [label="SS2-C4\nレスポンス処理" shape=box style="filled,rounded" fillcolor="#bbdefb" fontsize=10];
+    SS2_C5 [label="SS2-C5\nAPI統計" shape=box style="filled,rounded" fillcolor="#bbdefb" fontsize=10];
+
+    SS2 -> SS2_C1;
+    SS2 -> SS2_C2;
+    SS2 -> SS2_C3;
+    SS2 -> SS2_C4;
+    SS2 -> SS2_C5;
+
+    // -- SS3 構成要素 (緑系淡色) --
+    SS3_C1 [label="SS3-C1\nタスク管理" shape=box style="filled,rounded" fillcolor="#c8e6c9" fontsize=10];
+    SS3_C2 [label="SS3-C2\n並列実行制御" shape=box style="filled,rounded" fillcolor="#c8e6c9" fontsize=10];
+    SS3_C3 [label="SS3-C3\nファイル書き込み" shape=box style="filled,rounded" fillcolor="#c8e6c9" fontsize=10];
+    SS3_C4 [label="SS3-C4\n進捗管理" shape=box style="filled,rounded" fillcolor="#c8e6c9" fontsize=10];
+    SS3_C5 [label="SS3-C5\nリトライ/エラー" shape=box style="filled,rounded" fillcolor="#c8e6c9" fontsize=10];
+
+    SS3 -> SS3_C1;
+    SS3 -> SS3_C2;
+    SS3 -> SS3_C3;
+    SS3 -> SS3_C4;
+    SS3 -> SS3_C5;
+
+    // -- SS4 構成要素 (橙系淡色) --
+    SS4_C1 [label="SS4-C1\n設定ファイルI/O" shape=box style="filled,rounded" fillcolor="#ffe0b2" fontsize=10];
+    SS4_C2 [label="SS4-C2\nバリデーション" shape=box style="filled,rounded" fillcolor="#ffe0b2" fontsize=10];
+    SS4_C3 [label="SS4-C3\n設定更新" shape=box style="filled,rounded" fillcolor="#ffe0b2" fontsize=10];
+
+    SS4 -> SS4_C1;
+    SS4 -> SS4_C2;
+    SS4 -> SS4_C3;
+
+    // -- SS5 構成要素 (紫系淡色) --
+    SS5_C1 [label="SS5-C1\n暗号化エンジン" shape=box style="filled,rounded" fillcolor="#e1bee7" fontsize=10];
+    SS5_C2 [label="SS5-C2\n鍵管理" shape=box style="filled,rounded" fillcolor="#e1bee7" fontsize=10];
+    SS5_C3 [label="SS5-C3\nメモリセキュリティ" shape=box style="filled,rounded" fillcolor="#e1bee7" fontsize=10];
+    SS5_C4 [label="SS5-C4\nシリアライズ" shape=box style="filled,rounded" fillcolor="#e1bee7" fontsize=10];
+
+    SS5 -> SS5_C1;
+    SS5 -> SS5_C2;
+    SS5 -> SS5_C3;
+    SS5 -> SS5_C4;
+
+    // -- SS6 構成要素 (ティール系淡色) --
+    SS6_C1 [label="SS6-C1\n画面遷移" shape=box style="filled,rounded" fillcolor="#b2dfdb" fontsize=10];
+    SS6_C2 [label="SS6-C2\n設定画面" shape=box style="filled,rounded" fillcolor="#b2dfdb" fontsize=10];
+    SS6_C3 [label="SS6-C3\n録画一覧画面" shape=box style="filled,rounded" fillcolor="#b2dfdb" fontsize=10];
+    SS6_C4 [label="SS6-C4\n進捗画面" shape=box style="filled,rounded" fillcolor="#b2dfdb" fontsize=10];
+    SS6_C5 [label="SS6-C5\nログ管理" shape=box style="filled,rounded" fillcolor="#b2dfdb" fontsize=10];
+    SS6_C6 [label="SS6-C6\n外観/a11y" shape=box style="filled,rounded" fillcolor="#b2dfdb" fontsize=10];
+
+    SS6 -> SS6_C1;
+    SS6 -> SS6_C2;
+    SS6 -> SS6_C3;
+    SS6 -> SS6_C4;
+    SS6 -> SS6_C5;
+    SS6 -> SS6_C6;
+
+    // -- SS7 構成要素 (グレー系淡色) --
+    SS7_C1 [label="SS7-C1\nコンポーネント初期化" shape=box style="filled,rounded" fillcolor="#cfd8dc" fontsize=10];
+    SS7_C2 [label="SS7-C2\n認証ワークフロー" shape=box style="filled,rounded" fillcolor="#cfd8dc" fontsize=10];
+    SS7_C3 [label="SS7-C3\nDLワークフロー" shape=box style="filled,rounded" fillcolor="#cfd8dc" fontsize=10];
+    SS7_C4 [label="SS7-C4\nファイル名生成" shape=box style="filled,rounded" fillcolor="#cfd8dc" fontsize=10];
+    SS7_C5 [label="SS7-C5\nイベント処理" shape=box style="filled,rounded" fillcolor="#cfd8dc" fontsize=10];
+
+    SS7 -> SS7_C1;
+    SS7 -> SS7_C2;
+    SS7 -> SS7_C3;
+    SS7 -> SS7_C4;
+    SS7 -> SS7_C5;
+
+    // === 層4: 因子（通常ノード = 白楕円） ===
+
+    // -- SS1-C1: OAuthフロー因子 --
+    F001 [label="F001\n認証URL生成\n[FR001-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F002 [label="F002 <<共有>>\nPKCE\n[FR001-1,NFR003-1]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+    F003 [label="F003 <<共有>>\nCSRF State\n[FR001-1,NFR003-1]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+    F004 [label="F004\n認証コード交換\n[FR001-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS1_C1 -> F001;
+    SS1_C1 -> F002;
+    SS1_C1 -> F003;
+    SS1_C1 -> F004;
+
+    // -- SS1-C2: トークン管理因子 --
+    F005 [label="F005\nトークン取得\n[FR001-3]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F006 [label="F006\n有効期限判定\n[FR001-3]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F007 [label="F007\n自動更新(5分前)\n[FR001-3,NFR002-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F008 [label="F008\nリフレッシュ処理\n[FR001-3]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS1_C2 -> F005;
+    SS1_C2 -> F006;
+    SS1_C2 -> F007;
+    SS1_C2 -> F008;
+
+    // -- SS1-C3: トークン永続化因子 --
+    F009 [label="F009 <<共有>>\n暗号化保存\n[FR001-3,NFR003-1]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+    F010 [label="F010 <<共有>>\n暗号化読み込み\n[FR001-3,NFR003-1]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+    F011 [label="F011\n認証状態クリア\n[FR001-3]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS1_C3 -> F009;
+    SS1_C3 -> F010;
+    SS1_C3 -> F011;
+
+    // -- SS1-C4: 認証フロー状態因子 --
+    F012 [label="F012\n10分有効期限\n[FR001-4]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F013 [label="F013\n保留フロー管理\n[FR001-4]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F014 [label="F014 <<共有>>\nOAuth設定\n[FR001-2]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+
+    SS1_C4 -> F012;
+    SS1_C4 -> F013;
+    SS1_C4 -> F014;
+
+    // -- SS2-C1: HTTP通信基盤因子 --
+    F015 [label="F015\nHTTPクライアント初期化\n[FR002-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F016 [label="F016 <<共有>>\nBearer認証ヘッダ\n[FR002-1,NFR003-2]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+    F017 [label="F017 <<共有>>\nタイムアウト制御\n[NFR001-1]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+
+    SS2_C1 -> F015;
+    SS2_C1 -> F016;
+    SS2_C1 -> F017;
+
+    // -- SS2-C2: レート制限因子 --
+    F018 [label="F018\nToken Bucket\n[NFR001-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F019 [label="F019\nトークン補充\n[NFR001-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F020 [label="F020\nバースト容量\n[NFR001-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F021 [label="F021\n待機時間計算\n[NFR001-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS2_C2 -> F018;
+    SS2_C2 -> F019;
+    SS2_C2 -> F020;
+    SS2_C2 -> F021;
+
+    // -- SS2-C3: 録画検索API因子 --
+    F022 [label="F022\n単一ページ取得\n[FR002-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F023 [label="F023\n全ページ自動取得\n[FR002-4]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F024 [label="F024\n期間フィルタリング\n[FR002-3]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS2_C3 -> F022;
+    SS2_C3 -> F023;
+    SS2_C3 -> F024;
+
+    // -- SS2-C4: レスポンス処理因子 --
+    F025 [label="F025\nJSONパース\n[FR002-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F026 [label="F026 <<共有>>\nファイル種別判定\n[FR002-2,FR003-3]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+    F027 [label="F027\nページネーション\nトークン処理\n[FR002-4]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS2_C4 -> F025;
+    SS2_C4 -> F026;
+    SS2_C4 -> F027;
+
+    // -- SS2-C5: API統計因子 --
+    F028 [label="F028\n呼び出し回数\n[NFR001-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F029 [label="F029\n平均応答時間\n[NFR001-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS2_C5 -> F028;
+    SS2_C5 -> F029;
+
+    // -- SS3-C1: タスク管理因子 --
+    F030 [label="F030\nタスクキュー管理\n[FR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F031 [label="F031\nタスク状態遷移\n(5状態)\n[FR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F032 [label="F032\nタスクID生成\n[FR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS3_C1 -> F030;
+    SS3_C1 -> F031;
+    SS3_C1 -> F032;
+
+    // -- SS3-C2: 並列実行制御因子 --
+    F033 [label="F033\nワーカースレッド\n[FR003-1,NFR001-3]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F034 [label="F034\n同時DL数制限\n[FR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F035 [label="F035\nシャットダウン\nシグナル\n[FR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS3_C2 -> F033;
+    SS3_C2 -> F034;
+    SS3_C2 -> F035;
+
+    // -- SS3-C3: ファイル書き込み因子 --
+    F036 [label="F036\nストリーム/チャンク\n[FR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F037 [label="F037\n出力ディレクトリ\n[FR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F038 [label="F038 <<共有>>\nファイル名サニタイズ\n[FR003-4,NFR004-2]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+
+    SS3_C3 -> F036;
+    SS3_C3 -> F037;
+    SS3_C3 -> F038;
+
+    // -- SS3-C4: 進捗管理因子 --
+    F039 [label="F039\nDL進捗計算\n[FR003-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F040 [label="F040\n転送速度計算\n[FR003-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F041 [label="F041\nETA計算\n[FR003-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F042 [label="F042\n100ms更新間隔\n[FR003-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS3_C4 -> F039;
+    SS3_C4 -> F040;
+    SS3_C4 -> F041;
+    SS3_C4 -> F042;
+
+    // -- SS3-C5: リトライ/エラー処理因子 --
+    F043 [label="F043 <<共有>>\nリトライ管理(3回)\n[NFR002-2]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+    F044 [label="F044 <<共有>>\nエラー回復判定\n[NFR002-1,NFR002-2]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+    F045 [label="F045 <<共有>>\nDLイベント通知\n[FR003-2]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+
+    SS3_C5 -> F043;
+    SS3_C5 -> F044;
+    SS3_C5 -> F045;
+
+    // -- SS4-C1: 設定ファイルI/O因子 --
+    F046 [label="F046\nTOML読み込み\n[FR001-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F047 [label="F047\nTOML保存\n[FR001-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F048 [label="F048\nデフォルト設定\n[FR001-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS4_C1 -> F046;
+    SS4_C1 -> F047;
+    SS4_C1 -> F048;
+
+    // -- SS4-C2: バリデーション因子 --
+    F049 [label="F049\nOAuth設定検証\n[FR001-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F050 [label="F050\n数値範囲検証\n[FR001-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F051 [label="F051\nURL形式検証\n[FR001-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS4_C2 -> F049;
+    SS4_C2 -> F050;
+    SS4_C2 -> F051;
+
+    // -- SS4-C3: 設定更新因子 --
+    F052 [label="F052\nOAuth設定更新\n[FR001-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F053 [label="F053 <<共有>>\n出力Dir更新\n[FR003-1]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+
+    SS4_C3 -> F052;
+    SS4_C3 -> F053;
+
+    // -- SS5-C1: 暗号化エンジン因子 --
+    F054 [label="F054\nAES-256-GCM暗号化\n[NFR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F055 [label="F055\nAES-256-GCM復号化\n[NFR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F056 [label="F056\n96bitナンス生成\n[NFR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS5_C1 -> F054;
+    SS5_C1 -> F055;
+    SS5_C1 -> F056;
+
+    // -- SS5-C2: 鍵管理因子 --
+    F057 [label="F057\nマスターキー初期化\n[NFR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F058 [label="F058\nWindows DPAPI\n[NFR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F059 [label="F059\n非Windowsフォールバック\n[NFR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS5_C2 -> F057;
+    SS5_C2 -> F058;
+    SS5_C2 -> F059;
+
+    // -- SS5-C3: メモリセキュリティ因子 --
+    F060 [label="F060\nSecretData自動ゼロ化\n[NFR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F061 [label="F061\nマスターキークリア\n[NFR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS5_C3 -> F060;
+    SS5_C3 -> F061;
+
+    // -- SS5-C4: シリアライズ因子 --
+    F062 [label="F062\nJSON暗号化\n[NFR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F063 [label="F063\nJSON復号化\n[NFR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS5_C4 -> F062;
+    SS5_C4 -> F063;
+
+    // -- SS6-C1: 画面遷移因子 --
+    F064 [label="F064\n5画面状態遷移\n[FR005-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F065 [label="F065 <<共有>>\nエラー画面表示\n[FR005-1,NFR002-1]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+
+    SS6_C1 -> F064;
+    SS6_C1 -> F065;
+
+    // -- SS6-C2: 設定画面因子 --
+    F066 [label="F066\nOAuth設定入力\n[FR005-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F067 [label="F067\n保存先選択\n[FR005-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS6_C2 -> F066;
+    SS6_C2 -> F067;
+
+    // -- SS6-C3: 録画一覧画面因子 --
+    F068 [label="F068\nチェックボックス\n[FR005-3]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F069 [label="F069\n全選択/解除\n[FR005-3]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS6_C3 -> F068;
+    SS6_C3 -> F069;
+
+    // -- SS6-C4: 進捗画面因子 --
+    F070 [label="F070 <<共有>>\n進捗バー表示\n[FR003-2,FR005-1]" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+    F071 [label="F071\n一時停止/再開\n[FR005-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F072 [label="F072\nキャンセル操作\n[FR005-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS6_C4 -> F070;
+    SS6_C4 -> F071;
+    SS6_C4 -> F072;
+
+    // -- SS6-C5: ログ管理因子 --
+    F073 [label="F073\nログ蓄積(1000件)\n[NFR004-3]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F074 [label="F074\nログエクスポート\n[NFR004-3]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS6_C5 -> F073;
+    SS6_C5 -> F074;
+
+    // -- SS6-C6: 外観因子 --
+    F075 [label="F075\n日本語フォント\n[NFR004-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F076 [label="F076\nフォント1.5倍\n[NFR004-3]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F077 [label="F077\n高コントラスト配色\n[NFR004-3]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS6_C6 -> F075;
+    SS6_C6 -> F076;
+    SS6_C6 -> F077;
+
+    // -- SS7-C1: コンポーネント初期化因子 --
+    F078 [label="F078\n全コンポーネント結合\n[FR001-1,FR002-1,FR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F079 [label="F079\n設定パス管理\n[FR001-2]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS7_C1 -> F078;
+    SS7_C1 -> F079;
+
+    // -- SS7-C2: 認証ワークフロー因子 --
+    F080 [label="F080\nOAuth認証実行\n[FR001-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS7_C2 -> F080;
+
+    // -- SS7-C3: DLワークフロー因子 --
+    F081 [label="F081\n検索→フィルタ→DL\n[FR002-1,FR003-1]" shape=ellipse style=filled fillcolor=white fontsize=8];
+    F082 [label="F082\nファイルタイプ\nフィルタ\n[FR003-3]" shape=ellipse style=filled fillcolor=white fontsize=8];
+
+    SS7_C3 -> F081;
+    SS7_C3 -> F082;
+
+    // === 共有エッジ（破線+グレー） ===
+
+    // F009: SS1-C3 → SS5 (暗号化保存はSS5暗号化エンジンを使用)
+    SS5_C1 -> F009 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F010: SS1-C3 → SS5 (暗号化読み込みはSS5復号機能を使用)
+    SS5_C1 -> F010 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F014: SS1-C4 → SS4 (OAuth設定は設定管理で読み書き)
+    SS4_C2 -> F014 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F017: SS2-C1 → SS3 (タイムアウトはDLでも使用)
+    SS3_C2 -> F017 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F038: SS3-C3 → SS7 (ファイル名サニタイズは統合WFでも使用)
+    SS7_C4 -> F038 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F043: SS3-C5 → SS2 (リトライ管理はAPI呼び出しでも使用)
+    SS2_C3 -> F043 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F044: SS3-C5 → SS2, SS7 (エラー回復判定は全体で共通)
+    SS2_C4 -> F044 [style=dashed color="#9e9e9e" constraint=false];
+    SS7_C5 -> F044 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F045: SS3-C5 → SS7 (DLイベントは統合WFで受信)
+    SS7_C5 -> F045 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F053: SS4-C3 → SS3 (出力Dir更新はDLで参照)
+    SS3_C3 -> F053 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F002: SS1-C1 → SS5 (PKCEは暗号的ランダム性を要求)
+    SS5_C1 -> F002 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F003: SS1-C1 → SS5 (CSRF Stateは暗号的ランダム性を要求)
+    SS5_C1 -> F003 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F016: SS2-C1 → SS1 (Bearer認証はSS1トークンを使用)
+    SS1_C2 -> F016 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F026: SS2-C4 → SS3 (ファイル種別はDLでも参照)
+    SS3_C3 -> F026 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F065: SS6-C1 → SS7 (エラー画面は統合WFのエラー伝播と連動)
+    SS7_C5 -> F065 [style=dashed color="#9e9e9e" constraint=false];
+
+    // F070: SS6-C4 → SS3 (進捗バーはDL進捗イベントと連動)
+    SS3_C4 -> F070 [style=dashed color="#9e9e9e" constraint=false];
+
+    // === 凡例 ===
+    subgraph cluster_legend {
+        label="凡例";
+        fontsize=10;
+        style=dashed;
+        color="#bdbdbd";
+
+        leg_l1 [label="層1: ルート" shape=doubleoctagon style="filled,bold" fillcolor="#1a237e" fontcolor=white fontsize=8 penwidth=2];
+        leg_l2 [label="層2: サブシステム" shape=box style="filled,bold" fillcolor="#757575" fontcolor=white fontsize=8 penwidth=2];
+        leg_l3 [label="層3: 構成要素" shape=box style="filled,rounded" fillcolor="#e0e0e0" fontsize=8];
+        leg_l4 [label="層4: 因子(通常)" shape=ellipse style=filled fillcolor=white fontsize=8];
+        leg_l4s [label="層4: 因子(共有)" shape=ellipse style="filled,bold" fillcolor="#e0e0e0" fontsize=8 penwidth=2];
+
+        leg_l1 -> leg_l2 [label="所属" fontsize=7];
+        leg_l2 -> leg_l3 [label="所属" fontsize=7];
+        leg_l3 -> leg_l4 [label="所属" fontsize=7];
+        leg_l3 -> leg_l4s [style=dashed color="#9e9e9e" label="共有" fontsize=7];
+    }
+}
