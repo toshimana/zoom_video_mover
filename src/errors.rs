@@ -181,6 +181,14 @@ impl AppError {
             retry_after: None,
         }
     }
+
+    /// Retry-After付きレート制限エラーを作成
+    pub fn rate_limit_with_retry(message: impl Into<String>, retry_after: Option<u64>) -> Self {
+        Self::RateLimit {
+            message: message.into(),
+            retry_after,
+        }
+    }
     
     /// リソースが見つからないエラーを作成
     pub fn not_found(message: impl Into<String>) -> Self {
@@ -321,5 +329,16 @@ mod tests {
         let err = AppError::validation("Invalid field", Some("client_id".to_string()));
         assert!(matches!(err, AppError::Validation { .. }));
         assert!(!err.is_recoverable());
+    }
+
+    #[test]
+    fn test_rate_limit_with_retry() {
+        let err = AppError::rate_limit_with_retry("Rate limited", Some(30));
+        assert!(matches!(err, AppError::RateLimit { retry_after: Some(30), .. }));
+        assert_eq!(err.retry_after(), Some(30));
+        assert!(err.is_recoverable());
+
+        let err_no_retry = AppError::rate_limit_with_retry("Rate limited", None);
+        assert_eq!(err_no_retry.retry_after(), None);
     }
 }

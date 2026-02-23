@@ -40,7 +40,12 @@
       "Bash(test:*)",
       "Bash(wc -l \"C:\\\\Users\\\\toshi\\\\Documents\\\\project\\\\zoom_video_mover/docs/artifacts/requirements\"/**/*.md)",
       "Bash(du:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "WebSearch",
+      "Bash(dot:*)",
+      "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\":*)",
+      "Bash(echo $mod.rs: EXISTS:*)",
+      "Bash(sort:*)"
     ],
     "deny": []
   }

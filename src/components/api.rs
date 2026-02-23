@@ -31,8 +31,12 @@ pub struct ApiConfig {
     pub timeout: Duration,
     /// 最大リトライ回数
     pub max_retries: u32,
-    /// ページサイズ
+    /// ページサイズ（Zoom APIは最大300件/ページをサポート）
     pub default_page_size: u32,
+    /// 最大ページ取得数（安全制限）
+    pub max_pages: u32,
+    /// ページ間待機時間（ミリ秒）
+    pub page_interval_ms: u64,
 }
 
 impl Default for ApiConfig {
@@ -42,15 +46,21 @@ impl Default for ApiConfig {
             rate_limit: RateLimitConfig::default(),
             timeout: Duration::from_secs(30),
             max_retries: 3,
-            default_page_size: 30,
+            default_page_size: 300,
+            max_pages: 100,
+            page_interval_ms: 100,
         }
     }
 }
 
 /// レート制限設定
+///
+/// Zoom APIプラン別上限: Free=2, Pro=20, Business+=60 req/sec
+/// デフォルト10はPro以上で安全なマージン付きの値
 #[derive(Debug, Clone)]
 pub struct RateLimitConfig {
     /// 秒あたりのリクエスト数
+    /// Zoom APIプラン別上限: Free=2, Pro=20, Business+=60
     pub requests_per_second: u32,
     /// バースト容量
     pub burst_size: u32,
@@ -68,6 +78,37 @@ impl Default for RateLimitConfig {
     }
 }
 
+/// Zoom録画ファイルタイプ
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RecordingFileType {
+    MP4,
+    M4A,
+    #[serde(rename = "TRANSCRIPT")]
+    Transcript,
+    #[serde(rename = "CHAT")]
+    Chat,
+    #[serde(rename = "CC")]
+    ClosedCaption,
+    #[serde(rename = "TIMELINE")]
+    Timeline,
+    #[serde(other)]
+    Unknown,
+}
+
+impl std::fmt::Display for RecordingFileType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MP4 => write!(f, "MP4"),
+            Self::M4A => write!(f, "M4A"),
+            Self::Transcript => write!(f, "TRANSCRIPT"),
+            Self::Chat => write!(f, "CHAT"),
+            Self::ClosedCaption => write!(f, "CC"),
+            Self::Timeline => write!(f, "TIMELINE"),
+            Self::Unknown => write!(f, "UNKNOWN"),
+        }
+    }
+}
+
 /// 録画ファイル情報
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordingFile {
@@ -75,7 +116,7 @@ pub struct RecordingFile {
     pub meeting_id: String,
     pub recording_start: String,
     pub recording_end: String,
-    pub file_type: String,
+    pub file_type: RecordingFileType,
     pub file_extension: String,
     pub file_size: u64,
     pub play_url: Option<String>,
@@ -316,9 +357,8 @@ impl ApiComponent {
             ("to", request.to.format("%Y-%m-%d").to_string()),
         ];
         
-        if let Some(page_size) = request.page_size {
-            query_params.push(("page_size", page_size.to_string()));
-        }
+        let page_size = request.page_size.unwrap_or(self.config.default_page_size);
+        query_params.push(("page_size", page_size.to_string()));
         
         if let Some(next_page_token) = &request.next_page_token {
             query_params.push(("next_page_token", next_page_token.clone()));
@@ -345,7 +385,11 @@ impl ApiComponent {
                 StatusCode::UNAUTHORIZED => Err(AppError::authentication("Unauthorized API access", None::<std::io::Error>)),
                 StatusCode::TOO_MANY_REQUESTS => {
                     self.record_rate_limit_error().await;
-                    Err(AppError::rate_limit("API rate limit exceeded"))
+                    let retry_after = response.headers()
+                        .get(reqwest::header::RETRY_AFTER)
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|v| v.parse::<u64>().ok());
+                    Err(AppError::rate_limit_with_retry("API rate limit exceeded", retry_after))
                 },
                 StatusCode::NOT_FOUND => Err(AppError::not_found("User or resource not found")),
                 _ => {
@@ -399,13 +443,13 @@ impl ApiComponent {
                 current_request.next_page_token = Some(next_token);
                 
                 // 最大ページ数制限チェック（安全のため）
-                if total_pages >= 100 {
-                    log::warn!("Reached maximum page limit (100)");
+                if total_pages >= self.config.max_pages {
+                    log::warn!("Reached maximum page limit ({})", self.config.max_pages);
                     break;
                 }
-                
+
                 // ページ間隔制御（レート制限対策）
-                tokio::time::sleep(Duration::from_millis(100)).await;
+                tokio::time::sleep(Duration::from_millis(self.config.page_interval_ms)).await;
             } else {
                 break;
             }
@@ -595,5 +639,46 @@ mod tests {
         
         // 日付範囲が有効
         assert!(valid_request.from <= valid_request.to);
+    }
+
+    #[test]
+    fn test_recording_file_type_serialization() {
+        // 各バリアントのシリアライズ確認
+        assert_eq!(serde_json::to_string(&RecordingFileType::MP4).unwrap(), "\"MP4\"");
+        assert_eq!(serde_json::to_string(&RecordingFileType::M4A).unwrap(), "\"M4A\"");
+        assert_eq!(serde_json::to_string(&RecordingFileType::Transcript).unwrap(), "\"TRANSCRIPT\"");
+        assert_eq!(serde_json::to_string(&RecordingFileType::Chat).unwrap(), "\"CHAT\"");
+        assert_eq!(serde_json::to_string(&RecordingFileType::ClosedCaption).unwrap(), "\"CC\"");
+        assert_eq!(serde_json::to_string(&RecordingFileType::Timeline).unwrap(), "\"TIMELINE\"");
+    }
+
+    #[test]
+    fn test_recording_file_type_deserialization() {
+        // 既知のタイプのデシリアライズ確認
+        assert_eq!(serde_json::from_str::<RecordingFileType>("\"MP4\"").unwrap(), RecordingFileType::MP4);
+        assert_eq!(serde_json::from_str::<RecordingFileType>("\"M4A\"").unwrap(), RecordingFileType::M4A);
+        assert_eq!(serde_json::from_str::<RecordingFileType>("\"TRANSCRIPT\"").unwrap(), RecordingFileType::Transcript);
+        assert_eq!(serde_json::from_str::<RecordingFileType>("\"CHAT\"").unwrap(), RecordingFileType::Chat);
+        assert_eq!(serde_json::from_str::<RecordingFileType>("\"CC\"").unwrap(), RecordingFileType::ClosedCaption);
+        assert_eq!(serde_json::from_str::<RecordingFileType>("\"TIMELINE\"").unwrap(), RecordingFileType::Timeline);
+
+        // 未知のタイプはUnknownにフォールバック
+        assert_eq!(serde_json::from_str::<RecordingFileType>("\"UNKNOWN_TYPE\"").unwrap(), RecordingFileType::Unknown);
+    }
+
+    #[test]
+    fn test_recording_file_type_display() {
+        assert_eq!(RecordingFileType::MP4.to_string(), "MP4");
+        assert_eq!(RecordingFileType::ClosedCaption.to_string(), "CC");
+        assert_eq!(RecordingFileType::Timeline.to_string(), "TIMELINE");
+        assert_eq!(RecordingFileType::Unknown.to_string(), "UNKNOWN");
+    }
+
+    #[test]
+    fn test_api_config_defaults() {
+        let config = ApiConfig::default();
+        assert_eq!(config.default_page_size, 300);
+        assert_eq!(config.max_pages, 100);
+        assert_eq!(config.page_interval_ms, 100);
     }
 }

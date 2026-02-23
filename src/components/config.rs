@@ -29,6 +29,11 @@ pub struct OAuthConfig {
     pub redirect_uri: String,
     
     /// 認証スコープ
+    /// 現在のgenericスコープ(recording:read等)は引き続き有効
+    /// Zoom APIは粒度の細かいスコープも提供:
+    ///   cloud_recording:read:list_user_recordings
+    ///   cloud_recording:read:list_recording_files
+    /// 将来のAPI変更時に移行を検討
     pub scopes: Vec<String>,
 }
 
@@ -65,7 +70,9 @@ pub struct AppConfig {
     #[validate(range(min = 5, max = 300, message = "Timeout must be between 5 and 300 seconds"))]
     pub request_timeout_seconds: u64,
     
-    /// レート制限設定
+    /// レート制限設定（リクエスト/秒）
+    /// Zoom APIプラン別上限: Free=2, Pro=20, Business+=60
+    /// デフォルト10はPro以上で安全なマージン付きの値
     pub rate_limit_per_second: u32,
     
     /// デバッグモード
@@ -87,9 +94,18 @@ pub struct ApiSettings {
     pub timeout_seconds: u64,
     /// リトライ回数
     pub max_retries: u32,
-    /// ページサイズ
+    /// ページサイズ（Zoom APIは最大300件/ページをサポート）
     pub default_page_size: u32,
+    /// 最大ページ取得数（安全制限）
+    #[serde(default = "default_max_pages")]
+    pub max_pages: u32,
+    /// ページ間待機時間（ミリ秒）
+    #[serde(default = "default_page_interval_ms")]
+    pub page_interval_ms: u64,
 }
+
+fn default_max_pages() -> u32 { 100 }
+fn default_page_interval_ms() -> u64 { 100 }
 
 impl Default for ApiSettings {
     fn default() -> Self {
@@ -97,7 +113,9 @@ impl Default for ApiSettings {
             base_url: "https://api.zoom.us/v2".to_string(),
             timeout_seconds: 30,
             max_retries: 3,
-            default_page_size: 30,
+            default_page_size: 300,
+            max_pages: 100,
+            page_interval_ms: 100,
         }
     }
 }

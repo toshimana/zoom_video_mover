@@ -7,7 +7,7 @@
 
 use zoom_video_mover_lib::components::{
     auth::{AuthComponent, AuthToken},
-    api::{ApiComponent, ApiConfig, RecordingSearchRequest, MeetingRecording, RecordingFile},
+    api::{ApiComponent, ApiConfig, RecordingSearchRequest, MeetingRecording, RecordingFile, RecordingFileType},
     download::{DownloadComponent, DownloadConfig},
     config::{AppConfig, OAuthConfig, ApiSettings},
     ComponentLifecycle,
@@ -98,7 +98,14 @@ prop_compose! {
     fn arb_recording_file()
         (id in "[a-zA-Z0-9]{10,20}",
          meeting_id in "[0-9]{10,15}",
-         file_type in prop::sample::select(vec!["MP4", "M4A", "TRANSCRIPT", "CHAT"]),
+         file_type in prop::sample::select(vec![
+             RecordingFileType::MP4,
+             RecordingFileType::M4A,
+             RecordingFileType::Transcript,
+             RecordingFileType::Chat,
+             RecordingFileType::ClosedCaption,
+             RecordingFileType::Timeline,
+         ]),
          file_size in 1024u64..1_000_000_000u64,
          file_name in arb_valid_filename())
         -> RecordingFile
@@ -108,7 +115,7 @@ prop_compose! {
             meeting_id,
             recording_start: Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
             recording_end: (Utc::now() + Duration::hours(1)).format("%Y-%m-%dT%H:%M:%SZ").to_string(),
-            file_type: file_type.to_string(),
+            file_type,
             file_extension: file_name.split('.').last().unwrap_or("mp4").to_string(),
             file_size,
             play_url: Some(format!("https://example.com/play/{}", id)),
@@ -358,12 +365,7 @@ proptest! {
             rate_limit_per_second: 10,
             debug_mode: false,
             log_level: "info".to_string(),
-            api: ApiSettings {
-                base_url: "https://api.zoom.us/v2".to_string(),
-                timeout_seconds: 30,
-                max_retries: 3,
-                default_page_size: 30,
-            },
+            api: ApiSettings::default(),
         };
         
         // Property 1: シリアライゼーション・デシリアライゼーションの冪等性
@@ -470,7 +472,7 @@ mod stress_tests {
                         meeting_id: format!("{}", 1000000000 + i),
                         recording_start: Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
                         recording_end: (Utc::now() + Duration::hours(1)).format("%Y-%m-%dT%H:%M:%SZ").to_string(),
-                        file_type: "MP4".to_string(),
+                        file_type: RecordingFileType::MP4,
                         file_extension: "mp4".to_string(),
                         file_size: 80_000_000,
                         play_url: Some(format!("https://example.com/play/{}", i)),
@@ -483,7 +485,7 @@ mod stress_tests {
                         meeting_id: format!("{}", 1000000000 + i),
                         recording_start: Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
                         recording_end: (Utc::now() + Duration::hours(1)).format("%Y-%m-%dT%H:%M:%SZ").to_string(),
-                        file_type: "M4A".to_string(),
+                        file_type: RecordingFileType::M4A,
                         file_extension: "m4a".to_string(),
                         file_size: 20_000_000,
                         play_url: Some(format!("https://example.com/play_audio/{}", i)),

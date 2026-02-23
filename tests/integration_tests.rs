@@ -41,6 +41,8 @@ fn create_test_config() -> AppConfig {
             timeout_seconds: 30,
             max_retries: 3,
             default_page_size: 10,
+            max_pages: 100,
+            page_interval_ms: 100,
         },
     }
 }

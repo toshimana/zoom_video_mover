@@ -9,7 +9,7 @@
 use crate::errors::AppResult;
 use crate::components::ComponentLifecycle;
 use crate::components::auth::{AuthComponent, AuthToken};
-use crate::components::api::{ApiComponent, ApiConfig, RecordingSearchRequest, MeetingRecording};
+use crate::components::api::{ApiComponent, ApiConfig, RecordingSearchRequest, MeetingRecording, RecordingFileType};
 use crate::components::download::{DownloadComponent, DownloadConfig, DownloadEvent};
 use crate::components::config::{AppConfig, OAuthConfig};
 use async_trait::async_trait;
@@ -26,7 +26,7 @@ pub struct IntegrationConfig {
     /// 同時ダウンロード数
     pub concurrent_downloads: usize,
     /// ダウンロード対象ファイルタイプ
-    pub download_file_types: Vec<String>,
+    pub download_file_types: Vec<RecordingFileType>,
 }
 
 impl Default for IntegrationConfig {
@@ -35,10 +35,12 @@ impl Default for IntegrationConfig {
             output_directory: PathBuf::from("downloads"),
             concurrent_downloads: 3,
             download_file_types: vec![
-                "MP4".to_string(),
-                "M4A".to_string(),
-                "TRANSCRIPT".to_string(),
-                "CHAT".to_string(),
+                RecordingFileType::MP4,
+                RecordingFileType::M4A,
+                RecordingFileType::Transcript,
+                RecordingFileType::Chat,
+                RecordingFileType::ClosedCaption,
+                RecordingFileType::Timeline,
             ],
         }
     }
@@ -101,6 +103,8 @@ impl IntegrationComponent {
             timeout: std::time::Duration::from_secs(app_config.api.timeout_seconds),
             max_retries: app_config.api.max_retries,
             default_page_size: app_config.api.default_page_size,
+            max_pages: app_config.api.max_pages,
+            page_interval_ms: app_config.api.page_interval_ms,
         };
         
         // APIコンポーネントの初期化
@@ -201,7 +205,7 @@ impl IntegrationComponent {
             user_id,
             from: from_date,
             to: to_date,
-            page_size: Some(30),
+            page_size: None,
             next_page_token: None,
         };
         
@@ -216,13 +220,13 @@ impl IntegrationComponent {
         let mut task_count = 0;
         for meeting in meetings {
             for recording_file in &meeting.recording_files {
-                // ファイルタイプフィルタ
+                // ファイルタイプフィルタ（Unknownタイプはスキップ）
                 if !self.integration_config.download_file_types.contains(&recording_file.file_type) {
                     continue;
                 }
                 
                 let task_id = format!("{}_{}", meeting.id, recording_file.id);
-                let file_name = self.generate_file_name(&meeting, &recording_file);
+                let file_name = self.generate_file_name(&meeting, recording_file);
                 
                 self.download_component.add_download_task(
                     task_id,
@@ -271,7 +275,7 @@ impl IntegrationComponent {
         
         let date_str = meeting.start_time.split('T').next().unwrap_or("unknown");
         let topic_safe = sanitize_filename(&meeting.topic);
-        let file_type = recording_file.file_type.to_lowercase();
+        let file_type = recording_file.file_type.to_string().to_lowercase();
         let extension = &recording_file.file_extension;
         
         format!("{}_{}.{}.{}", date_str, topic_safe, file_type, extension)
