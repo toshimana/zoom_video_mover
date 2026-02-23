@@ -1,7 +1,7 @@
-/// サービスtrait定義
-///
-/// 外部依存を抽象化し、テスト時にMock化可能にするためのtrait群。
-/// GUI層はこれらのtraitを通じて外部システムにアクセスする。
+//! サービスtrait定義
+//!
+//! 外部依存を抽象化し、テスト時にMock化可能にするためのtrait群。
+//! GUI層はこれらのtraitを通じて外部システムにアクセスする。
 
 use std::sync::mpsc;
 use crate::{Config, RecordingResponse};

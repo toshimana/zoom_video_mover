@@ -1,9 +1,9 @@
-/// UI制御コンポーネント（スタブ実装）
-/// 
-/// # 責任
-/// - eGUI 状態管理
-/// - イベント処理
-/// - 画面遷移制御
+//! UI制御コンポーネント（スタブ実装）
+//!
+//! # 責任
+//! - eGUI 状態管理
+//! - イベント処理
+//! - 画面遷移制御
 
 use crate::errors::AppResult;
 use crate::components::ComponentLifecycle;
@@ -11,6 +11,12 @@ use async_trait::async_trait;
 
 pub struct UiComponent {
     // TODO: 実装
+}
+
+impl Default for UiComponent {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl UiComponent {

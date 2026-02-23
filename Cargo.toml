@@ -83,6 +83,11 @@ serial_test = "3.0"
 name = "zoom_video_mover"
 path = "src/main.rs"
 
+[[test]]
+name = "gui_tests"
+path = "tests/gui_tests.rs"
+required-features = ["test-support"]
+
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["Win32_System_Console", "Win32_Foundation"] }
 winapi = { version = "0.3", features = ["dpapi", "wincrypt", "winbase"] }

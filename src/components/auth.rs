@@ -1,10 +1,10 @@
-/// 認証コンポーネント
-/// 
-/// # 責任
-/// - OAuth 2.0 + PKCE認証フローの実装
-/// - アクセストークンの管理
-/// - トークンの更新・無効化
-/// - 認証状態の管理
+//! 認証コンポーネント
+//!
+//! # 責任
+//! - OAuth 2.0 + PKCE認証フローの実装
+//! - アクセストークンの管理
+//! - トークンの更新・無効化
+//! - 認証状態の管理
 
 use crate::errors::{AppError, AppResult};
 use crate::components::{ComponentLifecycle, Configurable};
@@ -573,8 +573,6 @@ impl AuthComponent {
     
     /// トークン保存パスを取得
     fn get_token_storage_path() -> AppResult<std::path::PathBuf> {
-        use std::path::PathBuf;
-        
         // Windows: %APPDATA%\ZoomVideoMover\auth_token.encrypted
         #[cfg(target_os = "windows")]
         {

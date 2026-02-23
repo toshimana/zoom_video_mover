@@ -1,7 +1,7 @@
-/// 本番用サービス実装
-///
-/// services.rsで定義されたtraitの本番実装。
-/// 既存のgui.rsにハードコードされていた外部呼び出しをラップする。
+//! 本番用サービス実装
+//!
+//! services.rsで定義されたtraitの本番実装。
+//! 既存のgui.rsにハードコードされていた外部呼び出しをラップする。
 
 use std::sync::{mpsc, Arc};
 use crate::{Config, RecordingResponse, ZoomRecordingDownloader};

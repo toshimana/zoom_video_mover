@@ -1,11 +1,11 @@
-/// API統合コンポーネント
-/// 
-/// # 責任
-/// - Zoom API との通信
-/// - レート制限管理
-/// - リクエスト/レスポンス処理
-/// - ページネーション処理
-/// - エラーハンドリング
+//! API統合コンポーネント
+//!
+//! # 責任
+//! - Zoom API との通信
+//! - レート制限管理
+//! - リクエスト/レスポンス処理
+//! - ページネーション処理
+//! - エラーハンドリング
 
 use crate::errors::{AppError, AppResult};
 use crate::components::{ComponentLifecycle, Configurable};

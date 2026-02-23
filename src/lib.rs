@@ -1,10 +1,10 @@
-/// Zoom Video Mover ライブラリ - レイヤードアーキテクチャ実装
-/// 
-/// # アーキテクチャ構成
-/// - components: ビジネスロジック・コンポーネント層
-/// - errors: 統一エラーハンドリング層 
-/// - gui: プレゼンテーション層
-/// - windows_console: プラットフォーム固有処理層
+//! Zoom Video Mover ライブラリ - レイヤードアーキテクチャ実装
+//!
+//! # アーキテクチャ構成
+//! - components: ビジネスロジック・コンポーネント層
+//! - errors: 統一エラーハンドリング層
+//! - gui: プレゼンテーション層
+//! - windows_console: プラットフォーム固有処理層
 
 pub mod errors;
 pub mod components;

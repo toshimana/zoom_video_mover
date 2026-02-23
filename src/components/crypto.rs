@@ -1,10 +1,10 @@
-/// 暗号化コンポーネント - AES-256-GCM + Windows DPAPI統合
-/// 
-/// # セキュリティ要件
-/// - AES-256-GCM暗号化による機密データ保護
-/// - Windows DPAPI統合によるキー管理
-/// - メモリゼロ化による機密情報消去
-/// - 暗号学的に安全な乱数生成
+//! 暗号化コンポーネント - AES-256-GCM + Windows DPAPI統合
+//!
+//! # セキュリティ要件
+//! - AES-256-GCM暗号化による機密データ保護
+//! - Windows DPAPI統合によるキー管理
+//! - メモリゼロ化による機密情報消去
+//! - 暗号学的に安全な乱数生成
 
 use crate::errors::{AppError, AppResult};
 use aes_gcm::{
@@ -128,9 +128,6 @@ impl CryptoComponent {
     /// Windows DPAPI使用のマスターキー初期化
     #[cfg(target_os = "windows")]
     async fn initialize_master_key_windows(&mut self) -> AppResult<()> {
-        use std::fs;
-        use std::path::PathBuf;
-        
         // キー保存パス
         let key_path = Self::get_key_storage_path()?;
         
@@ -223,8 +220,6 @@ impl CryptoComponent {
     
     /// キー保存パスを取得
     fn get_key_storage_path() -> AppResult<PathBuf> {
-        use std::path::PathBuf;
-        
         // Windows: %APPDATA%\ZoomVideoMover\encryption.key
         #[cfg(target_os = "windows")]
         {

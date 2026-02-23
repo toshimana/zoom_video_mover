@@ -603,7 +603,7 @@ impl ZoomDownloaderApp {
                     ui.horizontal(|ui| {
                         // RL005: ミーティング選択
                         let mut meeting_selected = self.selected_recordings.contains(&meeting.uuid);
-                        if ui.checkbox(&mut meeting_selected, &format!("Meeting - {}", meeting.topic)).changed() {
+                        if ui.checkbox(&mut meeting_selected, format!("Meeting - {}", meeting.topic)).changed() {
                             if meeting_selected {
                                 self.selected_recordings.insert(meeting.uuid.clone());
                             } else {
@@ -619,7 +619,7 @@ impl ZoomDownloaderApp {
                             // RL006: ファイル選択
                             let file_id = format!("{}-{}", meeting.uuid, file.id);
                             let mut file_selected = self.selected_recordings.contains(&file_id);
-                            if ui.checkbox(&mut file_selected, &format!("☑ {} ({}) - {}MB",
+                            if ui.checkbox(&mut file_selected, format!("☑ {} ({}) - {}MB",
                                 file.file_type, &file.file_extension,
                                 file.file_size / 1024 / 1024)).changed() {
                                 if file_selected {
