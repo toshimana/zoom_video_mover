@@ -36,6 +36,8 @@ debug_responses/
 # Temporary files
 *.tmp
 *.temp
+clipboard_screenshot.png
+save_clipboard.ps1
 
 # Windows
 *.exe
