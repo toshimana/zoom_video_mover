@@ -429,9 +429,14 @@ impl DownloadComponent {
         
         // ステータスチェック
         if !response.status().is_success() {
+            let status = response.status();
+            let error_body = response.text().await.unwrap_or_default();
+            log::error!("[DL-DIAG] Download HTTP error: task={}, status={}, body={}",
+                task.task_id, status,
+                if error_body.len() > 500 { &error_body[..500] } else { &error_body });
             return Err(AppError::external_service(format!(
-                "Download failed with status: {}",
-                response.status()
+                "Download failed with status: {} - {}",
+                status, if error_body.len() > 200 { &error_body[..200] } else { &error_body }
             )));
         }
         

@@ -228,8 +228,8 @@ impl IntegrationComponent {
 
                 // 空URLスキップ（SUMMARYなどdownload_urlが欠落する場合がある）
                 if recording_file.download_url.is_empty() {
-                    log::warn!("[DL-DIAG] Skipping file with empty download_url: type={}, stable_id={}",
-                        recording_file.file_type, recording_file.stable_id());
+                    log::warn!("[DL-DIAG] Skipping file with empty download_url: type={}, meeting='{}' ({}), stable_id={}",
+                        recording_file.file_type, meeting.topic, meeting.start_time, recording_file.stable_id());
                     continue;
                 }
 

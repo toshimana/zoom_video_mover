@@ -447,8 +447,35 @@ impl ApiComponent {
             };
         }
         
-        // レスポンス解析
-        let response_body = response.json::<RecordingSearchResponse>().await
+        // レスポンス解析（raw JSONをログ出力してからパース）
+        let response_text = response.text().await
+            .map_err(|e| AppError::network("Failed to read API response body", Some(e)))?;
+
+        log::debug!("[DL-DIAG] API raw response (truncated): {}",
+            if response_text.len() > 2000 { &response_text[..2000] } else { &response_text });
+
+        // SUMMARYファイルのdownload_url有無を個別にINFOログ出力
+        if let Ok(raw) = serde_json::from_str::<serde_json::Value>(&response_text) {
+            if let Some(meetings) = raw.get("meetings").and_then(|m| m.as_array()) {
+                for mtg in meetings {
+                    let topic = mtg.get("topic").and_then(|t| t.as_str()).unwrap_or("?");
+                    let uuid = mtg.get("uuid").and_then(|u| u.as_str()).unwrap_or("?");
+                    if let Some(files) = mtg.get("recording_files").and_then(|f| f.as_array()) {
+                        for f in files {
+                            let ft = f.get("file_type").and_then(|v| v.as_str()).unwrap_or("?");
+                            let has_url = f.get("download_url")
+                                .and_then(|u| u.as_str())
+                                .map(|u| !u.is_empty())
+                                .unwrap_or(false);
+                            log::info!("[DL-DIAG] API file: meeting='{}' uuid={} type={} has_download_url={}",
+                                topic, uuid, ft, has_url);
+                        }
+                    }
+                }
+            }
+        }
+
+        let response_body: RecordingSearchResponse = serde_json::from_str(&response_text)
             .map_err(|e| AppError::data_format("Failed to parse API response", Some(e)))?;
         
         self.record_api_call(duration, true).await;

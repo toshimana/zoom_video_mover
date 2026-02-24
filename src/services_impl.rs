@@ -208,32 +208,44 @@ impl DownloadService for RealDownloadService {
         // DownloadComponent用のタスク情報を事前に収集
         let access_token = access_token.to_string();
         let output_dir = output_dir.to_string();
-        let tasks: Vec<(String, String, String, Option<u64>)> = files_to_download
-            .iter()
-            .filter_map(|(meeting, file)| {
-                if file.download_url.is_empty() {
-                    log::warn!("[DL-DIAG] Skipping file with empty download_url: type={}, stable_id={}",
-                        file.file_type, file.stable_id());
-                    return None;
-                }
-                let task_id = format!("{}-{}", meeting.uuid, file.stable_id());
-                // Zoom APIではdownload_urlにaccess_tokenをクエリパラメータで付与する必要がある
-                let download_url = if file.download_url.contains('?') {
-                    format!("{}&access_token={}", file.download_url, access_token)
-                } else {
-                    format!("{}?access_token={}", file.download_url, access_token)
-                };
-                let file_name = crate::generate_file_path(meeting, file);
-                let file_size = if file.file_size > 0 {
-                    Some(file.file_size)
-                } else {
-                    None
-                };
-                log::info!("[DL-DIAG] Task created: id={}, type={}, url_len={}",
-                    task_id, file.file_type, file.download_url.len());
-                Some((task_id, download_url, file_name, file_size))
-            })
-            .collect();
+        let mut tasks: Vec<(String, String, String, Option<u64>)> = Vec::new();
+        let mut skipped_files: Vec<String> = Vec::new();
+
+        for (meeting, file) in &files_to_download {
+            if file.download_url.is_empty() {
+                let msg = format!("{}: meeting='{}' ({})",
+                    file.file_type, meeting.topic, meeting.start_time);
+                log::warn!("[DL-DIAG] Skipping file with empty download_url: {}", msg);
+                skipped_files.push(msg);
+                continue;
+            }
+            let task_id = format!("{}-{}", meeting.uuid, file.stable_id());
+            // Zoom APIではdownload_urlにaccess_tokenをクエリパラメータで付与する必要がある
+            let download_url = if file.download_url.contains('?') {
+                format!("{}&access_token={}", file.download_url, access_token)
+            } else {
+                format!("{}?access_token={}", file.download_url, access_token)
+            };
+            let file_name = crate::generate_file_path(meeting, file);
+            let file_size = if file.file_size > 0 {
+                Some(file.file_size)
+            } else {
+                None
+            };
+            log::info!("[DL-DIAG] Task created: id={}, type={}, url_len={}",
+                task_id, file.file_type, file.download_url.len());
+            tasks.push((task_id, download_url, file_name, file_size));
+        }
+
+        // GUIにスキップ通知
+        if !skipped_files.is_empty() {
+            let _ = sender.send(AppMessage::DownloadProgress(
+                format!("Warning: {} file(s) skipped (no download URL)", skipped_files.len()),
+            ));
+            for msg in &skipped_files {
+                let _ = sender.send(AppMessage::DownloadProgress(format!("  Skipped: {}", msg)));
+            }
+        }
 
         let sender_clone = sender.clone();
 
