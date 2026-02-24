@@ -9,7 +9,7 @@
 use crate::errors::AppResult;
 use crate::components::ComponentLifecycle;
 use crate::components::auth::{AuthComponent, AuthToken};
-use crate::components::api::{ApiComponent, ApiConfig, RecordingSearchRequest, MeetingRecording, RecordingFileType};
+use crate::components::api::{ApiComponent, ApiConfig, RecordingSearchRequest, RecordingFileType};
 use crate::components::download::{DownloadComponent, DownloadConfig, DownloadEvent};
 use crate::components::config::{AppConfig, OAuthConfig};
 use async_trait::async_trait;
@@ -41,6 +41,7 @@ impl Default for IntegrationConfig {
                 RecordingFileType::Chat,
                 RecordingFileType::ClosedCaption,
                 RecordingFileType::Timeline,
+                RecordingFileType::Summary,
             ],
         }
     }
@@ -224,10 +225,17 @@ impl IntegrationComponent {
                 if !self.integration_config.download_file_types.contains(&recording_file.file_type) {
                     continue;
                 }
-                
-                let task_id = format!("{}_{}", meeting.id, recording_file.id);
-                let file_name = self.generate_file_name(&meeting, recording_file);
-                
+
+                // 空URLスキップ（SUMMARYなどdownload_urlが欠落する場合がある）
+                if recording_file.download_url.is_empty() {
+                    log::warn!("[DL-DIAG] Skipping file with empty download_url: type={}, stable_id={}",
+                        recording_file.file_type, recording_file.stable_id());
+                    continue;
+                }
+
+                let task_id = format!("{}-{}", meeting.uuid, recording_file.stable_id());
+                let file_name = crate::generate_file_path(&meeting, recording_file);
+
                 self.download_component.add_download_task(
                     task_id,
                     recording_file.download_url.clone(),
@@ -269,17 +277,6 @@ impl IntegrationComponent {
         Ok(())
     }
     
-    /// ファイル名を生成
-    fn generate_file_name(&self, meeting: &MeetingRecording, recording_file: &crate::components::api::RecordingFile) -> String {
-        use crate::sanitize_filename;
-        
-        let date_str = meeting.start_time.split('T').next().unwrap_or("unknown");
-        let topic_safe = sanitize_filename(&meeting.topic);
-        let file_type = recording_file.file_type.to_string().to_lowercase();
-        let extension = &recording_file.file_extension;
-        
-        format!("{}_{}.{}.{}", date_str, topic_safe, file_type, extension)
-    }
 }
 
 #[async_trait]

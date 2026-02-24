@@ -91,6 +91,8 @@ pub enum RecordingFileType {
     ClosedCaption,
     #[serde(rename = "TIMELINE")]
     Timeline,
+    #[serde(rename = "SUMMARY")]
+    Summary,
     #[serde(other)]
     Unknown,
 }
@@ -104,7 +106,24 @@ impl std::fmt::Display for RecordingFileType {
             Self::Chat => write!(f, "CHAT"),
             Self::ClosedCaption => write!(f, "CC"),
             Self::Timeline => write!(f, "TIMELINE"),
+            Self::Summary => write!(f, "SUMMARY"),
             Self::Unknown => write!(f, "UNKNOWN"),
+        }
+    }
+}
+
+impl RecordingFileType {
+    /// ファイルタイプに対応する拡張子を返す
+    pub fn extension(&self) -> &str {
+        match self {
+            Self::MP4 => "mp4",
+            Self::M4A => "m4a",
+            Self::Transcript => "vtt",
+            Self::Chat => "txt",
+            Self::ClosedCaption => "vtt",
+            Self::Timeline => "json",
+            Self::Summary => "json",
+            Self::Unknown => "dat",
         }
     }
 }
@@ -112,17 +131,37 @@ impl std::fmt::Display for RecordingFileType {
 /// 録画ファイル情報
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordingFile {
+    #[serde(default)]
     pub id: String,
+    #[serde(default)]
     pub meeting_id: String,
+    #[serde(default)]
     pub recording_start: String,
+    #[serde(default)]
     pub recording_end: String,
     pub file_type: RecordingFileType,
+    #[serde(default)]
     pub file_extension: String,
+    #[serde(default)]
     pub file_size: u64,
     pub play_url: Option<String>,
+    #[serde(default)]
     pub download_url: String,
+    #[serde(default)]
     pub status: String,
+    #[serde(default)]
     pub recording_type: String,
+}
+
+impl RecordingFile {
+    /// 安定した識別子を返す（idが空の場合はfile_typeからフォールバック生成）
+    pub fn stable_id(&self) -> String {
+        if !self.id.is_empty() {
+            self.id.clone()
+        } else {
+            format!("auto_{}", self.file_type.to_string().to_lowercase())
+        }
+    }
 }
 
 /// 会議録画情報
@@ -130,15 +169,21 @@ pub struct RecordingFile {
 pub struct MeetingRecording {
     pub uuid: String,
     pub id: u64,
+    #[serde(default)]
     pub account_id: String,
     pub host_id: String,
     pub topic: String,
+    #[serde(rename = "type", default)]
     pub meeting_type: u32,
     pub start_time: String,
+    #[serde(default)]
     pub timezone: String,
     pub duration: u32,
+    #[serde(default)]
     pub total_size: u64,
+    #[serde(default)]
     pub recording_count: u32,
+    #[serde(default)]
     pub recording_files: Vec<RecordingFile>,
 }
 
@@ -147,10 +192,13 @@ pub struct MeetingRecording {
 pub struct RecordingSearchResponse {
     pub from: String,
     pub to: String,
+    #[serde(default)]
     pub page_count: u32,
     pub page_size: u32,
     pub total_records: u32,
+    #[serde(default)]
     pub next_page_token: Option<String>,
+    #[serde(default)]
     pub meetings: Vec<MeetingRecording>,
 }
 
@@ -650,6 +698,7 @@ mod tests {
         assert_eq!(serde_json::to_string(&RecordingFileType::Chat).unwrap(), "\"CHAT\"");
         assert_eq!(serde_json::to_string(&RecordingFileType::ClosedCaption).unwrap(), "\"CC\"");
         assert_eq!(serde_json::to_string(&RecordingFileType::Timeline).unwrap(), "\"TIMELINE\"");
+        assert_eq!(serde_json::to_string(&RecordingFileType::Summary).unwrap(), "\"SUMMARY\"");
     }
 
     #[test]
@@ -661,6 +710,7 @@ mod tests {
         assert_eq!(serde_json::from_str::<RecordingFileType>("\"CHAT\"").unwrap(), RecordingFileType::Chat);
         assert_eq!(serde_json::from_str::<RecordingFileType>("\"CC\"").unwrap(), RecordingFileType::ClosedCaption);
         assert_eq!(serde_json::from_str::<RecordingFileType>("\"TIMELINE\"").unwrap(), RecordingFileType::Timeline);
+        assert_eq!(serde_json::from_str::<RecordingFileType>("\"SUMMARY\"").unwrap(), RecordingFileType::Summary);
 
         // 未知のタイプはUnknownにフォールバック
         assert_eq!(serde_json::from_str::<RecordingFileType>("\"UNKNOWN_TYPE\"").unwrap(), RecordingFileType::Unknown);
@@ -671,7 +721,24 @@ mod tests {
         assert_eq!(RecordingFileType::MP4.to_string(), "MP4");
         assert_eq!(RecordingFileType::ClosedCaption.to_string(), "CC");
         assert_eq!(RecordingFileType::Timeline.to_string(), "TIMELINE");
+        assert_eq!(RecordingFileType::Summary.to_string(), "SUMMARY");
         assert_eq!(RecordingFileType::Unknown.to_string(), "UNKNOWN");
+    }
+
+    #[test]
+    fn test_recording_file_summary_missing_fields() {
+        // SUMMARYファイルはid, status, file_size, recording_type, play_urlが欠落する可能性がある
+        let json = r#"{
+            "file_type": "SUMMARY",
+            "download_url": "https://example.com/download/summary.json"
+        }"#;
+        let file: RecordingFile = serde_json::from_str(json).unwrap();
+        assert_eq!(file.file_type, RecordingFileType::Summary);
+        assert_eq!(file.download_url, "https://example.com/download/summary.json");
+        assert!(file.id.is_empty());
+        assert!(file.status.is_empty());
+        assert_eq!(file.file_size, 0);
+        assert!(file.play_url.is_none());
     }
 
     #[test]
@@ -680,5 +747,66 @@ mod tests {
         assert_eq!(config.default_page_size, 300);
         assert_eq!(config.max_pages, 100);
         assert_eq!(config.page_interval_ms, 100);
+    }
+
+    #[test]
+    fn test_extension_method() {
+        assert_eq!(RecordingFileType::MP4.extension(), "mp4");
+        assert_eq!(RecordingFileType::M4A.extension(), "m4a");
+        assert_eq!(RecordingFileType::Transcript.extension(), "vtt");
+        assert_eq!(RecordingFileType::Chat.extension(), "txt");
+        assert_eq!(RecordingFileType::ClosedCaption.extension(), "vtt");
+        assert_eq!(RecordingFileType::Timeline.extension(), "json");
+        assert_eq!(RecordingFileType::Summary.extension(), "json");
+        assert_eq!(RecordingFileType::Unknown.extension(), "dat");
+    }
+
+    #[test]
+    fn test_stable_id_with_id() {
+        let file = RecordingFile {
+            id: "abc123".to_string(),
+            meeting_id: String::new(),
+            recording_start: String::new(),
+            recording_end: String::new(),
+            file_type: RecordingFileType::MP4,
+            file_extension: "mp4".to_string(),
+            file_size: 0,
+            play_url: None,
+            download_url: "https://example.com/dl".to_string(),
+            status: String::new(),
+            recording_type: String::new(),
+        };
+        assert_eq!(file.stable_id(), "abc123");
+    }
+
+    #[test]
+    fn test_stable_id_empty_id() {
+        let file = RecordingFile {
+            id: String::new(),
+            meeting_id: String::new(),
+            recording_start: String::new(),
+            recording_end: String::new(),
+            file_type: RecordingFileType::Summary,
+            file_extension: String::new(),
+            file_size: 0,
+            play_url: None,
+            download_url: "https://example.com/dl".to_string(),
+            status: String::new(),
+            recording_type: String::new(),
+        };
+        assert_eq!(file.stable_id(), "auto_summary");
+    }
+
+    #[test]
+    fn test_recording_file_summary_missing_download_url() {
+        // SUMMARYファイルでdownload_urlが省略された場合のデシリアライズ
+        let json = r#"{
+            "file_type": "SUMMARY"
+        }"#;
+        let file: RecordingFile = serde_json::from_str(json).unwrap();
+        assert_eq!(file.file_type, RecordingFileType::Summary);
+        assert!(file.download_url.is_empty());
+        assert!(file.id.is_empty());
+        assert_eq!(file.stable_id(), "auto_summary");
     }
 }

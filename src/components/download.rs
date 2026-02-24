@@ -238,9 +238,15 @@ impl DownloadComponent {
         file_name: String,
         expected_size: Option<u64>,
     ) -> AppResult<()> {
-        assert!(!task_id.is_empty(), "task_id must not be empty");
-        assert!(!download_url.is_empty(), "download_url must not be empty");
-        assert!(!file_name.is_empty(), "file_name must not be empty");
+        if task_id.is_empty() {
+            return Err(AppError::validation("task_id must not be empty", None));
+        }
+        if download_url.is_empty() {
+            return Err(AppError::validation("download_url must not be empty", None));
+        }
+        if file_name.is_empty() {
+            return Err(AppError::validation("file_name must not be empty", None));
+        }
         
         // 出力パスの構築
         let output_path = self.config.output_directory.join(&file_name);
@@ -635,5 +641,31 @@ mod tests {
         // 終了処理テスト
         assert!(component.shutdown().await.is_ok());
         assert!(!component.health_check().await);
+    }
+
+    #[tokio::test]
+    async fn test_add_download_task_empty_url_returns_error() {
+        let config = DownloadConfig::default();
+        let component = DownloadComponent::new(config);
+        let result = component.add_download_task(
+            "task-1".to_string(),
+            "".to_string(),
+            "file.mp4".to_string(),
+            None,
+        ).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_add_download_task_empty_task_id_returns_error() {
+        let config = DownloadConfig::default();
+        let component = DownloadComponent::new(config);
+        let result = component.add_download_task(
+            "".to_string(),
+            "https://example.com/dl".to_string(),
+            "file.mp4".to_string(),
+            None,
+        ).await;
+        assert!(result.is_err());
     }
 }
