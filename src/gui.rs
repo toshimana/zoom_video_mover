@@ -2,14 +2,15 @@ use eframe::egui;
 use std::sync::{mpsc, Arc};
 use std::thread;
 use chrono::{Datelike, Local};
-use crate::{Config, RecordingResponse};
+use crate::Config;
+use crate::components::api::RecordingSearchResponse;
 use crate::services_impl::AppServices;
 
 #[derive(Debug)]
 pub enum AppMessage {
     AuthUrlGenerated(String),
     AuthComplete(String),
-    RecordingsLoaded(RecordingResponse),
+    RecordingsLoaded(RecordingSearchResponse),
     DownloadProgress(String),
     DownloadComplete(Vec<String>),
     DownloadPaused,
@@ -48,7 +49,7 @@ pub struct ZoomDownloaderApp {
     access_token: Option<String>,
 
     // Recordings Data
-    recordings: Option<RecordingResponse>,
+    recordings: Option<RecordingSearchResponse>,
     selected_recordings: std::collections::HashSet<String>,
 
     // Progress
@@ -593,8 +594,21 @@ impl ZoomDownloaderApp {
 
         // 録画リスト表示
         if let Some(recordings) = &self.recordings {
-            // RL004: 全選択チェックボックス
-            ui.checkbox(&mut false, "☑ Select All");
+            // RL004: 全選択/全解除ボタン
+            let meeting_uuids: Vec<String> = recordings.meetings.iter()
+                .map(|m| m.uuid.clone())
+                .collect();
+
+            ui.horizontal(|ui| {
+                if ui.button("全選択").clicked() {
+                    for uuid in &meeting_uuids {
+                        self.selected_recordings.insert(uuid.clone());
+                    }
+                }
+                if ui.button("全解除").clicked() {
+                    self.selected_recordings.clear();
+                }
+            });
             ui.separator();
 
             // 録画リスト
@@ -617,10 +631,15 @@ impl ZoomDownloaderApp {
                         ui.horizontal(|ui| {
                             ui.add_space(20.0);
                             // RL006: ファイル選択
-                            let file_id = format!("{}-{}", meeting.uuid, file.id);
+                            let file_id = format!("{}-{}", meeting.uuid, file.stable_id());
                             let mut file_selected = self.selected_recordings.contains(&file_id);
+                            let ext_display = if file.file_extension.is_empty() {
+                                file.file_type.to_string()
+                            } else {
+                                file.file_extension.clone()
+                            };
                             if ui.checkbox(&mut file_selected, format!("☑ {} ({}) - {}MB",
-                                file.file_type, &file.file_extension,
+                                file.file_type, ext_display,
                                 file.file_size / 1024 / 1024)).changed() {
                                 if file_selected {
                                     self.selected_recordings.insert(file_id);
@@ -801,6 +820,26 @@ impl ZoomDownloaderApp {
 
     /// 録画データを取得する（サービス経由）
     fn fetch_recordings(&mut self) {
+        // 日付バリデーション
+        let from_parsed = chrono::NaiveDate::parse_from_str(&self.from_date, "%Y-%m-%d");
+        let to_parsed = chrono::NaiveDate::parse_from_str(&self.to_date, "%Y-%m-%d");
+
+        match (from_parsed, to_parsed) {
+            (Err(_), _) => {
+                self.status_message = "エラー: 開始日の形式が不正です (YYYY-MM-DD)".to_string();
+                return;
+            }
+            (_, Err(_)) => {
+                self.status_message = "エラー: 終了日の形式が不正です (YYYY-MM-DD)".to_string();
+                return;
+            }
+            (Ok(from), Ok(to)) if from > to => {
+                self.status_message = "エラー: 開始日は終了日以前にしてください".to_string();
+                return;
+            }
+            _ => {} // OK
+        }
+
         if let Some(access_token) = &self.access_token {
             let access_token = access_token.clone();
             let from_date = self.from_date.clone();
@@ -907,18 +946,19 @@ impl ZoomDownloaderApp {
 
     /// ダウンロード開始（サービス経由）
     fn start_download(&mut self) {
-        if let Some(access_token) = &self.access_token {
+        if let (Some(access_token), Some(recordings)) = (&self.access_token, &self.recordings) {
             self.is_downloading = true;
             self.download_progress.clear();
 
             let access_token = access_token.clone();
+            let recordings = recordings.clone();
             let output_dir = self.output_dir.clone();
             let selected: Vec<String> = self.selected_recordings.iter().cloned().collect();
             let sender = self.sender.clone();
             let download_service = Arc::clone(&self.services.download_service);
 
             thread::spawn(move || {
-                match download_service.download_files(&access_token, &selected, &output_dir, sender.clone()) {
+                match download_service.download_files(&access_token, &recordings, &selected, &output_dir, sender.clone()) {
                     Ok(_) => {}
                     Err(e) => {
                         let _ = sender.send(AppMessage::Error(format!("Download error: {}", e)));
@@ -1047,7 +1087,7 @@ impl ZoomDownloaderApp {
         &self.status_message
     }
 
-    pub fn recordings(&self) -> &Option<RecordingResponse> {
+    pub fn recordings(&self) -> &Option<RecordingSearchResponse> {
         &self.recordings
     }
 

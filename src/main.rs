@@ -15,10 +15,23 @@ use zoom_video_mover_lib::ZoomDownloaderApp;
 /// - UI要素の可視性が向上する
 fn setup_gui_appearance(ctx: &egui::Context) {
     windows_console::println_japanese("Setting up GUI appearance...");
-    
-    // シンプルで安全なアプローチ：デフォルトフォントを使用
-    // eGUIのデフォルトフォントでも日本語は表示可能
-    
+
+    // 日本語フォント（NotoSansJP）を埋め込み設定
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(
+        "NotoSansJP".to_owned(),
+        egui::FontData::from_static(include_bytes!("../assets/fonts/NotoSansJP-Regular.ttf")),
+    );
+    fonts.families
+        .get_mut(&egui::FontFamily::Proportional)
+        .unwrap()
+        .insert(0, "NotoSansJP".to_owned());
+    fonts.families
+        .get_mut(&egui::FontFamily::Monospace)
+        .unwrap()
+        .insert(1, "NotoSansJP".to_owned());
+    ctx.set_fonts(fonts);
+
     // ライトテーマを明示的に設定
     ctx.set_visuals(egui::Visuals::light());
     

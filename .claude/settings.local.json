@@ -45,7 +45,20 @@
       "Bash(dot:*)",
       "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\":*)",
       "Bash(echo $mod.rs: EXISTS:*)",
-      "Bash(sort:*)"
+      "Bash(sort:*)",
+      "Bash(tail:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:zoom.github.io)",
+      "WebFetch(domain:marketplace.zoom.us)",
+      "WebFetch(domain:portal.apis.huit.harvard.edu)",
+      "WebFetch(domain:portal.stage.apis.huit.harvard.edu)",
+      "WebFetch(domain:www.recall.ai)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(powershell.exe:*)",
+      "Bash(cat:*)",
+      "WebFetch(domain:community.zoom.com)",
+      "Bash(cd:*)",
+      "Bash(xargs dirname)"
     ],
     "deny": []
   }

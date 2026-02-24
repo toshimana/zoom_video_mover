@@ -129,6 +129,8 @@ CLI版に加えて、使いやすいGUIアプリケーションも提供して�
 cargo run --bin zoom_video_mover_gui --release
 ```
 
+**詳細な操作手順は [GUI操作マニュアル](docs/user_manual.md) をご覧ください。**
+
 **GUI版の機能:**
 - 直感的なユーザーインターフェース
 - リアルタイムダウンロード進捗表示

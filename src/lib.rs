@@ -13,9 +13,10 @@ pub mod services_impl;
 pub mod gui;
 pub mod windows_console;
 
-// レガシーAPIの互換性維持
+// 公開API
 pub use components::config::{AppConfig, OAuthConfig};
 pub use components::auth::AuthToken;
+pub use components::api::{RecordingSearchResponse, MeetingRecording, RecordingFile, RecordingFileType};
 pub use errors::{AppError, AppResult};
 pub use gui::{ZoomDownloaderApp, AppMessage};
 
@@ -78,6 +79,43 @@ pub fn sanitize_filename(input: &str) -> String {
     result
 }
 
+/// 会議録画ファイルの保存パスを生成する
+///
+/// # 事前条件
+/// - meeting.start_time はISO 8601形式の文字列である
+///
+/// # 事後条件
+/// - "YYYY-MM-DD/YYYY-MM-DD_HH-MM_topic_filetype.ext" 形式のパスが返される
+/// - 拡張子は1つだけ付与される
+pub fn generate_file_path(meeting: &MeetingRecording, recording_file: &RecordingFile) -> String {
+    let date_str = meeting.start_time.split('T').next().unwrap_or("unknown");
+    let topic_safe = sanitize_filename(&meeting.topic);
+    let file_type_label = recording_file.file_type.to_string().to_lowercase();
+    let extension = if !recording_file.file_extension.is_empty() {
+        recording_file.file_extension.to_lowercase()
+    } else {
+        recording_file.file_type.extension().to_string()
+    };
+
+    // start_timeからHH-MMを抽出
+    let time_str = meeting.start_time
+        .split('T').nth(1).unwrap_or("00:00:00");
+    let time_clean = time_str
+        .split('Z').next().unwrap_or(time_str)
+        .split('+').next().unwrap_or(time_str);
+    let time_parts: Vec<&str> = time_clean.split(':').collect();
+    let time_hhmm = format!("{}-{}",
+        time_parts.first().unwrap_or(&"00"),
+        time_parts.get(1).unwrap_or(&"00")
+    );
+
+    let folder_name = date_str.to_string();
+    let file_name = format!("{}_{}_{}_{}.{}",
+        date_str, time_hhmm, topic_safe, file_type_label, extension);
+
+    format!("{}/{}", folder_name, file_name)
+}
+
 /// 日時文字列をパース
 /// 
 /// # 事前条件
@@ -101,7 +139,7 @@ pub fn parse_datetime(datetime_str: &str) -> DateTime<Utc> {
         .with_timezone(&chrono::Utc)
 }
 
-// レガシー型の互換性維持のため、旧Config構造体を実装
+// Config構造体（設定ファイル読み書き用）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub client_id: String,
@@ -137,95 +175,6 @@ impl Config {
     }
 }
 
-// レガシーAPI構造体（最小限）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecordingFile {
-    pub id: String,
-    pub meeting_id: String,
-    pub recording_start: DateTime<Utc>,
-    pub recording_end: DateTime<Utc>,
-    pub file_type: String,
-    pub file_extension: String,
-    pub file_size: u64,
-    pub play_url: Option<String>,
-    pub download_url: String,
-    pub status: String,
-    pub recording_type: String,
-    pub filename: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Recording {
-    pub meeting_id: String,
-    pub topic: String,
-    pub start_time: DateTime<Utc>,
-    pub duration: u32,
-    pub recording_files: Vec<RecordingFile>,
-    pub ai_summary_available: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecordingResponse {
-    pub from: String,
-    pub to: String,
-    pub page_count: u32,
-    pub page_size: u32,
-    pub total_records: u32,
-    pub meetings: Vec<MeetingRecording>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MeetingRecording {
-    pub uuid: String,
-    pub id: u64,
-    pub account_id: String,
-    pub host_id: String,
-    pub topic: String,
-    pub meeting_type: u32,
-    pub start_time: String,
-    pub timezone: String,
-    pub duration: u32,
-    pub total_size: u64,
-    pub recording_count: u32,
-    pub recording_files: Vec<RecordingFile>,
-}
-
-#[derive(Debug, Clone)]
-pub struct DownloadRequest {
-    pub file_id: String,
-    pub file_name: String,
-    pub download_url: String,
-    pub file_size: u64,
-    pub output_path: std::path::PathBuf,
-}
-
-// レガシー互換のためのZoomRecordingDownloader（最小限のスタブ）
-pub struct ZoomRecordingDownloader {
-    // スタブ実装
-}
-
-impl ZoomRecordingDownloader {
-    pub fn new(_client_id: String, _client_secret: String, _redirect_uri: String) -> Self {
-        Self {}
-    }
-    
-    pub fn new_with_token(_client_id: String, _client_secret: String, _access_token: String) -> Self {
-        Self {}
-    }
-    
-    pub async fn get_recordings(&mut self, _user_id: Option<&str>, _from_date: &str, _to_date: &str, _page_size: Option<u32>) -> Result<RecordingResponse, Box<dyn std::error::Error + Send + Sync>> {
-        // スタブ実装 - 空のレスポンスを返す
-        Ok(RecordingResponse {
-            from: _from_date.to_string(),
-            to: _to_date.to_string(),
-            page_count: 1,
-            page_size: 30,
-            total_records: 0,
-            meetings: vec![],
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242,5 +191,73 @@ mod tests {
     fn test_parse_datetime() {
         let dt = parse_datetime("2025-01-01T00:00:00Z");
         assert_eq!(dt.year(), 2025);
+    }
+
+    fn make_test_meeting(start_time: &str, topic: &str) -> MeetingRecording {
+        MeetingRecording {
+            uuid: "test-uuid".to_string(),
+            id: 1234567890,
+            account_id: String::new(),
+            host_id: "host".to_string(),
+            topic: topic.to_string(),
+            meeting_type: 2,
+            start_time: start_time.to_string(),
+            timezone: "UTC".to_string(),
+            duration: 3600,
+            total_size: 0,
+            recording_count: 0,
+            recording_files: vec![],
+        }
+    }
+
+    fn make_test_file(file_type: RecordingFileType, file_extension: &str) -> RecordingFile {
+        RecordingFile {
+            id: "file1".to_string(),
+            meeting_id: String::new(),
+            recording_start: String::new(),
+            recording_end: String::new(),
+            file_type,
+            file_extension: file_extension.to_string(),
+            file_size: 0,
+            play_url: None,
+            download_url: "https://example.com/dl".to_string(),
+            status: String::new(),
+            recording_type: String::new(),
+        }
+    }
+
+    #[test]
+    fn test_generate_file_path_mp4() {
+        let meeting = make_test_meeting("2025-02-24T10:30:00Z", "Project Discussion");
+        let file = make_test_file(RecordingFileType::MP4, "MP4");
+        let path = generate_file_path(&meeting, &file);
+        assert_eq!(path, "2025-02-24/2025-02-24_10-30_Project Discussion_mp4.mp4");
+    }
+
+    #[test]
+    fn test_generate_file_path_summary_empty_extension() {
+        let meeting = make_test_meeting("2025-02-24T10:30:00Z", "Project Discussion");
+        let file = make_test_file(RecordingFileType::Summary, "");
+        let path = generate_file_path(&meeting, &file);
+        assert_eq!(path, "2025-02-24/2025-02-24_10-30_Project Discussion_summary.json");
+    }
+
+    #[test]
+    fn test_generate_file_path_no_double_extension() {
+        let meeting = make_test_meeting("2025-02-24T10:30:00Z", "Test");
+        let file = make_test_file(RecordingFileType::MP4, "MP4");
+        let path = generate_file_path(&meeting, &file);
+        // ファイル名に拡張子が1つだけであること
+        assert!(path.ends_with(".mp4"));
+        assert!(!path.ends_with(".mp4.mp4"));
+    }
+
+    #[test]
+    fn test_generate_file_path_folder_is_date_only() {
+        let meeting = make_test_meeting("2025-02-24T10:30:00Z", "Test");
+        let file = make_test_file(RecordingFileType::MP4, "MP4");
+        let path = generate_file_path(&meeting, &file);
+        let folder = path.split('/').next().unwrap();
+        assert_eq!(folder, "2025-02-24");
     }
 }

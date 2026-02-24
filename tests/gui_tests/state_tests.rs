@@ -4,7 +4,7 @@
 /// process_messages_for_test()後の状態を検証する。
 
 use zoom_video_mover_lib::gui::{AppMessage, AppScreen};
-use zoom_video_mover_lib::RecordingResponse;
+use zoom_video_mover_lib::RecordingSearchResponse;
 use super::helpers::create_test_app;
 
 /// ST-001: AuthUrlGenerated処理
@@ -38,12 +38,13 @@ fn st002_auth_complete_sets_token_and_screen() {
 #[test]
 fn st003_recordings_loaded_sets_recordings() {
     let mut app = create_test_app();
-    let recordings = RecordingResponse {
+    let recordings = RecordingSearchResponse {
         from: "2025-01-01".to_string(),
         to: "2025-01-31".to_string(),
         page_count: 1,
         page_size: 30,
         total_records: 0,
+        next_page_token: None,
         meetings: vec![],
     };
 
@@ -177,12 +178,13 @@ fn st012_sequential_messages_maintain_consistency() {
 
     // 認証完了 → 録画ロード → ダウンロード開始 → ダウンロード完了
     app.sender().send(AppMessage::AuthComplete("token".to_string())).unwrap();
-    app.sender().send(AppMessage::RecordingsLoaded(RecordingResponse {
+    app.sender().send(AppMessage::RecordingsLoaded(RecordingSearchResponse {
         from: "2025-01-01".to_string(),
         to: "2025-01-31".to_string(),
         page_count: 1,
         page_size: 30,
         total_records: 1,
+        next_page_token: None,
         meetings: vec![],
     })).unwrap();
     app.sender().send(AppMessage::DownloadProgress("Starting...".to_string())).unwrap();

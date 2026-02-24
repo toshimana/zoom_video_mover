@@ -13,7 +13,7 @@ use zoom_video_mover_lib::components::{
     ComponentLifecycle,
 };
 use zoom_video_mover_lib::errors::AppError;
-use zoom_video_mover_lib::sanitize_filename;
+use zoom_video_mover_lib::{sanitize_filename, generate_file_path};
 use proptest::prelude::*;
 use chrono::{NaiveDate, Utc, Duration, Datelike};
 use tempfile::TempDir;
@@ -105,6 +105,7 @@ prop_compose! {
              RecordingFileType::Chat,
              RecordingFileType::ClosedCaption,
              RecordingFileType::Timeline,
+             RecordingFileType::Summary,
          ]),
          file_size in 1024u64..1_000_000_000u64,
          file_name in arb_valid_filename())
@@ -382,6 +383,39 @@ proptest! {
         prop_assert_eq!(app_config.oauth.client_secret, config2.oauth.client_secret);
         prop_assert_eq!(app_config.output_directory, config2.output_directory);
         prop_assert_eq!(app_config.max_concurrent_downloads, config2.max_concurrent_downloads);
+    }
+
+    /// generate_file_pathが二重拡張子を生成しないことのProperty検証
+    #[test]
+    fn generate_file_path_never_has_double_extension(
+        meeting in arb_meeting_recording(),
+        file in arb_recording_file()
+    ) {
+        let path = generate_file_path(&meeting, &file);
+
+        // ファイル名部分を取得
+        let file_name = path.split('/').last().unwrap_or(&path);
+
+        // 二重拡張子パターンがないことを確認
+        let double_ext_patterns = [
+            ".mp4.mp4", ".m4a.m4a", ".vtt.vtt", ".txt.txt",
+            ".json.json", ".dat.dat",
+        ];
+        for pattern in &double_ext_patterns {
+            prop_assert!(
+                !file_name.ends_with(pattern),
+                "Double extension detected: {} in {}",
+                pattern, file_name
+            );
+        }
+
+        // フォルダ名がYYYY-MM-DD形式であること
+        let folder = path.split('/').next().unwrap_or("");
+        prop_assert!(
+            folder.len() == 10 || folder == "unknown",
+            "Folder name should be YYYY-MM-DD or 'unknown', got: {}",
+            folder
+        );
     }
 }
 

@@ -4,7 +4,8 @@
 //! GUI層はこれらのtraitを通じて外部システムにアクセスする。
 
 use std::sync::mpsc;
-use crate::{Config, RecordingResponse};
+use crate::Config;
+use crate::components::api::RecordingSearchResponse;
 use crate::gui::AppMessage;
 
 #[cfg(feature = "test-support")]
@@ -44,7 +45,7 @@ pub trait RecordingService: Send + Sync + 'static {
         user_id: &str,
         from_date: &str,
         to_date: &str,
-    ) -> Result<RecordingResponse, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<RecordingSearchResponse, Box<dyn std::error::Error + Send + Sync>>;
 }
 
 /// ブラウザ起動を担当するサービス
@@ -59,6 +60,7 @@ pub trait DownloadService: Send + Sync + 'static {
     fn download_files(
         &self,
         access_token: &str,
+        recordings: &RecordingSearchResponse,
         selected_recordings: &[String],
         output_dir: &str,
         sender: mpsc::Sender<AppMessage>,
