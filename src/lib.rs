@@ -16,7 +16,7 @@ pub mod windows_console;
 // 公開API
 pub use components::config::{AppConfig, OAuthConfig};
 pub use components::auth::AuthToken;
-pub use components::api::{RecordingSearchResponse, MeetingRecording, RecordingFile, RecordingFileType};
+pub use components::api::{RecordingSearchResponse, MeetingRecording, RecordingFile, RecordingFileType, MeetingSummaryResponse, SummaryDetail};
 pub use errors::{AppError, AppResult};
 pub use gui::{ZoomDownloaderApp, AppMessage};
 

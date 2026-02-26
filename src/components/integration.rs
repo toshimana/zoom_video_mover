@@ -226,10 +226,36 @@ impl IntegrationComponent {
                     continue;
                 }
 
-                // 空URLスキップ（SUMMARYなどdownload_urlが欠落する場合がある）
+                // 空URLの場合の処理
                 if recording_file.download_url.is_empty() {
-                    log::warn!("[DL-DIAG] Skipping file with empty download_url: type={}, meeting='{}' ({}), stable_id={}",
-                        recording_file.file_type, meeting.topic, meeting.start_time, recording_file.stable_id());
+                    if recording_file.file_type == RecordingFileType::Summary {
+                        // SUMMARYファイルはMeeting Summary APIでフォールバック取得
+                        log::info!("[DL-DIAG] SUMMARY has empty download_url, trying Meeting Summary API: meeting_id={}", meeting.id);
+                        match self.api_component.get_meeting_summary(meeting.id).await {
+                            Ok(Some(summary)) => {
+                                let file_name = crate::generate_file_path(&meeting, recording_file);
+                                let output_path = self.integration_config.output_directory.join(&file_name);
+                                if let Some(parent) = output_path.parent() {
+                                    let _ = tokio::fs::create_dir_all(parent).await;
+                                }
+                                if let Ok(json_str) = serde_json::to_string_pretty(&summary) {
+                                    match tokio::fs::write(&output_path, json_str.as_bytes()).await {
+                                        Ok(_) => log::info!("AI summary saved: {:?}", output_path),
+                                        Err(e) => log::error!("Failed to write summary: {}", e),
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                log::info!("No AI summary available for meeting_id={}", meeting.id);
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to fetch AI summary for meeting_id={}: {}", meeting.id, e);
+                            }
+                        }
+                    } else {
+                        log::warn!("[DL-DIAG] Skipping file with empty download_url: type={}, meeting='{}' ({}), stable_id={}",
+                            recording_file.file_type, meeting.topic, meeting.start_time, recording_file.stable_id());
+                    }
                     continue;
                 }
 

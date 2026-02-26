@@ -7,7 +7,7 @@ use std::sync::{mpsc, Arc};
 use std::path::PathBuf;
 use log;
 use crate::Config;
-use crate::components::api::{ApiComponent, ApiConfig, MeetingRecording, RecordingFile, RecordingSearchRequest, RecordingSearchResponse};
+use crate::components::api::{ApiComponent, ApiConfig, MeetingRecording, RecordingFile, RecordingFileType, RecordingSearchRequest, RecordingSearchResponse};
 use crate::components::auth::AuthToken;
 use crate::components::download::{DownloadComponent, DownloadConfig, DownloadEvent};
 use crate::gui::AppMessage;
@@ -112,10 +112,48 @@ impl RecordingService for RealRecordingService {
                 next_page_token: None,
             };
 
-            api.search_recordings(request).await
+            let mut recordings = api.search_recordings(request).await
                 .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
                     Box::new(e)
-                })
+                })?;
+
+            // 各ミーティングのrecording_filesにSUMMARYが含まれない場合、
+            // Meeting Summary APIで自動チェックし、仮想エントリを追加
+            for meeting in &mut recordings.meetings {
+                let has_summary = meeting.recording_files.iter()
+                    .any(|f| f.file_type == RecordingFileType::Summary);
+                if !has_summary {
+                    log::info!("[DL-DIAG] No SUMMARY in recording_files, checking Meeting Summary API: meeting_id={}, topic='{}'",
+                        meeting.id, meeting.topic);
+                    match api.get_meeting_summary(meeting.id).await {
+                        Ok(Some(_)) => {
+                            log::info!("[DL-DIAG] Meeting summary available via API: meeting_id={}", meeting.id);
+                            // 仮想RecordingFileを追加（download_urlは空、DL時にフォールバック処理）
+                            meeting.recording_files.push(RecordingFile {
+                                id: String::new(),
+                                meeting_id: meeting.id.to_string(),
+                                recording_start: meeting.start_time.clone(),
+                                recording_end: String::new(),
+                                file_type: RecordingFileType::Summary,
+                                file_extension: "json".to_string(),
+                                file_size: 0,
+                                play_url: None,
+                                download_url: String::new(),
+                                status: String::new(),
+                                recording_type: String::new(),
+                            });
+                        }
+                        Ok(None) => {
+                            log::info!("[DL-DIAG] No meeting summary available for meeting_id={}", meeting.id);
+                        }
+                        Err(e) => {
+                            log::warn!("[DL-DIAG] Failed to check meeting summary for meeting_id={}: {}", meeting.id, e);
+                        }
+                    }
+                }
+            }
+
+            Ok(recordings)
         })
     }
 }
@@ -210,13 +248,20 @@ impl DownloadService for RealDownloadService {
         let output_dir = output_dir.to_string();
         let mut tasks: Vec<(String, String, String, Option<u64>)> = Vec::new();
         let mut skipped_files: Vec<String> = Vec::new();
+        let mut summary_fallback_targets: Vec<(MeetingRecording, RecordingFile)> = Vec::new();
 
         for (meeting, file) in &files_to_download {
             if file.download_url.is_empty() {
-                let msg = format!("{}: meeting='{}' ({})",
-                    file.file_type, meeting.topic, meeting.start_time);
-                log::warn!("[DL-DIAG] Skipping file with empty download_url: {}", msg);
-                skipped_files.push(msg);
+                if file.file_type == RecordingFileType::Summary {
+                    // SUMMARYファイルはMeeting Summary APIでフォールバック取得
+                    log::info!("[DL-DIAG] SUMMARY file has empty download_url, will use Meeting Summary API: meeting_id={}", meeting.id);
+                    summary_fallback_targets.push(((*meeting).clone(), (*file).clone()));
+                } else {
+                    let msg = format!("{}: meeting='{}' ({})",
+                        file.file_type, meeting.topic, meeting.start_time);
+                    log::warn!("[DL-DIAG] Skipping file with empty download_url: {}", msg);
+                    skipped_files.push(msg);
+                }
                 continue;
             }
             let task_id = format!("{}-{}", meeting.uuid, file.stable_id());
@@ -296,8 +341,9 @@ impl DownloadService for RealDownloadService {
             let mut completed_files: Vec<String> = Vec::new();
             let mut completed_count = 0u32;
             let mut failed_count = 0u32;
+            let download_task_count = tasks.len() as u32;
 
-            while completed_count + failed_count < total_files as u32 {
+            while download_task_count > 0 && completed_count + failed_count < download_task_count {
                 match event_rx.recv().await {
                     Some(event) => match event {
                         DownloadEvent::TaskStarted { task_id } => {
@@ -332,7 +378,7 @@ impl DownloadService for RealDownloadService {
                             let _ = sender_clone.send(AppMessage::DownloadProgress(
                                 format!(
                                     "Completed ({}/{}): {}",
-                                    completed_count, total_files, path_str
+                                    completed_count, download_task_count, path_str
                                 ),
                             ));
                         }
@@ -359,6 +405,75 @@ impl DownloadService for RealDownloadService {
 
             // シャットダウン
             let _ = component.stop_downloads().await;
+
+            // Meeting Summary APIフォールバック処理
+            if !summary_fallback_targets.is_empty() {
+                let _ = sender_clone.send(AppMessage::DownloadProgress(
+                    format!("Fetching {} AI summary(ies) via Meeting Summary API...", summary_fallback_targets.len()),
+                ));
+
+                let api = ApiComponent::new(ApiConfig::default());
+                let token = AuthToken {
+                    access_token: access_token.clone(),
+                    token_type: "Bearer".to_string(),
+                    expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
+                    refresh_token: None,
+                    scopes: vec!["recording:read".to_string()],
+                };
+                api.set_auth_token(token).await;
+
+                for (meeting, file) in &summary_fallback_targets {
+                    let _ = sender_clone.send(AppMessage::DownloadProgress(
+                        format!("Fetching AI summary: {}", meeting.topic),
+                    ));
+
+                    match api.get_meeting_summary(meeting.id).await {
+                        Ok(Some(summary)) => {
+                            let file_name = crate::generate_file_path(meeting, file);
+                            let output_path = PathBuf::from(&output_dir).join(&file_name);
+
+                            if let Some(parent) = output_path.parent() {
+                                let _ = tokio::fs::create_dir_all(parent).await;
+                            }
+
+                            match serde_json::to_string_pretty(&summary) {
+                                Ok(json_str) => {
+                                    match tokio::fs::write(&output_path, json_str.as_bytes()).await {
+                                        Ok(_) => {
+                                            let path_str = output_path.to_string_lossy().to_string();
+                                            completed_files.push(path_str.clone());
+                                            let _ = sender_clone.send(AppMessage::DownloadProgress(
+                                                format!("AI summary saved: {}", path_str),
+                                            ));
+                                        }
+                                        Err(e) => {
+                                            log::error!("Failed to write summary file: {}", e);
+                                            let _ = sender_clone.send(AppMessage::DownloadProgress(
+                                                format!("Failed to save AI summary: {}", e),
+                                            ));
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to serialize summary: {}", e);
+                                }
+                            }
+                        }
+                        Ok(None) => {
+                            log::info!("No AI summary available for meeting_id={}", meeting.id);
+                            let _ = sender_clone.send(AppMessage::DownloadProgress(
+                                format!("AI summary not available: {}", meeting.topic),
+                            ));
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to fetch AI summary for meeting_id={}: {}", meeting.id, e);
+                            let _ = sender_clone.send(AppMessage::DownloadProgress(
+                                format!("AI summary fetch failed: {} - {}", meeting.topic, e),
+                            ));
+                        }
+                    }
+                }
+            }
 
             let _ = sender_clone.send(AppMessage::DownloadComplete(completed_files.clone()));
 

@@ -202,6 +202,54 @@ pub struct RecordingSearchResponse {
     pub meetings: Vec<MeetingRecording>,
 }
 
+/// Meeting Summary APIレスポンス
+///
+/// Zoom API `GET /v2/meetings/{meetingId}/meeting_summary` のレスポンスを表す。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MeetingSummaryResponse {
+    #[serde(default)]
+    pub meeting_host_id: String,
+    #[serde(default)]
+    pub meeting_host_email: String,
+    #[serde(default)]
+    pub meeting_uuid: String,
+    #[serde(default)]
+    pub meeting_id: u64,
+    #[serde(default)]
+    pub meeting_topic: String,
+    #[serde(default)]
+    pub meeting_start_time: String,
+    #[serde(default)]
+    pub meeting_end_time: String,
+    #[serde(default)]
+    pub summary_start_time: String,
+    #[serde(default)]
+    pub summary_end_time: String,
+    #[serde(default)]
+    pub summary_created_time: String,
+    #[serde(default)]
+    pub summary_last_modified_time: String,
+    #[serde(default)]
+    pub summary_title: String,
+    #[serde(default)]
+    pub summary_overview: String,
+    #[serde(default)]
+    pub summary_details: Vec<SummaryDetail>,
+    #[serde(default)]
+    pub summary_content: String,
+    #[serde(default)]
+    pub next_steps: Vec<String>,
+}
+
+/// 要約の詳細セクション
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SummaryDetail {
+    #[serde(default)]
+    pub label: String,
+    #[serde(default)]
+    pub summary: String,
+}
+
 /// 録画検索リクエスト
 #[derive(Debug, Clone)]
 pub struct RecordingSearchRequest {
@@ -533,7 +581,81 @@ impl ApiComponent {
         log::info!("Retrieved {} meetings across {} pages", all_meetings.len(), total_pages);
         Ok(all_meetings)
     }
-    
+
+    /// Meeting Summary APIからAI要約を取得する
+    ///
+    /// # 副作用
+    /// - HTTPリクエストの送信
+    /// - レート制限の消費
+    /// - メトリクスの記録
+    ///
+    /// # 事前条件
+    /// - meeting_id は有効な数値のミーティングIDである
+    /// - 認証トークンが設定されている
+    ///
+    /// # 事後条件
+    /// - 成功時: MeetingSummaryResponse が返される
+    /// - API非対応(403/404)の場合: Ok(None) を返す（静かにスキップ）
+    /// - その他のエラー: Err を返す
+    pub async fn get_meeting_summary(&self, meeting_id: u64) -> AppResult<Option<MeetingSummaryResponse>> {
+        self.wait_for_rate_limit().await?;
+
+        let token = self.get_valid_token().await?;
+        let url = format!("{}/meetings/{}/meeting_summary", self.config.base_url, meeting_id);
+
+        log::info!("Fetching meeting summary for meeting_id={}", meeting_id);
+
+        let start_time = Instant::now();
+        let response = self.http_client
+            .get(&url)
+            .bearer_auth(&token.access_token)
+            .send()
+            .await
+            .map_err(|e| AppError::network("Failed to fetch meeting summary", Some(e)))?;
+
+        let duration = start_time.elapsed();
+        let status = response.status();
+
+        // 403/404 は「この会議にはサマリーがない」として静かにNone返却
+        if status == StatusCode::FORBIDDEN || status == StatusCode::NOT_FOUND {
+            self.record_api_call(duration, true).await;
+            log::info!("Meeting summary not available for meeting_id={} (status={})", meeting_id, status);
+            return Ok(None);
+        }
+
+        if status == StatusCode::TOO_MANY_REQUESTS {
+            self.record_api_call(duration, false).await;
+            self.record_rate_limit_error().await;
+            let retry_after = response.headers()
+                .get(reqwest::header::RETRY_AFTER)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u64>().ok());
+            return Err(AppError::rate_limit_with_retry("Meeting summary API rate limit exceeded", retry_after));
+        }
+
+        if !status.is_success() {
+            self.record_api_call(duration, false).await;
+            let error_body = response.text().await.unwrap_or_default();
+            log::warn!("Meeting summary API error for meeting_id={}: {} - {}", meeting_id, status, error_body);
+            return Err(AppError::external_service(
+                format!("Meeting summary API error: {} - {}", status, error_body)
+            ));
+        }
+
+        let response_text = response.text().await
+            .map_err(|e| AppError::network("Failed to read meeting summary response", Some(e)))?;
+
+        log::debug!("Meeting summary response for meeting_id={}: {}",
+            meeting_id,
+            if response_text.len() > 500 { &response_text[..500] } else { &response_text });
+
+        let summary: MeetingSummaryResponse = serde_json::from_str(&response_text)
+            .map_err(|e| AppError::data_format("Failed to parse meeting summary response", Some(e)))?;
+
+        self.record_api_call(duration, true).await;
+        Ok(Some(summary))
+    }
+
     /// 有効な認証トークンを取得
     async fn get_valid_token(&self) -> AppResult<AuthToken> {
         let token_guard = self.current_token.read().await;
@@ -835,5 +957,58 @@ mod tests {
         assert!(file.download_url.is_empty());
         assert!(file.id.is_empty());
         assert_eq!(file.stable_id(), "auto_summary");
+    }
+
+    #[test]
+    fn test_meeting_summary_response_deserialization() {
+        let json = r#"{
+            "meeting_host_id": "host123",
+            "meeting_host_email": "host@example.com",
+            "meeting_uuid": "abc-def",
+            "meeting_id": 123456789,
+            "meeting_topic": "Weekly Standup",
+            "meeting_start_time": "2025-01-15T10:00:00Z",
+            "meeting_end_time": "2025-01-15T11:00:00Z",
+            "summary_title": "Weekly Standup Summary",
+            "summary_overview": "Discussed project progress",
+            "summary_details": [
+                {"label": "Topic 1", "summary": "Detail 1"}
+            ],
+            "summary_content": "Full summary content here",
+            "next_steps": ["Action item 1", "Action item 2"]
+        }"#;
+        let summary: MeetingSummaryResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(summary.meeting_id, 123456789);
+        assert_eq!(summary.summary_title, "Weekly Standup Summary");
+        assert_eq!(summary.summary_overview, "Discussed project progress");
+        assert_eq!(summary.summary_content, "Full summary content here");
+        assert_eq!(summary.summary_details.len(), 1);
+        assert_eq!(summary.summary_details[0].label, "Topic 1");
+        assert_eq!(summary.next_steps.len(), 2);
+    }
+
+    #[test]
+    fn test_meeting_summary_response_missing_fields() {
+        // 最小限のフィールドのみ（Zoom APIバージョン差異対応）
+        let json = r#"{
+            "meeting_id": 999,
+            "summary_overview": "Brief summary"
+        }"#;
+        let summary: MeetingSummaryResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(summary.meeting_id, 999);
+        assert_eq!(summary.summary_overview, "Brief summary");
+        assert!(summary.summary_title.is_empty());
+        assert!(summary.summary_details.is_empty());
+        assert!(summary.next_steps.is_empty());
+        assert!(summary.summary_content.is_empty());
+    }
+
+    #[test]
+    fn test_meeting_summary_response_empty_json() {
+        let json = r#"{}"#;
+        let summary: MeetingSummaryResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(summary.meeting_id, 0);
+        assert!(summary.summary_overview.is_empty());
+        assert!(summary.meeting_topic.is_empty());
     }
 }
