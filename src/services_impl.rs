@@ -123,11 +123,11 @@ impl RecordingService for RealRecordingService {
                 let has_summary = meeting.recording_files.iter()
                     .any(|f| f.file_type == RecordingFileType::Summary);
                 if !has_summary {
-                    log::info!("[DL-DIAG] No SUMMARY in recording_files, checking Meeting Summary API: meeting_id={}, topic='{}'",
-                        meeting.id, meeting.topic);
-                    match api.get_meeting_summary(meeting.id).await {
+                    log::info!("[DL-DIAG] No SUMMARY in recording_files, checking Meeting Summary API: meeting_uuid={}, topic='{}'",
+                        meeting.uuid, meeting.topic);
+                    match api.get_meeting_summary(&meeting.uuid).await {
                         Ok(Some(_)) => {
-                            log::info!("[DL-DIAG] Meeting summary available via API: meeting_id={}", meeting.id);
+                            log::info!("[DL-DIAG] Meeting summary available via API: meeting_uuid={}", meeting.uuid);
                             // 仮想RecordingFileを追加（download_urlは空、DL時にフォールバック処理）
                             meeting.recording_files.push(RecordingFile {
                                 id: String::new(),
@@ -144,10 +144,10 @@ impl RecordingService for RealRecordingService {
                             });
                         }
                         Ok(None) => {
-                            log::info!("[DL-DIAG] No meeting summary available for meeting_id={}", meeting.id);
+                            log::info!("[DL-DIAG] No meeting summary available for meeting_uuid={}", meeting.uuid);
                         }
                         Err(e) => {
-                            log::warn!("[DL-DIAG] Failed to check meeting summary for meeting_id={}: {}", meeting.id, e);
+                            log::warn!("[DL-DIAG] Failed to check meeting summary for meeting_uuid={}: {}", meeting.uuid, e);
                         }
                     }
                 }
@@ -427,7 +427,7 @@ impl DownloadService for RealDownloadService {
                         format!("Fetching AI summary: {}", meeting.topic),
                     ));
 
-                    match api.get_meeting_summary(meeting.id).await {
+                    match api.get_meeting_summary(&meeting.uuid).await {
                         Ok(Some(summary)) => {
                             let file_name = crate::generate_file_path(meeting, file);
                             let output_path = PathBuf::from(&output_dir).join(&file_name);

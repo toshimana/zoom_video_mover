@@ -230,8 +230,8 @@ impl IntegrationComponent {
                 if recording_file.download_url.is_empty() {
                     if recording_file.file_type == RecordingFileType::Summary {
                         // SUMMARYファイルはMeeting Summary APIでフォールバック取得
-                        log::info!("[DL-DIAG] SUMMARY has empty download_url, trying Meeting Summary API: meeting_id={}", meeting.id);
-                        match self.api_component.get_meeting_summary(meeting.id).await {
+                        log::info!("[DL-DIAG] SUMMARY has empty download_url, trying Meeting Summary API: meeting_uuid={}", meeting.uuid);
+                        match self.api_component.get_meeting_summary(&meeting.uuid).await {
                             Ok(Some(summary)) => {
                                 let file_name = crate::generate_file_path(&meeting, recording_file);
                                 let output_path = self.integration_config.output_directory.join(&file_name);

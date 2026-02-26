@@ -590,20 +590,22 @@ impl ApiComponent {
     /// - メトリクスの記録
     ///
     /// # 事前条件
-    /// - meeting_id は有効な数値のミーティングIDである
+    /// - meeting_uuid は有効なミーティングUUIDである
     /// - 認証トークンが設定されている
     ///
     /// # 事後条件
     /// - 成功時: MeetingSummaryResponse が返される
     /// - API非対応(403/404)の場合: Ok(None) を返す（静かにスキップ）
     /// - その他のエラー: Err を返す
-    pub async fn get_meeting_summary(&self, meeting_id: u64) -> AppResult<Option<MeetingSummaryResponse>> {
+    pub async fn get_meeting_summary(&self, meeting_uuid: &str) -> AppResult<Option<MeetingSummaryResponse>> {
         self.wait_for_rate_limit().await?;
 
         let token = self.get_valid_token().await?;
-        let url = format!("{}/meetings/{}/meeting_summary", self.config.base_url, meeting_id);
+        // UUIDに '/' が含まれる場合はダブルURLエンコードが必要（Zoom API仕様）
+        let encoded_uuid = Self::double_encode_uuid(meeting_uuid);
+        let url = format!("{}/meetings/{}/meeting_summary", self.config.base_url, encoded_uuid);
 
-        log::info!("Fetching meeting summary for meeting_id={}", meeting_id);
+        log::info!("Fetching meeting summary for meeting_uuid={}", meeting_uuid);
 
         let start_time = Instant::now();
         let response = self.http_client
@@ -619,7 +621,7 @@ impl ApiComponent {
         // 403/404 は「この会議にはサマリーがない」として静かにNone返却
         if status == StatusCode::FORBIDDEN || status == StatusCode::NOT_FOUND {
             self.record_api_call(duration, true).await;
-            log::info!("Meeting summary not available for meeting_id={} (status={})", meeting_id, status);
+            log::info!("Meeting summary not available for meeting_uuid={} (status={})", meeting_uuid, status);
             return Ok(None);
         }
 
@@ -636,7 +638,7 @@ impl ApiComponent {
         if !status.is_success() {
             self.record_api_call(duration, false).await;
             let error_body = response.text().await.unwrap_or_default();
-            log::warn!("Meeting summary API error for meeting_id={}: {} - {}", meeting_id, status, error_body);
+            log::warn!("Meeting summary API error for meeting_uuid={}: {} - {}", meeting_uuid, status, error_body);
             return Err(AppError::external_service(
                 format!("Meeting summary API error: {} - {}", status, error_body)
             ));
@@ -645,8 +647,8 @@ impl ApiComponent {
         let response_text = response.text().await
             .map_err(|e| AppError::network("Failed to read meeting summary response", Some(e)))?;
 
-        log::debug!("Meeting summary response for meeting_id={}: {}",
-            meeting_id,
+        log::debug!("Meeting summary response for meeting_uuid={}: {}",
+            meeting_uuid,
             if response_text.len() > 500 { &response_text[..500] } else { &response_text });
 
         let summary: MeetingSummaryResponse = serde_json::from_str(&response_text)
@@ -654,6 +656,33 @@ impl ApiComponent {
 
         self.record_api_call(duration, true).await;
         Ok(Some(summary))
+    }
+
+    /// Zoom API用にUUIDをダブルURLエンコードする
+    ///
+    /// UUIDが '/' で始まる、または '//' を含む場合にダブルエンコードが必要（Zoom API仕様）
+    fn double_encode_uuid(uuid: &str) -> String {
+        if uuid.starts_with('/') || uuid.contains("//") {
+            // まずURLエンコードし、さらにもう一度エンコード
+            let first_encode: String = uuid.bytes().map(|b| {
+                match b {
+                    b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                        (b as char).to_string()
+                    }
+                    _ => format!("%{:02X}", b),
+                }
+            }).collect();
+            first_encode.bytes().map(|b| {
+                match b {
+                    b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                        (b as char).to_string()
+                    }
+                    _ => format!("%{:02X}", b),
+                }
+            }).collect()
+        } else {
+            uuid.to_string()
+        }
     }
 
     /// 有効な認証トークンを取得
@@ -1010,5 +1039,29 @@ mod tests {
         assert_eq!(summary.meeting_id, 0);
         assert!(summary.summary_overview.is_empty());
         assert!(summary.meeting_topic.is_empty());
+    }
+
+    #[test]
+    fn test_double_encode_uuid_normal() {
+        // '/' を含まないUUIDはそのまま返す
+        let uuid = "SLP784cNRtK39yiU198CCQ==";
+        assert_eq!(ApiComponent::double_encode_uuid(uuid), uuid);
+    }
+
+    #[test]
+    fn test_double_encode_uuid_with_slash() {
+        // '/' で始まるUUIDはダブルエンコード
+        let uuid = "/abc+def==";
+        let encoded = ApiComponent::double_encode_uuid(uuid);
+        assert!(!encoded.contains('/'));
+        assert!(encoded.contains("%25")); // '%' がさらにエンコードされる
+    }
+
+    #[test]
+    fn test_double_encode_uuid_with_double_slash() {
+        // '//' を含むUUIDはダブルエンコード
+        let uuid = "abc//def==";
+        let encoded = ApiComponent::double_encode_uuid(uuid);
+        assert!(!encoded.contains('/'));
     }
 }
