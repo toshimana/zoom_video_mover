@@ -58,7 +58,8 @@
       "Bash(cat:*)",
       "WebFetch(domain:community.zoom.com)",
       "Bash(cd:*)",
-      "Bash(xargs dirname)"
+      "Bash(xargs dirname)",
+      "Bash(cd /c/Users/toshi/Documents/project/zoom_video_mover && RUST_LOG=zoom_video_mover=debug cargo run 2>&1)"
     ],
     "deny": []
   }
