@@ -6,3 +6,7 @@ mod helpers;
 mod state_tests;
 #[path = "gui_tests/screen_tests.rs"]
 mod screen_tests;
+#[path = "gui_tests/screenshot.rs"]
+mod screenshot;
+#[path = "gui_tests/screenshot_tests.rs"]
+mod screenshot_tests;
