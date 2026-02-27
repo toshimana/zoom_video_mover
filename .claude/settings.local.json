@@ -59,7 +59,12 @@
       "WebFetch(domain:community.zoom.com)",
       "Bash(cd:*)",
       "Bash(xargs dirname)",
-      "Bash(cd /c/Users/toshi/Documents/project/zoom_video_mover && RUST_LOG=zoom_video_mover=debug cargo run 2>&1)"
+      "Bash(cd /c/Users/toshi/Documents/project/zoom_video_mover && RUST_LOG=zoom_video_mover=debug cargo run 2>&1)",
+      "WebFetch(domain:docs.rs)",
+      "WebFetch(domain:crates.io)",
+      "WebFetch(domain:lib.rs)",
+      "WebFetch(domain:sotrh.github.io)",
+      "Bash(git status:*)"
     ],
     "deny": []
   }

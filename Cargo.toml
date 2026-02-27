@@ -78,6 +78,11 @@ rstest = "0.18"
 wiremock = "0.5"
 # Serial test execution
 serial_test = "3.0"
+# Screenshot testing (headless wgpu rendering)
+egui-wgpu = "0.28"
+wgpu = "0.20"
+pollster = "0.3"
+image = "0.25"
 
 [[bin]]
 name = "zoom_video_mover"
