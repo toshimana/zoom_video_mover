@@ -18,6 +18,7 @@ use chrono::{Datelike, NaiveDate};
 use log;
 use std::path::PathBuf;
 use std::sync::{mpsc, Arc};
+use tokio::sync::Semaphore;
 
 /// 本番用設定サービス
 pub struct RealConfigService;
@@ -139,28 +140,42 @@ impl RecordingService for RealRecordingService {
                     Box::new(e)
                 })?;
 
-            // 月単位チャンクに分割してページネーション対応で全件取得
+            // 月単位チャンクに分割してページネーション対応で全件取得（並列）
             let chunks = split_into_monthly_chunks(from, to);
-            log::info!("Fetching recordings: from={} to={}, split into {} chunk(s)", from, to, chunks.len());
-
-            let mut all_meetings: Vec<MeetingRecording> = Vec::new();
             let total_chunks = chunks.len();
-            for (chunk_idx, (chunk_from, chunk_to)) in chunks.iter().enumerate() {
-                let _ = progress_sender.send(AppMessage::SearchProgress(
-                    format!("録画データを取得中... ({}/{})", chunk_idx + 1, total_chunks),
-                ));
-                log::info!("Fetching chunk: from={} to={}", chunk_from, chunk_to);
-                let request = RecordingSearchRequest {
-                    user_id: Some(user_id.clone()),
-                    from: *chunk_from,
-                    to: *chunk_to,
-                    page_size: None,
-                    next_page_token: None,
-                };
+            log::info!("Fetching recordings: from={} to={}, split into {} chunk(s)", from, to, total_chunks);
 
-                let chunk_meetings = api.get_all_recordings(request).await
-                    .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
-                log::info!("Chunk from={} to={}: {} meetings", chunk_from, chunk_to, chunk_meetings.len());
+            let api = Arc::new(api);
+            let mut all_meetings: Vec<MeetingRecording> = Vec::new();
+
+            let mut handles = Vec::new();
+            for (chunk_idx, (chunk_from, chunk_to)) in chunks.iter().enumerate() {
+                let api = Arc::clone(&api);
+                let user_id = user_id.clone();
+                let progress_sender = progress_sender.clone();
+                let chunk_from = *chunk_from;
+                let chunk_to = *chunk_to;
+                handles.push(tokio::spawn(async move {
+                    let _ = progress_sender.send(AppMessage::SearchProgress(
+                        format!("録画データを取得中... ({}/{})", chunk_idx + 1, total_chunks),
+                    ));
+                    log::info!("Fetching chunk: from={} to={}", chunk_from, chunk_to);
+                    let request = RecordingSearchRequest {
+                        user_id: Some(user_id),
+                        from: chunk_from,
+                        to: chunk_to,
+                        page_size: None,
+                        next_page_token: None,
+                    };
+                    let result = api.get_all_recordings(request).await
+                        .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) });
+                    log::info!("Chunk from={} to={}: completed", chunk_from, chunk_to);
+                    result
+                }));
+            }
+            for handle in handles {
+                let chunk_meetings = handle.await
+                    .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })??;
                 all_meetings.extend(chunk_meetings);
             }
 
@@ -177,41 +192,59 @@ impl RecordingService for RealRecordingService {
             };
 
             // 各ミーティングのrecording_filesにSUMMARYが含まれない場合、
-            // Meeting Summary APIで自動チェックし、仮想エントリを追加
+            // Meeting Summary APIで自動チェックし、仮想エントリを追加（セマフォ付き並列化）
             let total_meetings = recordings.meetings.len();
-            for (meeting_idx, meeting) in recordings.meetings.iter_mut().enumerate() {
-                let _ = progress_sender.send(AppMessage::SearchProgress(
-                    format!("AI要約をチェック中... ({}/{})", meeting_idx + 1, total_meetings),
-                ));
+            let semaphore = Arc::new(Semaphore::new(5));
+            let mut summary_handles = Vec::new();
+
+            for (meeting_idx, meeting) in recordings.meetings.iter().enumerate() {
                 let has_summary = meeting.recording_files.iter()
                     .any(|f| f.file_type == RecordingFileType::Summary);
                 if !has_summary {
-                    log::info!("[DL-DIAG] No SUMMARY in recording_files, checking Meeting Summary API: meeting_uuid={}, topic='{}'",
-                        meeting.uuid, meeting.topic);
-                    match api.get_meeting_summary(&meeting.uuid).await {
-                        Ok(Some(_)) => {
-                            log::info!("[DL-DIAG] Meeting summary available via API: meeting_uuid={}", meeting.uuid);
-                            // 仮想RecordingFileを追加（download_urlは空、DL時にフォールバック処理）
-                            meeting.recording_files.push(RecordingFile {
-                                id: String::new(),
-                                meeting_id: meeting.id.to_string(),
-                                recording_start: meeting.start_time.clone(),
-                                recording_end: String::new(),
-                                file_type: RecordingFileType::Summary,
-                                file_extension: "json".to_string(),
-                                file_size: 0,
-                                play_url: None,
-                                download_url: String::new(),
-                                status: String::new(),
-                                recording_type: String::new(),
-                            });
-                        }
-                        Ok(None) => {
-                            log::info!("[DL-DIAG] No meeting summary available for meeting_uuid={}", meeting.uuid);
-                        }
-                        Err(e) => {
-                            log::warn!("[DL-DIAG] Failed to check meeting summary for meeting_uuid={}: {}", meeting.uuid, e);
-                        }
+                    let api = Arc::clone(&api);
+                    let sem = Arc::clone(&semaphore);
+                    let uuid = meeting.uuid.clone();
+                    let topic = meeting.topic.clone();
+                    let progress_sender = progress_sender.clone();
+                    summary_handles.push((meeting_idx, tokio::spawn(async move {
+                        let _permit = sem.acquire().await.unwrap();
+                        let _ = progress_sender.send(AppMessage::SearchProgress(
+                            format!("AI要約をチェック中... ({}/{})", meeting_idx + 1, total_meetings),
+                        ));
+                        log::info!("[DL-DIAG] No SUMMARY in recording_files, checking Meeting Summary API: meeting_uuid={}, topic='{}'",
+                            uuid, topic);
+                        api.get_meeting_summary(&uuid).await
+                    })));
+                }
+            }
+
+            for (meeting_idx, handle) in summary_handles {
+                let meeting = &mut recordings.meetings[meeting_idx];
+                match handle.await {
+                    Ok(Ok(Some(_))) => {
+                        log::info!("[DL-DIAG] Meeting summary available via API: meeting_uuid={}", meeting.uuid);
+                        meeting.recording_files.push(RecordingFile {
+                            id: String::new(),
+                            meeting_id: meeting.id.to_string(),
+                            recording_start: meeting.start_time.clone(),
+                            recording_end: String::new(),
+                            file_type: RecordingFileType::Summary,
+                            file_extension: "json".to_string(),
+                            file_size: 0,
+                            play_url: None,
+                            download_url: String::new(),
+                            status: String::new(),
+                            recording_type: String::new(),
+                        });
+                    }
+                    Ok(Ok(None)) => {
+                        log::info!("[DL-DIAG] No meeting summary available for meeting_uuid={}", meeting.uuid);
+                    }
+                    Ok(Err(e)) => {
+                        log::warn!("[DL-DIAG] Failed to check meeting summary for meeting_uuid={}: {}", meeting.uuid, e);
+                    }
+                    Err(e) => {
+                        log::warn!("[DL-DIAG] Summary check task panicked for meeting_uuid={}: {}", meeting.uuid, e);
                     }
                 }
             }
