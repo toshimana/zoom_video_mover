@@ -1,10 +1,44 @@
 use eframe::egui;
+use egui::Color32;
 use std::sync::{mpsc, Arc};
 use std::thread;
 use chrono::{Datelike, Local};
 use crate::Config;
 use crate::components::api::RecordingSearchResponse;
 use crate::services_impl::AppServices;
+
+// === Modern Color Palette ===
+// Primary
+const PRIMARY: Color32 = Color32::from_rgb(59, 130, 246);        // Blue-500
+const PRIMARY_HOVER: Color32 = Color32::from_rgb(37, 99, 235);   // Blue-600
+
+// Semantic
+const SUCCESS_BG: Color32 = Color32::from_rgb(220, 252, 231);    // Green-100
+const SUCCESS_TEXT: Color32 = Color32::from_rgb(22, 101, 52);     // Green-800
+const WARNING_BG: Color32 = Color32::from_rgb(254, 243, 199);    // Amber-100
+const WARNING_TEXT: Color32 = Color32::from_rgb(146, 64, 14);     // Amber-800
+const ERROR: Color32 = Color32::from_rgb(239, 68, 68);           // Red-500
+const ERROR_BG: Color32 = Color32::from_rgb(254, 226, 226);      // Red-100
+const ERROR_TEXT: Color32 = Color32::from_rgb(153, 27, 27);       // Red-800
+
+// Button
+const BTN_SAVE: Color32 = Color32::from_rgb(34, 197, 94);        // Green
+const BTN_LOAD: Color32 = Color32::from_rgb(59, 130, 246);       // Blue
+const BTN_PAUSE: Color32 = Color32::from_rgb(245, 158, 11);      // Amber
+const BTN_CANCEL: Color32 = Color32::from_rgb(239, 68, 68);      // Red
+
+// Neutral / Background
+const BG_BASE: Color32 = Color32::from_rgb(241, 245, 249);       // Slate-100
+const BG_CARD: Color32 = Color32::from_rgb(255, 255, 255);       // White
+const BORDER_DEFAULT: Color32 = Color32::from_rgb(226, 232, 240); // Slate-200
+
+// Text
+const TEXT_PRIMARY: Color32 = Color32::from_rgb(15, 23, 42);      // Slate-900
+const TEXT_SECONDARY: Color32 = Color32::from_rgb(100, 116, 139); // Slate-500
+const TEXT_ON_PRIMARY: Color32 = Color32::from_rgb(255, 255, 255); // White
+
+// Progress
+const PROGRESS_FILL: Color32 = Color32::from_rgb(59, 130, 246);  // Blue
 
 /// GUI表示設定（フォント・テーマ・スタイル）
 /// テストのスクリーンショット生成でも使用
@@ -33,7 +67,7 @@ pub fn setup_gui_appearance(ctx: &egui::Context) {
         .insert(1, "NotoSansJP".to_owned());
     ctx.set_fonts(fonts);
 
-    // ライトテーマを明示的に設定
+    // ライトテーマを明示的に設定（カラーパレット適用）
     ctx.set_visuals(egui::Visuals::light());
 
     // フォントとスタイルの設定
@@ -46,31 +80,74 @@ pub fn setup_gui_appearance(ctx: &egui::Context) {
         // スペーシングの改善
         style.spacing.item_spacing.x = 12.0;
         style.spacing.item_spacing.y = 10.0;
-        style.spacing.button_padding.x = 16.0;
-        style.spacing.button_padding.y = 12.0;
+        style.spacing.button_padding.x = 20.0;
+        style.spacing.button_padding.y = 10.0;
 
-        // より明確な色設定
-        style.visuals.widgets.noninteractive.bg_fill = egui::Color32::WHITE;
-        style.visuals.widgets.inactive.bg_fill = egui::Color32::from_gray(245);
-        style.visuals.widgets.hovered.bg_fill = egui::Color32::from_gray(230);
-        style.visuals.widgets.active.bg_fill = egui::Color32::from_rgb(100, 149, 237);
+        let rounding = egui::Rounding::same(8.0);
 
-        // テキスト色を明確に
-        style.visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::BLACK;
-        style.visuals.widgets.inactive.fg_stroke.color = egui::Color32::BLACK;
-        style.visuals.widgets.hovered.fg_stroke.color = egui::Color32::BLACK;
-        style.visuals.widgets.active.fg_stroke.color = egui::Color32::WHITE;
+        // noninteractive
+        style.visuals.widgets.noninteractive.bg_fill = BG_CARD;
+        style.visuals.widgets.noninteractive.rounding = rounding;
+        style.visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, TEXT_PRIMARY);
 
-        // 背景色を明確に
-        style.visuals.panel_fill = egui::Color32::from_gray(248);
-        style.visuals.window_fill = egui::Color32::WHITE;
+        // inactive
+        style.visuals.widgets.inactive.bg_fill = Color32::from_gray(245);
+        style.visuals.widgets.inactive.weak_bg_fill = Color32::from_gray(240);
+        style.visuals.widgets.inactive.rounding = rounding;
+        style.visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, TEXT_PRIMARY);
+        style.visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, BORDER_DEFAULT);
 
-        // テキストのstroke幅を太くして視認性向上
-        style.visuals.widgets.noninteractive.fg_stroke.width = 1.0;
-        style.visuals.widgets.inactive.fg_stroke.width = 1.0;
-        style.visuals.widgets.hovered.fg_stroke.width = 1.0;
-        style.visuals.widgets.active.fg_stroke.width = 1.0;
+        // hovered
+        style.visuals.widgets.hovered.bg_fill = Color32::from_gray(230);
+        style.visuals.widgets.hovered.weak_bg_fill = Color32::from_gray(225);
+        style.visuals.widgets.hovered.rounding = rounding;
+        style.visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, TEXT_PRIMARY);
+
+        // active
+        style.visuals.widgets.active.bg_fill = PRIMARY;
+        style.visuals.widgets.active.weak_bg_fill = PRIMARY_HOVER;
+        style.visuals.widgets.active.rounding = rounding;
+        style.visuals.widgets.active.fg_stroke = egui::Stroke::new(1.0, TEXT_ON_PRIMARY);
+
+        // パネル・ウィンドウ背景
+        style.visuals.panel_fill = BG_BASE;
+        style.visuals.window_fill = BG_CARD;
+        style.visuals.window_shadow = egui::Shadow {
+            offset: [0.0, 4.0].into(),
+            blur: 12.0,
+            spread: 0.0,
+            color: Color32::from_black_alpha(20),
+        };
+
+        // 選択色
+        style.visuals.selection.bg_fill = PRIMARY.gamma_multiply(0.3);
     });
+}
+
+/// カード型フレーム（各セクションの囲み用）
+fn card_frame() -> egui::Frame {
+    egui::Frame::none()
+        .fill(BG_CARD)
+        .rounding(egui::Rounding::same(12.0))
+        .shadow(egui::Shadow {
+            offset: [0.0, 2.0].into(),
+            blur: 8.0,
+            spread: 0.0,
+            color: Color32::from_black_alpha(15),
+        })
+        .stroke(egui::Stroke::new(1.0, BORDER_DEFAULT))
+        .inner_margin(egui::Margin::same(20.0))
+        .outer_margin(egui::Margin::symmetric(0.0, 6.0))
+}
+
+/// エラー表示用カードフレーム
+fn error_card_frame() -> egui::Frame {
+    egui::Frame::none()
+        .fill(ERROR_BG)
+        .rounding(egui::Rounding::same(12.0))
+        .stroke(egui::Stroke::new(2.0, ERROR))
+        .inner_margin(egui::Margin::same(20.0))
+        .outer_margin(egui::Margin::symmetric(0.0, 6.0))
 }
 
 #[derive(Debug)]
@@ -389,66 +466,48 @@ impl ZoomDownloaderApp {
     pub fn update_ui(&mut self, ctx: &egui::Context) {
         self.process_messages();
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Zoom Video Mover");
-            ui.separator();
+        let panel_frame = egui::Frame::none()
+            .fill(BG_BASE)
+            .inner_margin(egui::Margin::same(24.0));
 
-            // SC001: メイン画面 - タブコンテナ
+        egui::CentralPanel::default().frame(panel_frame).show(ctx, |ui| {
+            // ヘッダー
+            ui.add(egui::Label::new(
+                egui::RichText::new("Zoom Video Mover")
+                    .size(28.0)
+                    .strong()
+                    .color(TEXT_PRIMARY),
+            ));
+            ui.add_space(4.0);
+
+            // SC001: メイン画面 - タブコンテナ（ピル型）
             ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 12.0;
+                ui.spacing_mut().item_spacing.x = 8.0;
 
-                // MC004: 設定タブ (常時表示)
-                let config_button = egui::Button::new("設定")
-                    .fill(if self.current_screen == AppScreen::Config {
-                        egui::Color32::from_rgb(100, 149, 237)
-                    } else {
-                        egui::Color32::from_gray(220)
-                    });
-                if ui.add_sized([90.0, 35.0], config_button).clicked() {
-                    self.current_screen = AppScreen::Config;
-                }
+                let tabs: Vec<(&str, AppScreen, bool)> = vec![
+                    ("設定", AppScreen::Config, true),
+                    ("認証", AppScreen::Auth, self.config_loaded),
+                    ("録画リスト", AppScreen::Recordings, self.access_token.is_some()),
+                    ("ダウンロード", AppScreen::Progress, self.is_downloading),
+                ];
 
-                // MC005: 認証タブ (config_loaded = true時のみ)
-                if self.config_loaded {
-                    let auth_button = egui::Button::new("認証")
-                        .fill(if self.current_screen == AppScreen::Auth {
-                            egui::Color32::from_rgb(100, 149, 237)
-                        } else {
-                            egui::Color32::from_gray(220)
-                        });
-                    if ui.add_sized([90.0, 35.0], auth_button).clicked() {
-                        self.current_screen = AppScreen::Auth;
+                for (label, screen, visible) in tabs {
+                    if !visible {
+                        continue;
                     }
-                }
-
-                // MC006: 録画リストタブ (access_token != None時のみ)
-                if self.access_token.is_some() {
-                    let recordings_button = egui::Button::new("録画リスト")
-                        .fill(if self.current_screen == AppScreen::Recordings {
-                            egui::Color32::from_rgb(100, 149, 237)
-                        } else {
-                            egui::Color32::from_gray(220)
-                        });
-                    if ui.add_sized([110.0, 35.0], recordings_button).clicked() {
-                        self.current_screen = AppScreen::Recordings;
-                    }
-                }
-
-                // MC007: ダウンロードタブ (is_downloading = true時のみ)
-                if self.is_downloading {
-                    let progress_button = egui::Button::new("ダウンロード")
-                        .fill(if self.current_screen == AppScreen::Progress {
-                            egui::Color32::from_rgb(100, 149, 237)
-                        } else {
-                            egui::Color32::from_gray(220)
-                        });
-                    if ui.add_sized([110.0, 35.0], progress_button).clicked() {
-                        self.current_screen = AppScreen::Progress;
+                    let is_active = self.current_screen == screen;
+                    let btn = egui::Button::new(
+                        egui::RichText::new(label).color(if is_active { TEXT_ON_PRIMARY } else { TEXT_PRIMARY }),
+                    )
+                    .rounding(egui::Rounding::same(20.0))
+                    .fill(if is_active { PRIMARY } else { Color32::TRANSPARENT });
+                    if ui.add_sized([100.0, 36.0], btn).clicked() {
+                        self.current_screen = screen;
                     }
                 }
             });
 
-            ui.separator();
+            ui.add_space(8.0);
 
             // 現在のタブコンテンツ表示エリア
             match self.current_screen {
@@ -461,16 +520,29 @@ impl ZoomDownloaderApp {
                 },
             }
 
-            ui.separator();
+            ui.add_space(8.0);
 
             // MC003: ステータスバー
-            ui.horizontal(|ui| {
-                ui.label("Status:");
-                ui.colored_label(
-                    if self.error_message.is_empty() { egui::Color32::GREEN } else { egui::Color32::RED },
-                    &self.status_message
-                );
-            });
+            egui::Frame::none()
+                .fill(BG_CARD)
+                .rounding(egui::Rounding::same(8.0))
+                .stroke(egui::Stroke::new(1.0, BORDER_DEFAULT))
+                .inner_margin(egui::Margin::same(10.0))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.add(egui::Label::new(
+                            egui::RichText::new("Status:").size(14.0).color(TEXT_SECONDARY),
+                        ));
+                        let status_color = if self.error_message.is_empty() {
+                            SUCCESS_TEXT
+                        } else {
+                            ERROR_TEXT
+                        };
+                        ui.add(egui::Label::new(
+                            egui::RichText::new(&self.status_message).size(14.0).color(status_color),
+                        ));
+                    });
+                });
         });
 
         ctx.request_repaint();
@@ -478,64 +550,108 @@ impl ZoomDownloaderApp {
 
     /// SC002: 設定画面をレンダリングする
     fn render_config(&mut self, ui: &mut egui::Ui) {
-        ui.heading("設定");
-        ui.separator();
+        ui.add(egui::Label::new(
+            egui::RichText::new("設定").size(26.0).strong().color(TEXT_PRIMARY),
+        ));
+        ui.add(egui::Label::new(
+            egui::RichText::new("Zoom API接続の設定を行います").size(14.0).color(TEXT_SECONDARY),
+        ));
+        ui.add_space(8.0);
 
-        ui.add_space(10.0);
+        // 設定フォーム（カード内）
+        card_frame().show(ui, |ui| {
+            let field_width = (ui.available_width() - 180.0 - 20.0).max(300.0);
+            egui::Grid::new("config_grid")
+                .num_columns(2)
+                .spacing([20.0, 12.0])
+                .show(ui, |ui| {
+                    // CF001: Client ID入力
+                    ui.add(egui::Label::new(
+                        egui::RichText::new("Client ID").color(TEXT_SECONDARY),
+                    ));
+                    ui.add_sized([field_width, 30.0], egui::TextEdit::singleline(&mut self.client_id));
+                    ui.end_row();
 
-        // 設定フォーム
-        let field_width = (ui.available_width() - 180.0 - 40.0).max(300.0);
-        egui::Grid::new("config_grid")
-            .num_columns(2)
-            .spacing([20.0, 10.0])
-            .show(ui, |ui| {
-                // CF001: Client ID入力
-                ui.label("Client ID:");
-                ui.add_sized([field_width, 25.0], egui::TextEdit::singleline(&mut self.client_id));
-                ui.end_row();
+                    // CF002: Client Secret入力 (パスワード形式)
+                    ui.add(egui::Label::new(
+                        egui::RichText::new("Client Secret").color(TEXT_SECONDARY),
+                    ));
+                    ui.add_sized([field_width, 30.0], egui::TextEdit::singleline(&mut self.client_secret).password(true));
+                    ui.end_row();
 
-                // CF002: Client Secret入力 (パスワード形式)
-                ui.label("Client Secret:");
-                ui.add_sized([field_width, 25.0], egui::TextEdit::singleline(&mut self.client_secret).password(true));
-                ui.end_row();
+                    // CF003: 出力ディレクトリ入力
+                    ui.add(egui::Label::new(
+                        egui::RichText::new("Output Directory").color(TEXT_SECONDARY),
+                    ));
+                    if self.output_dir.is_empty() {
+                        self.output_dir = self.get_default_downloads_dir();
+                    }
+                    ui.add_sized([field_width, 30.0], egui::TextEdit::singleline(&mut self.output_dir));
+                    ui.end_row();
+                });
+        });
 
-                // CF003: 出力ディレクトリ入力
-                ui.label("Output Directory:");
-                if self.output_dir.is_empty() {
-                    self.output_dir = self.get_default_downloads_dir();
-                }
-                ui.add_sized([field_width, 25.0], egui::TextEdit::singleline(&mut self.output_dir));
-                ui.end_row();
-            });
-
-        ui.add_space(20.0);
+        ui.add_space(12.0);
 
         // CF004 & CF005: 設定保存・読込ボタン
         ui.horizontal(|ui| {
-            let save_button = egui::Button::new("設定を保存")
-                .fill(egui::Color32::from_rgb(46, 139, 87));
-            if ui.add_sized([120.0, 35.0], save_button).clicked() {
+            let save_button = egui::Button::new(
+                egui::RichText::new("設定を保存").color(TEXT_ON_PRIMARY),
+            )
+            .fill(BTN_SAVE)
+            .rounding(egui::Rounding::same(8.0));
+            if ui.add_sized([140.0, 40.0], save_button).clicked() {
                 self.save_config();
             }
 
-            ui.add_space(15.0);
+            ui.add_space(12.0);
 
-            let load_button = egui::Button::new("設定を読込")
-                .fill(egui::Color32::from_rgb(65, 105, 225));
-            if ui.add_sized([120.0, 35.0], load_button).clicked() {
+            let load_button = egui::Button::new(
+                egui::RichText::new("設定を読込").color(TEXT_ON_PRIMARY),
+            )
+            .fill(BTN_LOAD)
+            .rounding(egui::Rounding::same(8.0));
+            if ui.add_sized([140.0, 40.0], load_button).clicked() {
                 self.load_config();
             }
         });
 
-        ui.add_space(15.0);
+        ui.add_space(12.0);
 
-        // 入力検証とバリデーションメッセージ
+        // 入力検証とバリデーションメッセージ（色付きフレーム）
         if self.client_id.is_empty() {
-            ui.colored_label(egui::Color32::RED, "⚠ Client ID is required");
+            egui::Frame::none()
+                .fill(WARNING_BG)
+                .rounding(egui::Rounding::same(8.0))
+                .stroke(egui::Stroke::new(1.0, WARNING_TEXT))
+                .inner_margin(egui::Margin::same(10.0))
+                .show(ui, |ui| {
+                    ui.add(egui::Label::new(
+                        egui::RichText::new("Client ID is required").color(WARNING_TEXT),
+                    ));
+                });
         } else if self.client_secret.is_empty() {
-            ui.colored_label(egui::Color32::RED, "⚠ Client Secret is required");
+            egui::Frame::none()
+                .fill(WARNING_BG)
+                .rounding(egui::Rounding::same(8.0))
+                .stroke(egui::Stroke::new(1.0, WARNING_TEXT))
+                .inner_margin(egui::Margin::same(10.0))
+                .show(ui, |ui| {
+                    ui.add(egui::Label::new(
+                        egui::RichText::new("Client Secret is required").color(WARNING_TEXT),
+                    ));
+                });
         } else {
-            ui.colored_label(egui::Color32::GREEN, "✓ 設定が有効です");
+            egui::Frame::none()
+                .fill(SUCCESS_BG)
+                .rounding(egui::Rounding::same(8.0))
+                .stroke(egui::Stroke::new(1.0, SUCCESS_TEXT))
+                .inner_margin(egui::Margin::same(10.0))
+                .show(ui, |ui| {
+                    ui.add(egui::Label::new(
+                        egui::RichText::new("設定が有効です").color(SUCCESS_TEXT),
+                    ));
+                });
             self.config_loaded = true;
         }
     }
@@ -552,73 +668,114 @@ impl eframe::App for ZoomDownloaderApp {
 impl ZoomDownloaderApp {
     /// SC003: 認証画面をレンダリングする
     fn render_auth(&mut self, ui: &mut egui::Ui) {
-        ui.heading("認証");
-        ui.separator();
+        ui.add(egui::Label::new(
+            egui::RichText::new("認証").size(26.0).strong().color(TEXT_PRIMARY),
+        ));
+        ui.add(egui::Label::new(
+            egui::RichText::new("Zoom OAuthで接続します").size(14.0).color(TEXT_SECONDARY),
+        ));
+        ui.add_space(8.0);
 
-        // 認証状態表示
-        let status_text = if self.access_token.is_some() {
-            "Status: Authenticated"
-        } else if self.is_authenticating {
-            "Status: Waiting for Code"
-        } else if self.auth_url.is_some() {
-            "Status: Auth URL Generated"
-        } else {
-            "Status: Ready"
-        };
-        ui.label(status_text);
-        ui.add_space(10.0);
+        // 認証状態バッジ
+        card_frame().show(ui, |ui| {
+            let (badge_text, badge_bg, badge_fg) = if self.access_token.is_some() {
+                ("Authenticated", SUCCESS_BG, SUCCESS_TEXT)
+            } else if self.is_authenticating {
+                ("Waiting for Code", WARNING_BG, WARNING_TEXT)
+            } else if self.auth_url.is_some() {
+                ("Auth URL Generated", WARNING_BG, WARNING_TEXT)
+            } else {
+                ("Ready", Color32::from_gray(240), TEXT_SECONDARY)
+            };
 
-        if self.access_token.is_none() {
-            if !self.is_authenticating {
-                // AU001: 認証開始ボタン
-                if ui.button("認証開始").clicked() {
-                    self.start_authentication();
+            egui::Frame::none()
+                .fill(badge_bg)
+                .rounding(egui::Rounding::same(16.0))
+                .inner_margin(egui::Margin::symmetric(14.0, 6.0))
+                .show(ui, |ui| {
+                    ui.add(egui::Label::new(
+                        egui::RichText::new(badge_text).color(badge_fg).size(14.0),
+                    ));
+                });
+
+            ui.add_space(12.0);
+
+            if self.access_token.is_none() {
+                if !self.is_authenticating {
+                    // AU001: 認証開始ボタン
+                    let btn = egui::Button::new(
+                        egui::RichText::new("認証開始").color(TEXT_ON_PRIMARY),
+                    )
+                    .fill(PRIMARY)
+                    .rounding(egui::Rounding::same(8.0));
+                    if ui.add_sized([140.0, 40.0], btn).clicked() {
+                        self.start_authentication();
+                    }
+                } else {
+                    self.render_auth_in_progress(ui);
                 }
             } else {
-                self.render_auth_in_progress(ui);
+                ui.add(egui::Label::new(
+                    egui::RichText::new("Authenticated").color(SUCCESS_TEXT),
+                ));
+                let btn = egui::Button::new("Reset Authentication")
+                    .rounding(egui::Rounding::same(8.0));
+                if ui.add(btn).clicked() {
+                    self.access_token = None;
+                    self.auth_url = None;
+                    self.auth_code.clear();
+                    self.is_authenticating = false;
+                }
             }
-        } else {
-            ui.colored_label(egui::Color32::GREEN, "✓ Authenticated");
-            if ui.button("Reset Authentication").clicked() {
-                self.access_token = None;
-                self.auth_url = None;
-                self.auth_code.clear();
-                self.is_authenticating = false;
-            }
-        }
+        });
     }
 
     /// SC003: 認証進行中の詳細UIをレンダリングする
     fn render_auth_in_progress(&mut self, ui: &mut egui::Ui) {
         if let Some(url) = &self.auth_url {
             // AU002: Auth URL表示
-            ui.label("Auth URL:");
+            ui.add(egui::Label::new(
+                egui::RichText::new("Auth URL").color(TEXT_SECONDARY),
+            ));
             let mut url_display = url.clone();
             ui.add_sized([ui.available_width(), 60.0], egui::TextEdit::multiline(&mut url_display));
 
             let url_for_open = url.clone();
             ui.horizontal(|ui| {
                 // AU003: URLコピーボタン
-                if ui.button("📋 コピー").clicked() {
+                let copy_btn = egui::Button::new("コピー").rounding(egui::Rounding::same(8.0));
+                if ui.add(copy_btn).clicked() {
                     ui.output_mut(|o| o.copied_text = url_for_open.clone());
                 }
 
                 // AU004: ブラウザ起動ボタン（サービス経由）
-                if ui.button("ブラウザで開く").clicked() {
+                let open_btn = egui::Button::new(
+                    egui::RichText::new("ブラウザで開く").color(TEXT_ON_PRIMARY),
+                )
+                .fill(PRIMARY)
+                .rounding(egui::Rounding::same(8.0));
+                if ui.add(open_btn).clicked() {
                     let _ = self.services.browser_launcher.open_url(&url_for_open);
                 }
             });
 
-            ui.add_space(15.0);
+            ui.add_space(12.0);
 
             // AU005: 認証コード入力
-            ui.label("Authorization Code:");
-            ui.add_sized([ui.available_width(), 20.0], egui::TextEdit::singleline(&mut self.auth_code));
+            ui.add(egui::Label::new(
+                egui::RichText::new("Authorization Code").color(TEXT_SECONDARY),
+            ));
+            ui.add_sized([ui.available_width(), 30.0], egui::TextEdit::singleline(&mut self.auth_code));
 
             ui.add_space(10.0);
 
             // AU006: 認証完了ボタン
-            if ui.add_enabled(!self.auth_code.is_empty(), egui::Button::new("認証完了")).clicked() {
+            let complete_btn = egui::Button::new(
+                egui::RichText::new("認証完了").color(TEXT_ON_PRIMARY),
+            )
+            .fill(PRIMARY)
+            .rounding(egui::Rounding::same(8.0));
+            if ui.add_enabled(!self.auth_code.is_empty(), complete_btn).clicked() {
                 self.complete_authentication();
             }
         }
@@ -626,180 +783,265 @@ impl ZoomDownloaderApp {
 
     /// SC004: 録画リスト画面をレンダリングする
     fn render_recordings(&mut self, ui: &mut egui::Ui) {
-        ui.heading("録画リスト");
-        ui.separator();
+        ui.add(egui::Label::new(
+            egui::RichText::new("録画リスト").size(26.0).strong().color(TEXT_PRIMARY),
+        ));
+        ui.add_space(8.0);
 
-        // 検索期間設定
-        ui.label("検索期間:");
-        ui.horizontal(|ui| {
-            ui.label("From:");
-            if self.from_date.is_empty() {
-                let today = Local::now().date_naive();
-                let month_start = today.with_day(1).unwrap();
-                self.from_date = month_start.format("%Y-%m-%d").to_string();
-            }
-            ui.add_sized([150.0, 25.0], egui::TextEdit::singleline(&mut self.from_date));
+        // 検索期間設定（カード内）
+        card_frame().show(ui, |ui| {
+            ui.add(egui::Label::new(
+                egui::RichText::new("検索期間").color(TEXT_SECONDARY),
+            ));
+            ui.horizontal(|ui| {
+                ui.add(egui::Label::new(egui::RichText::new("From").color(TEXT_SECONDARY)));
+                if self.from_date.is_empty() {
+                    let today = Local::now().date_naive();
+                    let month_start = today.with_day(1).unwrap();
+                    self.from_date = month_start.format("%Y-%m-%d").to_string();
+                }
+                ui.add_sized([150.0, 30.0], egui::TextEdit::singleline(&mut self.from_date));
 
-            ui.label("To:");
-            if self.to_date.is_empty() {
-                self.to_date = Local::now().date_naive().format("%Y-%m-%d").to_string();
-            }
-            ui.add_sized([150.0, 25.0], egui::TextEdit::singleline(&mut self.to_date));
+                ui.add(egui::Label::new(egui::RichText::new("To").color(TEXT_SECONDARY)));
+                if self.to_date.is_empty() {
+                    self.to_date = Local::now().date_naive().format("%Y-%m-%d").to_string();
+                }
+                ui.add_sized([150.0, 30.0], egui::TextEdit::singleline(&mut self.to_date));
 
-            // RL003: 検索実行ボタン
-            if ui.button("検索実行").clicked() {
-                self.fetch_recordings();
-            }
+                // RL003: 検索実行ボタン
+                let search_btn = egui::Button::new(
+                    egui::RichText::new("検索実行").color(TEXT_ON_PRIMARY),
+                )
+                .fill(PRIMARY)
+                .rounding(egui::Rounding::same(8.0));
+                if ui.add_sized([120.0, 36.0], search_btn).clicked() {
+                    self.fetch_recordings();
+                }
+            });
         });
-
-        ui.separator();
 
         // 録画リスト表示
         if let Some(recordings) = &self.recordings {
-            // RL004: 全選択/全解除ボタン
             let meeting_uuids: Vec<String> = recordings.meetings.iter()
                 .map(|m| m.uuid.clone())
                 .collect();
 
-            ui.horizontal(|ui| {
-                if ui.button("全選択").clicked() {
-                    for uuid in &meeting_uuids {
-                        self.selected_recordings.insert(uuid.clone());
-                    }
-                }
-                if ui.button("全解除").clicked() {
-                    self.selected_recordings.clear();
-                }
-            });
-            ui.separator();
+            card_frame().show(ui, |ui| {
+                // ヘッダー行: 選択数バッジ + 全選択/全解除
+                ui.horizontal(|ui| {
+                    ui.add(egui::Label::new(
+                        egui::RichText::new("録画一覧").strong().color(TEXT_PRIMARY),
+                    ));
 
-            // 録画リスト
-            egui::ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
-                for meeting in &recordings.meetings {
-                    ui.horizontal(|ui| {
-                        // RL005: ミーティング選択
-                        let mut meeting_selected = self.selected_recordings.contains(&meeting.uuid);
-                        if ui.checkbox(&mut meeting_selected, format!("Meeting - {}", meeting.topic)).changed() {
-                            if meeting_selected {
-                                self.selected_recordings.insert(meeting.uuid.clone());
-                            } else {
-                                self.selected_recordings.remove(&meeting.uuid);
+                    // 選択数バッジ
+                    egui::Frame::none()
+                        .fill(PRIMARY)
+                        .rounding(egui::Rounding::same(12.0))
+                        .inner_margin(egui::Margin::symmetric(10.0, 3.0))
+                        .show(ui, |ui| {
+                            ui.add(egui::Label::new(
+                                egui::RichText::new(format!("{}", self.selected_recordings.len()))
+                                    .color(TEXT_ON_PRIMARY)
+                                    .size(13.0),
+                            ));
+                        });
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let deselect_btn = egui::Button::new("全解除").rounding(egui::Rounding::same(8.0));
+                        if ui.add(deselect_btn).clicked() {
+                            self.selected_recordings.clear();
+                        }
+                        let select_btn = egui::Button::new("全選択").rounding(egui::Rounding::same(8.0));
+                        if ui.add(select_btn).clicked() {
+                            for uuid in &meeting_uuids {
+                                self.selected_recordings.insert(uuid.clone());
                             }
                         }
                     });
+                });
 
-                    // ファイルリスト表示（簡略版）
-                    for file in &meeting.recording_files {
+                ui.add_space(6.0);
+
+                // 録画リスト
+                egui::ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
+                    for meeting in &recordings.meetings {
                         ui.horizontal(|ui| {
-                            ui.add_space(20.0);
-                            // RL006: ファイル選択
-                            let file_id = format!("{}-{}", meeting.uuid, file.stable_id());
-                            let mut file_selected = self.selected_recordings.contains(&file_id);
-                            let ext_display = if file.file_extension.is_empty() {
-                                file.file_type.to_string()
-                            } else {
-                                file.file_extension.clone()
-                            };
-                            if ui.checkbox(&mut file_selected, format!("☑ {} ({}) - {}MB",
-                                file.file_type, ext_display,
-                                file.file_size / 1024 / 1024)).changed() {
-                                if file_selected {
-                                    self.selected_recordings.insert(file_id);
+                            let mut meeting_selected = self.selected_recordings.contains(&meeting.uuid);
+                            if ui.checkbox(&mut meeting_selected, format!("Meeting - {}", meeting.topic)).changed() {
+                                if meeting_selected {
+                                    self.selected_recordings.insert(meeting.uuid.clone());
                                 } else {
-                                    self.selected_recordings.remove(&file_id);
+                                    self.selected_recordings.remove(&meeting.uuid);
                                 }
                             }
                         });
+
+                        for file in &meeting.recording_files {
+                            ui.horizontal(|ui| {
+                                ui.add_space(20.0);
+                                let file_id = format!("{}-{}", meeting.uuid, file.stable_id());
+                                let mut file_selected = self.selected_recordings.contains(&file_id);
+                                let ext_display = if file.file_extension.is_empty() {
+                                    file.file_type.to_string()
+                                } else {
+                                    file.file_extension.clone()
+                                };
+                                if ui.checkbox(&mut file_selected, format!("{} ({}) - {}MB",
+                                    file.file_type, ext_display,
+                                    file.file_size / 1024 / 1024)).changed() {
+                                    if file_selected {
+                                        self.selected_recordings.insert(file_id);
+                                    } else {
+                                        self.selected_recordings.remove(&file_id);
+                                    }
+                                }
+                            });
+                        }
+                        ui.add_space(5.0);
                     }
-                    ui.add_space(5.0);
-                }
+                });
             });
 
-            ui.separator();
+            ui.add_space(8.0);
 
-            // 統計情報とダウンロードボタン
+            // ダウンロードボタン
             ui.horizontal(|ui| {
-                ui.label(format!("Selected: {} items", self.selected_recordings.len()));
+                ui.add(egui::Label::new(
+                    egui::RichText::new(format!("Selected: {} items", self.selected_recordings.len()))
+                        .color(TEXT_SECONDARY),
+                ));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    // RL007: ダウンロード開始ボタン
-                    if ui.add_enabled(!self.selected_recordings.is_empty() && !self.is_downloading,
-                        egui::Button::new("ダウンロード")).clicked() {
+                    let dl_btn = egui::Button::new(
+                        egui::RichText::new("ダウンロード").color(TEXT_ON_PRIMARY),
+                    )
+                    .fill(PRIMARY)
+                    .rounding(egui::Rounding::same(8.0));
+                    if ui.add_enabled(
+                        !self.selected_recordings.is_empty() && !self.is_downloading,
+                        dl_btn,
+                    ).clicked() {
                         self.start_download();
                     }
                 });
             });
         } else {
-            ui.label("録画データを読み込むには検索実行ボタンをクリックしてください。");
+            // 空状態
+            card_frame().show(ui, |ui| {
+                ui.add(egui::Label::new(
+                    egui::RichText::new("録画データを読み込むには検索実行ボタンをクリックしてください。")
+                        .color(TEXT_SECONDARY),
+                ));
+            });
         }
     }
 
     /// SC005: ダウンロード進捗画面をレンダリングする
     fn render_progress(&mut self, ui: &mut egui::Ui) {
-        ui.heading("ダウンロード進捗");
-        ui.separator();
+        ui.add(egui::Label::new(
+            egui::RichText::new("ダウンロード進捗").size(26.0).strong().color(TEXT_PRIMARY),
+        ));
+        ui.add_space(8.0);
 
-        // PR001: 全体進捗バー
-        ui.label("Overall Progress:");
-        ui.add(egui::ProgressBar::new(self.progress_percentage).show_percentage());
-
-        ui.add_space(10.0);
-
-        // PR002: 現在ファイル名
-        if !self.current_file.is_empty() {
-            ui.label(format!("Current: {}", self.current_file));
-
-            // PR003: ファイル進捗バー（全体進捗と同じ値を使用）
-            ui.label("Progress:");
-            ui.add(egui::ProgressBar::new(self.progress_percentage).show_percentage());
-        }
-
-        ui.add_space(15.0);
-
-        // PR004 & PR005: 制御ボタン
-        ui.horizontal(|ui| {
-            if self.is_download_paused {
-                let resume_button = egui::Button::new("再開")
-                    .fill(egui::Color32::from_rgb(46, 139, 87));
-                if ui.add_sized([110.0, 35.0], resume_button).clicked() {
-                    self.resume_download();
-                }
-            } else {
-                let pause_button = egui::Button::new("一時停止")
-                    .fill(egui::Color32::from_rgb(255, 165, 0));
-                if ui.add_sized([110.0, 35.0], pause_button).clicked() {
-                    self.pause_download();
-                }
-            }
+        // 進捗カード
+        card_frame().show(ui, |ui| {
+            // PR001: 全体進捗バー
+            ui.add(egui::Label::new(
+                egui::RichText::new("Overall Progress").color(TEXT_SECONDARY),
+            ));
+            ui.add(
+                egui::ProgressBar::new(self.progress_percentage)
+                    .fill(PROGRESS_FILL)
+                    .rounding(egui::Rounding::same(6.0))
+                    .desired_height(12.0)
+                    .show_percentage(),
+            );
 
             ui.add_space(10.0);
 
-            let cancel_button = egui::Button::new("キャンセル")
-                .fill(egui::Color32::from_rgb(220, 20, 60));
-            if ui.add_sized([110.0, 35.0], cancel_button).clicked() {
-                self.cancel_download();
+            // PR002: 現在ファイル名
+            if !self.current_file.is_empty() {
+                ui.add(egui::Label::new(
+                    egui::RichText::new(format!("Current: {}", self.current_file)).color(TEXT_PRIMARY),
+                ));
+
+                // PR003: ファイル進捗バー
+                ui.add(
+                    egui::ProgressBar::new(self.progress_percentage)
+                        .fill(PROGRESS_FILL)
+                        .rounding(egui::Rounding::same(6.0))
+                        .desired_height(12.0)
+                        .show_percentage(),
+                );
             }
+
+            ui.add_space(12.0);
+
+            // PR004 & PR005: 制御ボタン
+            ui.horizontal(|ui| {
+                if self.is_download_paused {
+                    let resume_button = egui::Button::new(
+                        egui::RichText::new("再開").color(TEXT_ON_PRIMARY),
+                    )
+                    .fill(BTN_SAVE)
+                    .rounding(egui::Rounding::same(8.0));
+                    if ui.add_sized([120.0, 40.0], resume_button).clicked() {
+                        self.resume_download();
+                    }
+                } else {
+                    let pause_button = egui::Button::new(
+                        egui::RichText::new("一時停止").color(TEXT_ON_PRIMARY),
+                    )
+                    .fill(BTN_PAUSE)
+                    .rounding(egui::Rounding::same(8.0));
+                    if ui.add_sized([120.0, 40.0], pause_button).clicked() {
+                        self.pause_download();
+                    }
+                }
+
+                ui.add_space(8.0);
+
+                let cancel_button = egui::Button::new(
+                    egui::RichText::new("キャンセル").color(TEXT_ON_PRIMARY),
+                )
+                .fill(BTN_CANCEL)
+                .rounding(egui::Rounding::same(8.0));
+                if ui.add_sized([120.0, 40.0], cancel_button).clicked() {
+                    self.cancel_download();
+                }
+            });
         });
 
-        ui.separator();
-
-        // PR006: ログ表示エリア
-        ui.label("Download Log:");
-        egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-            for msg in &self.download_progress {
-                ui.label(msg);
-            }
+        // ログカード
+        card_frame().show(ui, |ui| {
+            ui.add(egui::Label::new(
+                egui::RichText::new("Download Log").strong().color(TEXT_PRIMARY),
+            ));
+            ui.add_space(4.0);
+            egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                for msg in &self.download_progress {
+                    ui.add(egui::Label::new(
+                        egui::RichText::new(msg).size(13.0).color(TEXT_SECONDARY),
+                    ));
+                }
+            });
         });
 
-        ui.add_space(10.0);
+        ui.add_space(6.0);
 
         // PR007: 統計情報
-        ui.label(format!("Status: {}", self.status_message));
+        ui.add(egui::Label::new(
+            egui::RichText::new(format!("Status: {}", self.status_message))
+                .size(14.0)
+                .color(TEXT_SECONDARY),
+        ));
     }
 
     /// SC006: エラー表示画面をレンダリングする
     fn render_error(&mut self, ui: &mut egui::Ui) {
-        ui.heading("⚠ エラー");
-        ui.separator();
+        ui.add(egui::Label::new(
+            egui::RichText::new("エラー").size(26.0).strong().color(ERROR_TEXT),
+        ));
+        ui.add_space(8.0);
 
         egui::ScrollArea::vertical().show(ui, |ui| {
             // エラー種別自動判定
@@ -813,62 +1055,94 @@ impl ZoomDownloaderApp {
                 "一般エラー"
             };
 
-            ui.label(format!("エラー種別: {}", error_type));
-            ui.add_space(5.0);
+            // エラー詳細カード（赤枠）
+            error_card_frame().show(ui, |ui| {
+                // エラー種別バッジ
+                egui::Frame::none()
+                    .fill(ERROR)
+                    .rounding(egui::Rounding::same(12.0))
+                    .inner_margin(egui::Margin::symmetric(10.0, 4.0))
+                    .show(ui, |ui| {
+                        ui.add(egui::Label::new(
+                            egui::RichText::new(error_type).color(TEXT_ON_PRIMARY).size(13.0),
+                        ));
+                    });
 
-            // エラーメッセージ
-            ui.label("エラーメッセージ:");
-            ui.add_sized([ui.available_width(), 40.0],
-                egui::TextEdit::multiline(&mut self.error_message.clone()).desired_width(f32::INFINITY));
+                ui.add_space(8.0);
 
-            ui.add_space(5.0);
+                // エラーメッセージ
+                ui.add(egui::Label::new(
+                    egui::RichText::new("エラーメッセージ").color(ERROR_TEXT).size(14.0),
+                ));
+                let error_width = ui.available_width();
+                ui.add_sized([error_width, 40.0],
+                    egui::TextEdit::multiline(&mut self.error_message.clone()).desired_width(f32::INFINITY));
 
-            // 詳細情報
-            ui.label("詳細情報:");
-            ui.add_sized([ui.available_width(), 50.0],
-                egui::TextEdit::multiline(&mut self.error_details.clone()).desired_width(f32::INFINITY));
+                ui.add_space(6.0);
 
-            ui.add_space(8.0);
+                // 詳細情報
+                ui.add(egui::Label::new(
+                    egui::RichText::new("詳細情報").color(ERROR_TEXT).size(14.0),
+                ));
+                ui.add_sized([error_width, 50.0],
+                    egui::TextEdit::multiline(&mut self.error_details.clone()).desired_width(f32::INFINITY));
+            });
 
-            // 推奨アクション
-            ui.label("推奨アクション:");
-            match error_type {
-                "認証エラー" => {
-                    ui.label("• 設定画面でClient IDとClient Secretを確認してください");
-                    ui.label("• Zoom Developer Appの設定を確認してください");
+            // 推奨アクション（通常カード）
+            card_frame().show(ui, |ui| {
+                ui.add(egui::Label::new(
+                    egui::RichText::new("推奨アクション").strong().color(TEXT_PRIMARY),
+                ));
+                ui.add_space(4.0);
+                match error_type {
+                    "認証エラー" => {
+                        ui.label("・設定画面でClient IDとClient Secretを確認してください");
+                        ui.label("・Zoom Developer Appの設定を確認してください");
+                    }
+                    "ネットワークエラー" => {
+                        ui.label("・インターネット接続を確認してください");
+                        ui.label("・ファイアウォール設定を確認してください");
+                    }
+                    "ファイルエラー" => {
+                        ui.label("・ディスク容量を確認してください");
+                        ui.label("・出力ディレクトリの権限を確認してください");
+                    }
+                    _ => {
+                        ui.label("・設定を確認してからリトライしてください");
+                    }
                 }
-                "ネットワークエラー" => {
-                    ui.label("• インターネット接続を確認してください");
-                    ui.label("• ファイアウォール設定を確認してください");
-                }
-                "ファイルエラー" => {
-                    ui.label("• ディスク容量を確認してください");
-                    ui.label("• 出力ディレクトリの権限を確認してください");
-                }
-                _ => {
-                    ui.label("• 設定を確認してからリトライしてください");
-                }
-            }
+            });
 
             ui.add_space(8.0);
 
             // アクションボタン
             ui.horizontal(|ui| {
-                if ui.button("リトライ").clicked() {
+                let retry_btn = egui::Button::new(
+                    egui::RichText::new("リトライ").color(TEXT_ON_PRIMARY),
+                )
+                .fill(PRIMARY)
+                .rounding(egui::Rounding::same(8.0));
+                if ui.add_sized([120.0, 40.0], retry_btn).clicked() {
                     self.error_message.clear();
                     self.error_details.clear();
                     self.current_screen = AppScreen::Recordings;
                 }
 
-                if ui.button("設定に戻る").clicked() {
+                let back_btn = egui::Button::new("設定に戻る")
+                    .rounding(egui::Rounding::same(8.0))
+                    .stroke(egui::Stroke::new(1.0, PRIMARY));
+                if ui.add_sized([120.0, 40.0], back_btn).clicked() {
                     self.error_message.clear();
                     self.error_details.clear();
                     self.current_screen = AppScreen::Config;
                 }
 
-                let log_button = egui::Button::new("ログ出力")
-                    .fill(egui::Color32::from_rgb(70, 130, 180));
-                if ui.add_sized([100.0, 35.0], log_button).clicked() {
+                let log_button = egui::Button::new(
+                    egui::RichText::new("ログ出力").color(TEXT_ON_PRIMARY),
+                )
+                .fill(BTN_LOAD)
+                .rounding(egui::Rounding::same(8.0));
+                if ui.add_sized([120.0, 40.0], log_button).clicked() {
                     match self.export_logs() {
                         Ok(filepath) => {
                             let _ = self.sender.send(AppMessage::LogExported(filepath));
