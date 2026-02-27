@@ -557,8 +557,11 @@ impl ApiComponent {
 
         self.record_api_call(duration, true).await;
 
-        // 事後条件の検証
-        debug_assert!(response_body.page_size > 0, "page_size must be positive");
+        // 事後条件の検証: page_sizeは録画0件時に0を返すため非負で検証
+        debug_assert!(
+            response_body.total_records == 0 || response_body.page_size > 0,
+            "page_size must be positive when results exist"
+        );
 
         Ok(response_body)
     }
