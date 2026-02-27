@@ -6,6 +6,73 @@ use crate::Config;
 use crate::components::api::RecordingSearchResponse;
 use crate::services_impl::AppServices;
 
+/// GUI表示設定（フォント・テーマ・スタイル）
+/// テストのスクリーンショット生成でも使用
+///
+/// 事前条件:
+/// - ctx は有効なegui::Contextである
+///
+/// 事後条件:
+/// - 日本語フォント（NotoSansJP）が設定される
+/// - ライトテーマが適用される
+/// - フォントサイズ・スペーシング・色が読みやすく調整される
+pub fn setup_gui_appearance(ctx: &egui::Context) {
+    // 日本語フォント（NotoSansJP）を埋め込み設定
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(
+        "NotoSansJP".to_owned(),
+        egui::FontData::from_static(include_bytes!("../assets/fonts/NotoSansJP-Regular.ttf")),
+    );
+    fonts.families
+        .get_mut(&egui::FontFamily::Proportional)
+        .unwrap()
+        .insert(0, "NotoSansJP".to_owned());
+    fonts.families
+        .get_mut(&egui::FontFamily::Monospace)
+        .unwrap()
+        .insert(1, "NotoSansJP".to_owned());
+    ctx.set_fonts(fonts);
+
+    // ライトテーマを明示的に設定
+    ctx.set_visuals(egui::Visuals::light());
+
+    // フォントとスタイルの設定
+    ctx.style_mut(|style| {
+        // フォントサイズを大幅に拡大（日本語の可読性向上）
+        for (_, font_id) in style.text_styles.iter_mut() {
+            font_id.size = (font_id.size * 1.5).max(20.0);
+        }
+
+        // スペーシングの改善
+        style.spacing.item_spacing.x = 12.0;
+        style.spacing.item_spacing.y = 10.0;
+        style.spacing.button_padding.x = 16.0;
+        style.spacing.button_padding.y = 12.0;
+
+        // より明確な色設定
+        style.visuals.widgets.noninteractive.bg_fill = egui::Color32::WHITE;
+        style.visuals.widgets.inactive.bg_fill = egui::Color32::from_gray(245);
+        style.visuals.widgets.hovered.bg_fill = egui::Color32::from_gray(230);
+        style.visuals.widgets.active.bg_fill = egui::Color32::from_rgb(100, 149, 237);
+
+        // テキスト色を明確に
+        style.visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::BLACK;
+        style.visuals.widgets.inactive.fg_stroke.color = egui::Color32::BLACK;
+        style.visuals.widgets.hovered.fg_stroke.color = egui::Color32::BLACK;
+        style.visuals.widgets.active.fg_stroke.color = egui::Color32::WHITE;
+
+        // 背景色を明確に
+        style.visuals.panel_fill = egui::Color32::from_gray(248);
+        style.visuals.window_fill = egui::Color32::WHITE;
+
+        // テキストのstroke幅を太くして視認性向上
+        style.visuals.widgets.noninteractive.fg_stroke.width = 1.0;
+        style.visuals.widgets.inactive.fg_stroke.width = 1.0;
+        style.visuals.widgets.hovered.fg_stroke.width = 1.0;
+        style.visuals.widgets.active.fg_stroke.width = 1.0;
+    });
+}
+
 #[derive(Debug)]
 pub enum AppMessage {
     AuthUrlGenerated(String),
