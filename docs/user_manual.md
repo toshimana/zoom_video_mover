@@ -7,7 +7,7 @@ Zoom Video Mover GUI アプリケーションの操作手順を説明します�
 **起動コマンド**:
 
 ```powershell
-cargo run --bin zoom_video_mover_gui --release
+cargo run --release
 ```
 
 ---

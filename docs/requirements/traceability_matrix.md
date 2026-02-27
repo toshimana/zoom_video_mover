@@ -639,7 +639,7 @@ impl CrossProcessImpactAnalyzer {
 | FR004-1 | AI要約API呼び出し | zoom_api_specifications.md:AI要約API | - | 実装予定（API仕様未確定） | - | SC004:録画リスト画面 | OP005:ファイル選択 | FN005:AI要約取得機能 | ⏳ 実装待ち |
 | FR004-2 | 要約データ構造 | requirements.md:対象ファイル | src/lib.rs:220-255 | `AISummaryResponse` | tests/ai_summary_tests.rs | SC004:録画リスト画面 | OP005:ファイル選択 | FN005:AI要約取得機能 | ✅ 構造体定義完了 |
 | **FR005** | **GUI操作** | | | | | | | | |
-| FR005-1 | egui/eframe UI | ARCHITECTURE.md:GUI状態遷移図 | src/gui.rs, src/main_gui.rs | `ZoomDownloaderApp` | tests/gui_integration.rs | SC001:メイン画面 | OP001:アプリケーション起動 | - | ✅ 実装完了 |
+| FR005-1 | egui/eframe UI | ARCHITECTURE.md:GUI状態遷移図 | src/gui.rs, src/main.rs | `ZoomDownloaderApp` | tests/gui_integration.rs | SC001:メイン画面 | OP001:アプリケーション起動 | - | ✅ 実装完了 |
 | FR005-2 | 設定画面 | rdra_models.md:システムコンテキスト図 | src/gui.rs:render_config | `render_config()` | tests/config_ui_tests.rs | SC002:設定画面 | OP002:設定入力・保存 | FN001:設定管理機能 | ✅ 実装完了 |
 | FR005-3 | ファイル選択 | requirements.md:ユーザーインターフェース | src/gui.rs:render_recordings | `render_file_selection()` | tests/selection_tests.rs | SC004:録画リスト画面 | OP005:ファイル選択 | - | ✅ 実装完了 |
 | **FR006** | **CLI操作** | | | | | | | | |
@@ -691,10 +691,8 @@ impl CrossProcessImpactAnalyzer {
 | render_config() | - | - | FR005-2 | 設定画面描画 | tests/config_ui_tests.rs |
 | render_recordings() | - | - | FR002-2, FR005-3 | 録画リスト表示 | tests/gui_integration.rs |
 | render_progress() | - | - | FR003-2 | 進捗バー表示 | tests/progress_tests.rs |
-| **src/main_gui.rs** | | | | | |
-| main() | - | - | FR005-1 | GUI アプリ起動 | tests/gui_integration.rs |
 | **src/main.rs** | | | | | |
-| main() | - | - | FR006-1 | CLI アプリ起動 | tests/cli_tests.rs |
+| main() | - | - | FR005-1 | GUI アプリ起動 | tests/gui_integration.rs |
 | **src/windows_console.rs** | | | | | |
 | setup_console_encoding() | - | 15 | NFR004-1 | Windows UTF-8設定 | tests/encoding_tests.rs |
 

@@ -3,7 +3,7 @@
 ## 1. プロジェクト概要
 
 ### 目的
-ZoomクラウドレコーディングをローカルにダウンロードするRustアプリケーション（CLI・GUI両対応）
+ZoomクラウドレコーディングをローカルにダウンロードするRust GUIアプリケーション
 
 ### 対象環境
 - Windows（主要対象）
@@ -38,16 +38,12 @@ ZoomクラウドレコーディングをローカルにダウンロードするR
   - ファイル名の自動生成
 
 ### 2.4 ユーザーインターフェース
-- **CLI版**
-  - コマンドライン引数対応
-  - 対話式インターフェース
-  - プログレスバー表示
-
-- **GUI版**
-  - egui/eframe使用
+- **GUI（egui/eframe）**
   - 直感的な操作画面
+  - リアルタイムダウンロード進捗表示
   - ファイル選択・フォルダ選択
   - 設定画面
+  - 日本語フォント対応
 
 ## 3. 非機能要件
 
@@ -84,25 +80,41 @@ ZoomクラウドレコーディングをローカルにダウンロードするR
 ### 4.2 依存関係
 ```toml
 [dependencies]
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["json", "rustls-tls", "stream"], default-features = false }
 oauth2 = "4.4"
 url = "2.4"
-eframe = "0.24"
-egui = "0.24"
+eframe = "0.28"
+egui = "0.28"
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-windows = { version = "0.52", features = ["Win32_System_Console"] }
+env_logger = "0.10"
+log = "0.4"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = ["Win32_System_Console", "Win32_Foundation"] }
 ```
 
 ### 4.3 プロジェクト構造
 ```
 src/
-├── main.rs          # CLIアプリケーションのエントリーポイント
-├── main_gui.rs      # GUIアプリケーションのエントリーポイント
-├── lib.rs           # コアライブラリ
-├── gui.rs           # GUI実装
-└── windows_console.rs # Windows固有のコンソール処理
+├── main.rs            # GUIアプリケーションのエントリーポイント
+├── lib.rs             # コアライブラリ
+├── gui.rs             # GUI実装
+├── errors.rs          # エラー型定義
+├── services.rs        # サービスインターフェース（トレイト定義）
+├── services_impl.rs   # サービス実装
+├── windows_console.rs # Windows固有のコンソール処理
+└── components/        # 機能別コンポーネント
+    ├── mod.rs         # モジュール定義
+    ├── api.rs         # API通信
+    ├── auth.rs        # 認証処理
+    ├── config.rs      # 設定管理
+    ├── crypto.rs      # 暗号化処理
+    ├── download.rs    # ダウンロード処理
+    ├── integration.rs # 統合処理
+    ├── recording.rs   # 録画管理
+    └── ui.rs          # UIコンポーネント
 ```
 
 ## 5. 品質要件
@@ -135,13 +147,13 @@ src/
 
 ### 6.2 ビルド・実行
 ```bash
-# CLI版
+# GUIアプリケーション実行
 cargo run
 
-# GUI版
-cargo run --bin zoom_video_mover_gui
+# リリースビルド（実行）
+cargo run --release
 
-# リリースビルド
+# リリースビルド（ビルドのみ）
 cargo build --release
 ```
 
@@ -183,7 +195,7 @@ cargo build --release
 ### 9.1 機能面
 - ✅ Zoom OAuth認証が正常に動作する
 - ✅ 録画ファイルが確実にダウンロードできる
-- ✅ CLI・GUI両方が安定動作する
+- ✅ GUIアプリケーションが安定動作する
 - ✅ Windows日本語環境で文字化けしない
 
 ### 9.2 品質面

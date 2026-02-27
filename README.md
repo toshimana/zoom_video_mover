@@ -1,6 +1,6 @@
 # Zoom Cloud Recording Downloader
 
-ZoomクラウドレコーディングをローカルにダウンロードするRustアプリケーション
+ZoomクラウドレコーディングをローカルにダウンロードするRust GUIアプリケーション
 
 ## ドキュメント構成
 
@@ -102,13 +102,15 @@ cargo run --release
 
 ## 実行手順
 
-1. プログラムを実行
-2. 初回実行時はブラウザが自動で開きZoom認証画面が表示されます
-3. Zoomアカウントでログインし、アプリを承認
-4. 表示される認証コードをコピーしてターミナルに入力
-5. ダウンロードしたい期間（開始日・終了日）を入力（YYYY-MM-DD形式）
-6. 保存先ディレクトリを指定（デフォルト: ユーザーのダウンロードフォルダ\ZoomRecordings）
-7. ダウンロード開始
+1. `cargo run --release` でGUIアプリケーションを起動
+2. 「設定」タブでClient ID・Client Secretを入力し保存
+3. 「認証」タブで認証を開始し、ブラウザでZoomにログイン・承認
+4. 認証コードをGUI画面に貼り付けて認証完了
+5. 「録画リスト」タブで日付範囲を指定して録画を検索
+6. ダウンロードしたい録画を選択し「ダウンロード」をクリック
+7. 進捗バーでダウンロード状況をリアルタイム確認
+
+詳細な操作手順は [GUI操作マニュアル](docs/user_manual.md) をご覧ください。
 
 ## Windows固有の機能
 
@@ -120,13 +122,11 @@ cargo run --release
 - **ダウンロードフォルダ**: デフォルトでユーザーのダウンロードフォルダ内にZoomRecordingsフォルダを作成
 - **Windows環境変数**: `set ZOOM_ACCESS_TOKEN=...` 形式で環境変数設定コマンドを表示
 
-### GUIアプリケーション（実験的）
-
-CLI版に加えて、使いやすいGUIアプリケーションも提供しています：
+### GUIアプリケーション
 
 ```powershell
 # GUIアプリケーションを起動
-cargo run --bin zoom_video_mover_gui --release
+cargo run --release
 ```
 
 **詳細な操作手順は [GUI操作マニュアル](docs/user_manual.md) をご覧ください。**
@@ -184,7 +184,7 @@ cargo run --release
 **現在の動作:**
 ```powershell
 # 正常に起動するようになりました
-cargo run --bin zoom_video_mover_gui --release
+cargo run --release
 ```
 
 ### エラー: "linker 'link.exe' not found"

@@ -3,10 +3,23 @@
 ## プロジェクト構造
 ```
 src/
-├── main.rs          # GUIアプリケーションのエントリーポイント
-├── lib.rs           # コアライブラリ
-├── gui.rs           # GUI実装
-└── windows_console.rs # Windows固有のコンソール処理
+├── main.rs            # GUIアプリケーションのエントリーポイント
+├── lib.rs             # コアライブラリ
+├── gui.rs             # GUI実装
+├── errors.rs          # エラー型定義
+├── services.rs        # サービスインターフェース（トレイト定義）
+├── services_impl.rs   # サービス実装
+├── windows_console.rs # Windows固有のコンソール処理
+└── components/        # 機能別コンポーネント
+    ├── mod.rs         # モジュール定義
+    ├── api.rs         # API通信
+    ├── auth.rs        # 認証処理
+    ├── config.rs      # 設定管理
+    ├── crypto.rs      # 暗号化処理
+    ├── download.rs    # ダウンロード処理
+    ├── integration.rs # 統合処理
+    ├── recording.rs   # 録画管理
+    └── ui.rs          # UIコンポーネント
 ```
 
 ## 主要依存関係
