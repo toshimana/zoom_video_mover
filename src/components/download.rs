@@ -193,7 +193,7 @@ impl DownloadComponent {
     /// - 内部状態が適切に初期化される
     pub fn new(config: DownloadConfig) -> Self {
         let http_client = Client::builder()
-            .timeout(config.timeout)
+            .connect_timeout(Duration::from_secs(30))
             .build()
             .expect("Failed to create HTTP client");
 
@@ -380,6 +380,15 @@ impl DownloadComponent {
                             task.error = Some(e.to_string());
                             task.retry_count += 1;
 
+                            // 不完全なファイルを削除
+                            if task.output_path.exists() {
+                                let _ = tokio::fs::remove_file(&task.output_path).await;
+                                log::info!(
+                                    "Removed incomplete file: {}",
+                                    task.output_path.display()
+                                );
+                            }
+
                             if task.retry_count < config.max_retries {
                                 // リトライ
                                 task.state = TaskState::Pending;
@@ -426,7 +435,7 @@ impl DownloadComponent {
         http_client: &Client,
         task: &mut DownloadTask,
         event_sender: &Option<mpsc::UnboundedSender<DownloadEvent>>,
-        _config: &DownloadConfig,
+        config: &DownloadConfig,
     ) -> AppResult<()> {
         // 出力ディレクトリの作成
         if let Some(parent) = task.output_path.parent() {
@@ -487,7 +496,15 @@ impl DownloadComponent {
         let start_time = Instant::now();
         let mut last_update_time = start_time;
 
-        while let Some(chunk_result) = stream.next().await {
+        while let Some(chunk_result) = tokio::time::timeout(config.timeout, stream.next())
+            .await
+            .map_err(|_| {
+                AppError::network::<reqwest::Error>(
+                    "Chunk read timed out: no data received within timeout period",
+                    None,
+                )
+            })?
+        {
             let chunk =
                 chunk_result.map_err(|e| AppError::network("Failed to download chunk", Some(e)))?;
 
@@ -616,7 +633,7 @@ impl Configurable<DownloadConfig> for DownloadComponent {
 
         // HTTPクライアントの再構築
         self.http_client = Client::builder()
-            .timeout(self.config.timeout)
+            .connect_timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| AppError::configuration("Failed to create HTTP client", Some(e)))?;
 
