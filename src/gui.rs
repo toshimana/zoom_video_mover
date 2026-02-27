@@ -458,12 +458,6 @@ impl ZoomDownloaderApp {
                 AppScreen::Progress => self.render_progress(ui),
                 AppScreen::Error => {
                     self.render_error(ui);
-                    ui.separator();
-                    if ui.button("設定画面に戻る").clicked() {
-                        self.current_screen = AppScreen::Config;
-                        self.error_message.clear();
-                        self.error_details.clear();
-                    }
                 },
             }
 
@@ -490,18 +484,19 @@ impl ZoomDownloaderApp {
         ui.add_space(10.0);
 
         // 設定フォーム
+        let field_width = (ui.available_width() - 180.0 - 40.0).max(300.0);
         egui::Grid::new("config_grid")
             .num_columns(2)
             .spacing([20.0, 10.0])
             .show(ui, |ui| {
                 // CF001: Client ID入力
                 ui.label("Client ID:");
-                ui.add_sized([300.0, 25.0], egui::TextEdit::singleline(&mut self.client_id));
+                ui.add_sized([field_width, 25.0], egui::TextEdit::singleline(&mut self.client_id));
                 ui.end_row();
 
                 // CF002: Client Secret入力 (パスワード形式)
                 ui.label("Client Secret:");
-                ui.add_sized([300.0, 25.0], egui::TextEdit::singleline(&mut self.client_secret).password(true));
+                ui.add_sized([field_width, 25.0], egui::TextEdit::singleline(&mut self.client_secret).password(true));
                 ui.end_row();
 
                 // CF003: 出力ディレクトリ入力
@@ -509,7 +504,7 @@ impl ZoomDownloaderApp {
                 if self.output_dir.is_empty() {
                     self.output_dir = self.get_default_downloads_dir();
                 }
-                ui.add_sized([300.0, 25.0], egui::TextEdit::singleline(&mut self.output_dir));
+                ui.add_sized([field_width, 25.0], egui::TextEdit::singleline(&mut self.output_dir));
                 ui.end_row();
             });
 
@@ -643,13 +638,13 @@ impl ZoomDownloaderApp {
                 let month_start = today.with_day(1).unwrap();
                 self.from_date = month_start.format("%Y-%m-%d").to_string();
             }
-            ui.text_edit_singleline(&mut self.from_date);
+            ui.add_sized([150.0, 25.0], egui::TextEdit::singleline(&mut self.from_date));
 
             ui.label("To:");
             if self.to_date.is_empty() {
                 self.to_date = Local::now().date_naive().format("%Y-%m-%d").to_string();
             }
-            ui.text_edit_singleline(&mut self.to_date);
+            ui.add_sized([150.0, 25.0], egui::TextEdit::singleline(&mut self.to_date));
 
             // RL003: 検索実行ボタン
             if ui.button("検索実行").clicked() {
@@ -765,13 +760,13 @@ impl ZoomDownloaderApp {
             if self.is_download_paused {
                 let resume_button = egui::Button::new("再開")
                     .fill(egui::Color32::from_rgb(46, 139, 87));
-                if ui.add_sized([80.0, 30.0], resume_button).clicked() {
+                if ui.add_sized([110.0, 35.0], resume_button).clicked() {
                     self.resume_download();
                 }
             } else {
                 let pause_button = egui::Button::new("一時停止")
                     .fill(egui::Color32::from_rgb(255, 165, 0));
-                if ui.add_sized([80.0, 30.0], pause_button).clicked() {
+                if ui.add_sized([110.0, 35.0], pause_button).clicked() {
                     self.pause_download();
                 }
             }
@@ -780,7 +775,7 @@ impl ZoomDownloaderApp {
 
             let cancel_button = egui::Button::new("キャンセル")
                 .fill(egui::Color32::from_rgb(220, 20, 60));
-            if ui.add_sized([80.0, 30.0], cancel_button).clicked() {
+            if ui.add_sized([110.0, 35.0], cancel_button).clicked() {
                 self.cancel_download();
             }
         });
@@ -806,82 +801,84 @@ impl ZoomDownloaderApp {
         ui.heading("⚠ エラー");
         ui.separator();
 
-        // エラー種別自動判定
-        let error_type = if self.error_message.contains("auth") || self.error_message.contains("401") {
-            "認証エラー"
-        } else if self.error_message.contains("network") || self.error_message.contains("timeout") {
-            "ネットワークエラー"
-        } else if self.error_message.contains("file") || self.error_message.contains("disk") {
-            "ファイルエラー"
-        } else {
-            "一般エラー"
-        };
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            // エラー種別自動判定
+            let error_type = if self.error_message.contains("auth") || self.error_message.contains("401") {
+                "認証エラー"
+            } else if self.error_message.contains("network") || self.error_message.contains("timeout") {
+                "ネットワークエラー"
+            } else if self.error_message.contains("file") || self.error_message.contains("disk") {
+                "ファイルエラー"
+            } else {
+                "一般エラー"
+            };
 
-        ui.label(format!("エラー種別: {}", error_type));
-        ui.add_space(10.0);
+            ui.label(format!("エラー種別: {}", error_type));
+            ui.add_space(5.0);
 
-        // エラーメッセージ
-        ui.label("エラーメッセージ:");
-        ui.add_sized([ui.available_width(), 60.0],
-            egui::TextEdit::multiline(&mut self.error_message.clone()).desired_width(f32::INFINITY));
+            // エラーメッセージ
+            ui.label("エラーメッセージ:");
+            ui.add_sized([ui.available_width(), 40.0],
+                egui::TextEdit::multiline(&mut self.error_message.clone()).desired_width(f32::INFINITY));
 
-        ui.add_space(10.0);
+            ui.add_space(5.0);
 
-        // 詳細情報
-        ui.label("詳細情報:");
-        ui.add_sized([ui.available_width(), 80.0],
-            egui::TextEdit::multiline(&mut self.error_details.clone()).desired_width(f32::INFINITY));
+            // 詳細情報
+            ui.label("詳細情報:");
+            ui.add_sized([ui.available_width(), 50.0],
+                egui::TextEdit::multiline(&mut self.error_details.clone()).desired_width(f32::INFINITY));
 
-        ui.add_space(15.0);
+            ui.add_space(8.0);
 
-        // 推奨アクション
-        ui.label("推奨アクション:");
-        match error_type {
-            "認証エラー" => {
-                ui.label("• 設定画面でClient IDとClient Secretを確認してください");
-                ui.label("• Zoom Developer Appの設定を確認してください");
-            }
-            "ネットワークエラー" => {
-                ui.label("• インターネット接続を確認してください");
-                ui.label("• ファイアウォール設定を確認してください");
-            }
-            "ファイルエラー" => {
-                ui.label("• ディスク容量を確認してください");
-                ui.label("• 出力ディレクトリの権限を確認してください");
-            }
-            _ => {
-                ui.label("• 設定を確認してからリトライしてください");
-            }
-        }
-
-        ui.add_space(15.0);
-
-        // アクションボタン
-        ui.horizontal(|ui| {
-            if ui.button("リトライ").clicked() {
-                self.error_message.clear();
-                self.error_details.clear();
-                self.current_screen = AppScreen::Recordings;
-            }
-
-            if ui.button("設定に戻る").clicked() {
-                self.error_message.clear();
-                self.error_details.clear();
-                self.current_screen = AppScreen::Config;
-            }
-
-            let log_button = egui::Button::new("ログ出力")
-                .fill(egui::Color32::from_rgb(70, 130, 180));
-            if ui.add_sized([80.0, 30.0], log_button).clicked() {
-                match self.export_logs() {
-                    Ok(filepath) => {
-                        let _ = self.sender.send(AppMessage::LogExported(filepath));
-                    }
-                    Err(error_msg) => {
-                        let _ = self.sender.send(AppMessage::Error(format!("Failed to export log: {}", error_msg)));
-                    }
+            // 推奨アクション
+            ui.label("推奨アクション:");
+            match error_type {
+                "認証エラー" => {
+                    ui.label("• 設定画面でClient IDとClient Secretを確認してください");
+                    ui.label("• Zoom Developer Appの設定を確認してください");
+                }
+                "ネットワークエラー" => {
+                    ui.label("• インターネット接続を確認してください");
+                    ui.label("• ファイアウォール設定を確認してください");
+                }
+                "ファイルエラー" => {
+                    ui.label("• ディスク容量を確認してください");
+                    ui.label("• 出力ディレクトリの権限を確認してください");
+                }
+                _ => {
+                    ui.label("• 設定を確認してからリトライしてください");
                 }
             }
+
+            ui.add_space(8.0);
+
+            // アクションボタン
+            ui.horizontal(|ui| {
+                if ui.button("リトライ").clicked() {
+                    self.error_message.clear();
+                    self.error_details.clear();
+                    self.current_screen = AppScreen::Recordings;
+                }
+
+                if ui.button("設定に戻る").clicked() {
+                    self.error_message.clear();
+                    self.error_details.clear();
+                    self.current_screen = AppScreen::Config;
+                }
+
+                let log_button = egui::Button::new("ログ出力")
+                    .fill(egui::Color32::from_rgb(70, 130, 180));
+                if ui.add_sized([100.0, 35.0], log_button).clicked() {
+                    match self.export_logs() {
+                        Ok(filepath) => {
+                            let _ = self.sender.send(AppMessage::LogExported(filepath));
+                        }
+                        Err(error_msg) => {
+                            let _ = self.sender.send(AppMessage::Error(format!("Failed to export log: {}", error_msg)));
+                        }
+                    }
+                }
+            });
         });
     }
 
