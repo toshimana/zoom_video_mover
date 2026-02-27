@@ -3,15 +3,21 @@
 //! services.rsで定義されたtraitの本番実装。
 //! 既存のgui.rsにハードコードされていた外部呼び出しをラップする。
 
-use std::sync::{mpsc, Arc};
-use std::path::PathBuf;
-use log;
-use crate::Config;
-use crate::components::api::{ApiComponent, ApiConfig, MeetingRecording, RecordingFile, RecordingFileType, RecordingSearchRequest, RecordingSearchResponse};
+use crate::components::api::{
+    ApiComponent, ApiConfig, MeetingRecording, RecordingFile, RecordingFileType,
+    RecordingSearchRequest, RecordingSearchResponse,
+};
 use crate::components::auth::AuthToken;
 use crate::components::download::{DownloadComponent, DownloadConfig, DownloadEvent};
 use crate::gui::AppMessage;
-use crate::services::{AuthService, BrowserLauncher, ConfigService, DownloadService, RecordingService};
+use crate::services::{
+    AuthService, BrowserLauncher, ConfigService, DownloadService, RecordingService,
+};
+use crate::Config;
+use chrono::{Datelike, NaiveDate};
+use log;
+use std::path::PathBuf;
+use std::sync::{mpsc, Arc};
 
 /// 本番用設定サービス
 pub struct RealConfigService;
@@ -43,9 +49,7 @@ impl AuthService for RealAuthService {
             .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
         let client_id = client_id.to_string();
         let client_secret = client_secret.to_string();
-        rt.block_on(async {
-            crate::gui::generate_auth_url_async(&client_id, &client_secret).await
-        })
+        rt.block_on(async { crate::gui::generate_auth_url_async(&client_id, &client_secret).await })
     }
 
     fn exchange_code_for_token(
@@ -67,6 +71,36 @@ impl AuthService for RealAuthService {
 
 /// 本番用録画取得サービス
 pub struct RealRecordingService;
+
+/// 日付範囲を最大1ヶ月ごとのチャンクに分割する
+///
+/// Zoom APIの `from`/`to` パラメータは最大1ヶ月の範囲のみ許容するため、
+/// 1ヶ月を超える期間を月単位に分割する。
+/// 各チャンクの `to` は次チャンクの `from` と同じ値（API側でexclusive扱い対策として+1日）。
+fn split_into_monthly_chunks(from: NaiveDate, to: NaiveDate) -> Vec<(NaiveDate, NaiveDate)> {
+    let mut chunks = Vec::new();
+    let mut chunk_start = from;
+
+    while chunk_start <= to {
+        // chunk_startの翌月1日を計算
+        let next_month_first = if chunk_start.month() == 12 {
+            NaiveDate::from_ymd_opt(chunk_start.year() + 1, 1, 1)
+        } else {
+            NaiveDate::from_ymd_opt(chunk_start.year(), chunk_start.month() + 1, 1)
+        };
+
+        let chunk_end = match next_month_first {
+            Some(nm) if nm <= to => nm,
+            // 最後のチャンク: toに+1日してexclusive対策
+            _ => to + chrono::Duration::days(1),
+        };
+
+        chunks.push((chunk_start, chunk_end));
+        chunk_start = chunk_end;
+    }
+
+    chunks
+}
 
 impl RecordingService for RealRecordingService {
     fn get_recordings(
@@ -95,27 +129,47 @@ impl RecordingService for RealRecordingService {
             api.set_auth_token(token).await;
 
             // 日付パース
-            let from = chrono::NaiveDate::parse_from_str(&from_date, "%Y-%m-%d")
+            let from = NaiveDate::parse_from_str(&from_date, "%Y-%m-%d")
                 .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
                     Box::new(e)
                 })?;
-            let to = chrono::NaiveDate::parse_from_str(&to_date, "%Y-%m-%d")
+            let to = NaiveDate::parse_from_str(&to_date, "%Y-%m-%d")
                 .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
                     Box::new(e)
                 })?;
 
-            let request = RecordingSearchRequest {
-                user_id: Some(user_id),
-                from,
-                to,
-                page_size: None,
+            // 月単位チャンクに分割してページネーション対応で全件取得
+            let chunks = split_into_monthly_chunks(from, to);
+            log::info!("Fetching recordings: from={} to={}, split into {} chunk(s)", from, to, chunks.len());
+
+            let mut all_meetings: Vec<MeetingRecording> = Vec::new();
+            for (chunk_from, chunk_to) in &chunks {
+                log::info!("Fetching chunk: from={} to={}", chunk_from, chunk_to);
+                let request = RecordingSearchRequest {
+                    user_id: Some(user_id.clone()),
+                    from: *chunk_from,
+                    to: *chunk_to,
+                    page_size: None,
+                    next_page_token: None,
+                };
+
+                let chunk_meetings = api.get_all_recordings(request).await
+                    .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
+                log::info!("Chunk from={} to={}: {} meetings", chunk_from, chunk_to, chunk_meetings.len());
+                all_meetings.extend(chunk_meetings);
+            }
+
+            log::info!("Total meetings fetched: {}", all_meetings.len());
+
+            let mut recordings = RecordingSearchResponse {
+                from: from_date.clone(),
+                to: to_date.clone(),
+                page_count: 1,
+                page_size: all_meetings.len() as u32,
+                total_records: all_meetings.len() as u32,
                 next_page_token: None,
+                meetings: all_meetings,
             };
-
-            let mut recordings = api.search_recordings(request).await
-                .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
-                    Box::new(e)
-                })?;
 
             // 各ミーティングのrecording_filesにSUMMARYが含まれない場合、
             // Meeting Summary APIで自動チェックし、仮想エントリを追加
@@ -181,26 +235,40 @@ impl RealDownloadService {
         selected_recordings: &[String],
     ) -> Vec<(&'a MeetingRecording, &'a RecordingFile)> {
         let mut result = Vec::new();
-        log::info!("[DL-DIAG] resolve_selected_files: {} selections, {} meetings",
-            selected_recordings.len(), recordings.meetings.len());
+        log::info!(
+            "[DL-DIAG] resolve_selected_files: {} selections, {} meetings",
+            selected_recordings.len(),
+            recordings.meetings.len()
+        );
 
         for selection in selected_recordings {
             for meeting in &recordings.meetings {
                 if *selection == meeting.uuid {
                     // ミーティング全体が選択されている
-                    log::info!("[DL-DIAG] Meeting-level selection: uuid={}, {} files",
-                        meeting.uuid, meeting.recording_files.len());
+                    log::info!(
+                        "[DL-DIAG] Meeting-level selection: uuid={}, {} files",
+                        meeting.uuid,
+                        meeting.recording_files.len()
+                    );
                     for file in &meeting.recording_files {
-                        log::info!("[DL-DIAG]   file: type={}, stable_id={}, download_url_len={}",
-                            file.file_type, file.stable_id(), file.download_url.len());
+                        log::info!(
+                            "[DL-DIAG]   file: type={}, stable_id={}, download_url_len={}",
+                            file.file_type,
+                            file.stable_id(),
+                            file.download_url.len()
+                        );
                         result.push((meeting, file));
                     }
-                } else if let Some(file_id) = selection.strip_prefix(&format!("{}-", meeting.uuid)) {
+                } else if let Some(file_id) = selection.strip_prefix(&format!("{}-", meeting.uuid))
+                {
                     // 個別ファイルが選択されている
                     for file in &meeting.recording_files {
                         if file.stable_id() == file_id {
-                            log::info!("[DL-DIAG] Individual file matched: selection={}, stable_id={}",
-                                selection, file.stable_id());
+                            log::info!(
+                                "[DL-DIAG] Individual file matched: selection={}, stable_id={}",
+                                selection,
+                                file.stable_id()
+                            );
                             result.push((meeting, file));
                         }
                     }
@@ -208,13 +276,18 @@ impl RealDownloadService {
             }
         }
 
-        log::info!("[DL-DIAG] resolve result: {} files before dedup", result.len());
+        log::info!(
+            "[DL-DIAG] resolve result: {} files before dedup",
+            result.len()
+        );
         // 重複除去（同じ stable_id を持つものは1つだけ）
         result.dedup_by_key(|(_, f)| f.stable_id());
-        log::info!("[DL-DIAG] resolve result: {} files after dedup", result.len());
+        log::info!(
+            "[DL-DIAG] resolve result: {} files after dedup",
+            result.len()
+        );
         result
     }
-
 }
 
 impl DownloadService for RealDownloadService {
@@ -239,9 +312,10 @@ impl DownloadService for RealDownloadService {
         }
 
         let total_files = files_to_download.len();
-        let _ = sender.send(AppMessage::DownloadProgress(
-            format!("Preparing to download {} files...", total_files),
-        ));
+        let _ = sender.send(AppMessage::DownloadProgress(format!(
+            "Preparing to download {} files...",
+            total_files
+        )));
 
         // DownloadComponent用のタスク情報を事前に収集
         let access_token = access_token.to_string();
@@ -257,8 +331,10 @@ impl DownloadService for RealDownloadService {
                     log::info!("[DL-DIAG] SUMMARY file has empty download_url, will use Meeting Summary API: meeting_id={}", meeting.id);
                     summary_fallback_targets.push(((*meeting).clone(), (*file).clone()));
                 } else {
-                    let msg = format!("{}: meeting='{}' ({})",
-                        file.file_type, meeting.topic, meeting.start_time);
+                    let msg = format!(
+                        "{}: meeting='{}' ({})",
+                        file.file_type, meeting.topic, meeting.start_time
+                    );
                     log::warn!("[DL-DIAG] Skipping file with empty download_url: {}", msg);
                     skipped_files.push(msg);
                 }
@@ -277,16 +353,21 @@ impl DownloadService for RealDownloadService {
             } else {
                 None
             };
-            log::info!("[DL-DIAG] Task created: id={}, type={}, url_len={}",
-                task_id, file.file_type, file.download_url.len());
+            log::info!(
+                "[DL-DIAG] Task created: id={}, type={}, url_len={}",
+                task_id,
+                file.file_type,
+                file.download_url.len()
+            );
             tasks.push((task_id, download_url, file_name, file_size));
         }
 
         // GUIにスキップ通知
         if !skipped_files.is_empty() {
-            let _ = sender.send(AppMessage::DownloadProgress(
-                format!("Warning: {} file(s) skipped (no download URL)", skipped_files.len()),
-            ));
+            let _ = sender.send(AppMessage::DownloadProgress(format!(
+                "Warning: {} file(s) skipped (no download URL)",
+                skipped_files.len()
+            )));
             for msg in &skipped_files {
                 let _ = sender.send(AppMessage::DownloadProgress(format!("  Skipped: {}", msg)));
             }
@@ -311,10 +392,14 @@ impl DownloadService for RealDownloadService {
             component.set_event_listener(event_tx);
 
             // 出力ディレクトリを作成
-            tokio::fs::create_dir_all(&output_dir).await
-                .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
-                    Box::new(std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to create output directory: {}", e)))
-                })?;
+            tokio::fs::create_dir_all(&output_dir).await.map_err(
+                |e| -> Box<dyn std::error::Error + Send + Sync> {
+                    Box::new(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("Failed to create output directory: {}", e),
+                    ))
+                },
+            )?;
 
             // タスクを追加
             for (task_id, download_url, file_name, file_size) in &tasks {
@@ -327,15 +412,22 @@ impl DownloadService for RealDownloadService {
                     )
                     .await
                     .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
-                        Box::new(std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to add task: {}", e)))
+                        Box::new(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("Failed to add task: {}", e),
+                        ))
                     })?;
             }
 
             // ダウンロード開始
-            component.start_downloads().await
-                .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
-                    Box::new(std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to start downloads: {}", e)))
-                })?;
+            component.start_downloads().await.map_err(
+                |e| -> Box<dyn std::error::Error + Send + Sync> {
+                    Box::new(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("Failed to start downloads: {}", e),
+                    ))
+                },
+            )?;
 
             // イベントを受信して進捗を通知
             let mut completed_files: Vec<String> = Vec::new();
@@ -348,49 +440,50 @@ impl DownloadService for RealDownloadService {
                     Some(event) => match event {
                         DownloadEvent::TaskStarted { task_id } => {
                             // task_idからファイル名を取得
-                            let file_name = tasks.iter()
+                            let file_name = tasks
+                                .iter()
                                 .find(|(id, _, _, _)| *id == task_id)
                                 .map(|(_, _, name, _)| name.as_str())
                                 .unwrap_or("unknown");
-                            let _ = sender_clone.send(AppMessage::DownloadProgress(
-                                format!("Downloading: {}", file_name),
-                            ));
+                            let _ = sender_clone.send(AppMessage::DownloadProgress(format!(
+                                "Downloading: {}",
+                                file_name
+                            )));
                         }
                         DownloadEvent::ProgressUpdate { task_id, progress } => {
-                            let file_name = tasks.iter()
+                            let file_name = tasks
+                                .iter()
                                 .find(|(id, _, _, _)| *id == task_id)
                                 .map(|(_, _, name, _)| name.as_str())
                                 .unwrap_or("unknown");
                             let speed_mbps = progress.current_speed / 1024.0 / 1024.0;
-                            let _ = sender_clone.send(AppMessage::DownloadProgress(
-                                format!(
-                                    "{}: {:.1}% ({:.1} MB/s)",
-                                    file_name,
-                                    progress.percentage * 100.0,
-                                    speed_mbps
-                                ),
-                            ));
+                            let _ = sender_clone.send(AppMessage::DownloadProgress(format!(
+                                "{}: {:.1}% ({:.1} MB/s)",
+                                file_name,
+                                progress.percentage * 100.0,
+                                speed_mbps
+                            )));
                         }
                         DownloadEvent::TaskCompleted { output_path, .. } => {
                             completed_count += 1;
                             let path_str = output_path.to_string_lossy().to_string();
                             completed_files.push(path_str.clone());
-                            let _ = sender_clone.send(AppMessage::DownloadProgress(
-                                format!(
-                                    "Completed ({}/{}): {}",
-                                    completed_count, download_task_count, path_str
-                                ),
-                            ));
+                            let _ = sender_clone.send(AppMessage::DownloadProgress(format!(
+                                "Completed ({}/{}): {}",
+                                completed_count, download_task_count, path_str
+                            )));
                         }
                         DownloadEvent::TaskFailed { task_id, error } => {
                             failed_count += 1;
-                            let file_name = tasks.iter()
+                            let file_name = tasks
+                                .iter()
                                 .find(|(id, _, _, _)| *id == task_id)
                                 .map(|(_, _, name, _)| name.as_str())
                                 .unwrap_or("unknown");
-                            let _ = sender_clone.send(AppMessage::DownloadProgress(
-                                format!("Failed: {} - {}", file_name, error),
-                            ));
+                            let _ = sender_clone.send(AppMessage::DownloadProgress(format!(
+                                "Failed: {} - {}",
+                                file_name, error
+                            )));
                         }
                         DownloadEvent::OverallProgressUpdate(_) => {
                             // 全体進捗更新（現時点では未実装部分のためスキップ）
@@ -408,9 +501,10 @@ impl DownloadService for RealDownloadService {
 
             // Meeting Summary APIフォールバック処理
             if !summary_fallback_targets.is_empty() {
-                let _ = sender_clone.send(AppMessage::DownloadProgress(
-                    format!("Fetching {} AI summary(ies) via Meeting Summary API...", summary_fallback_targets.len()),
-                ));
+                let _ = sender_clone.send(AppMessage::DownloadProgress(format!(
+                    "Fetching {} AI summary(ies) via Meeting Summary API...",
+                    summary_fallback_targets.len()
+                )));
 
                 let api = ApiComponent::new(ApiConfig::default());
                 let token = AuthToken {
@@ -423,9 +517,10 @@ impl DownloadService for RealDownloadService {
                 api.set_auth_token(token).await;
 
                 for (meeting, file) in &summary_fallback_targets {
-                    let _ = sender_clone.send(AppMessage::DownloadProgress(
-                        format!("Fetching AI summary: {}", meeting.topic),
-                    ));
+                    let _ = sender_clone.send(AppMessage::DownloadProgress(format!(
+                        "Fetching AI summary: {}",
+                        meeting.topic
+                    )));
 
                     match api.get_meeting_summary(&meeting.uuid).await {
                         Ok(Some(summary)) => {
@@ -438,19 +533,23 @@ impl DownloadService for RealDownloadService {
 
                             match serde_json::to_string_pretty(&summary) {
                                 Ok(json_str) => {
-                                    match tokio::fs::write(&output_path, json_str.as_bytes()).await {
+                                    match tokio::fs::write(&output_path, json_str.as_bytes()).await
+                                    {
                                         Ok(_) => {
-                                            let path_str = output_path.to_string_lossy().to_string();
+                                            let path_str =
+                                                output_path.to_string_lossy().to_string();
                                             completed_files.push(path_str.clone());
-                                            let _ = sender_clone.send(AppMessage::DownloadProgress(
-                                                format!("AI summary saved: {}", path_str),
-                                            ));
+                                            let _ =
+                                                sender_clone.send(AppMessage::DownloadProgress(
+                                                    format!("AI summary saved: {}", path_str),
+                                                ));
                                         }
                                         Err(e) => {
                                             log::error!("Failed to write summary file: {}", e);
-                                            let _ = sender_clone.send(AppMessage::DownloadProgress(
-                                                format!("Failed to save AI summary: {}", e),
-                                            ));
+                                            let _ =
+                                                sender_clone.send(AppMessage::DownloadProgress(
+                                                    format!("Failed to save AI summary: {}", e),
+                                                ));
                                         }
                                     }
                                 }
@@ -461,15 +560,21 @@ impl DownloadService for RealDownloadService {
                         }
                         Ok(None) => {
                             log::info!("No AI summary available for meeting_id={}", meeting.id);
-                            let _ = sender_clone.send(AppMessage::DownloadProgress(
-                                format!("AI summary not available: {}", meeting.topic),
-                            ));
+                            let _ = sender_clone.send(AppMessage::DownloadProgress(format!(
+                                "AI summary not available: {}",
+                                meeting.topic
+                            )));
                         }
                         Err(e) => {
-                            log::warn!("Failed to fetch AI summary for meeting_id={}: {}", meeting.id, e);
-                            let _ = sender_clone.send(AppMessage::DownloadProgress(
-                                format!("AI summary fetch failed: {} - {}", meeting.topic, e),
-                            ));
+                            log::warn!(
+                                "Failed to fetch AI summary for meeting_id={}: {}",
+                                meeting.id,
+                                e
+                            );
+                            let _ = sender_clone.send(AppMessage::DownloadProgress(format!(
+                                "AI summary fetch failed: {} - {}",
+                                meeting.topic, e
+                            )));
                         }
                     }
                 }
@@ -544,9 +649,89 @@ mod tests {
     }
 
     #[test]
+    fn test_split_into_monthly_chunks_within_one_month() {
+        let from = NaiveDate::from_ymd_opt(2025, 1, 5).unwrap();
+        let to = NaiveDate::from_ymd_opt(2025, 1, 20).unwrap();
+        let chunks = split_into_monthly_chunks(from, to);
+        // 1ヶ月以内なら1チャンク、toに+1日
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].0, from);
+        assert_eq!(chunks[0].1, NaiveDate::from_ymd_opt(2025, 1, 21).unwrap());
+    }
+
+    #[test]
+    fn test_split_into_monthly_chunks_exact_one_month() {
+        let from = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
+        let to = NaiveDate::from_ymd_opt(2025, 1, 31).unwrap();
+        let chunks = split_into_monthly_chunks(from, to);
+        // 1月1日〜1月31日 → 1チャンク（翌月1日 = 2/1 > to なので最後のチャンク）
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].0, from);
+        assert_eq!(chunks[0].1, NaiveDate::from_ymd_opt(2025, 2, 1).unwrap());
+    }
+
+    #[test]
+    fn test_split_into_monthly_chunks_multi_month() {
+        let from = NaiveDate::from_ymd_opt(2025, 12, 1).unwrap();
+        let to = NaiveDate::from_ymd_opt(2026, 2, 27).unwrap();
+        let chunks = split_into_monthly_chunks(from, to);
+        // 3チャンク: 12/1-1/1, 1/1-2/1, 2/1-2/28
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(
+            chunks[0],
+            (
+                NaiveDate::from_ymd_opt(2025, 12, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+            )
+        );
+        assert_eq!(
+            chunks[1],
+            (
+                NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2026, 2, 1).unwrap(),
+            )
+        );
+        assert_eq!(
+            chunks[2],
+            (
+                NaiveDate::from_ymd_opt(2026, 2, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2026, 2, 28).unwrap(),
+            )
+        );
+    }
+
+    #[test]
+    fn test_split_into_monthly_chunks_year_boundary() {
+        let from = NaiveDate::from_ymd_opt(2025, 11, 15).unwrap();
+        let to = NaiveDate::from_ymd_opt(2026, 1, 10).unwrap();
+        let chunks = split_into_monthly_chunks(from, to);
+        // 3チャンク: 11/15-12/1, 12/1-1/1, 1/1-1/11
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0].0, NaiveDate::from_ymd_opt(2025, 11, 15).unwrap());
+        assert_eq!(chunks[0].1, NaiveDate::from_ymd_opt(2025, 12, 1).unwrap());
+        assert_eq!(chunks[1].0, NaiveDate::from_ymd_opt(2025, 12, 1).unwrap());
+        assert_eq!(chunks[1].1, NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
+        assert_eq!(chunks[2].0, NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
+        assert_eq!(chunks[2].1, NaiveDate::from_ymd_opt(2026, 1, 11).unwrap());
+    }
+
+    #[test]
+    fn test_split_into_monthly_chunks_same_day() {
+        let date = NaiveDate::from_ymd_opt(2025, 6, 15).unwrap();
+        let chunks = split_into_monthly_chunks(date, date);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].0, date);
+        assert_eq!(chunks[0].1, NaiveDate::from_ymd_opt(2025, 6, 16).unwrap());
+    }
+
+    #[test]
     fn test_resolve_selected_files_meeting_level_includes_summary() {
         let summary_file = make_file("", RecordingFileType::Summary, "");
-        let mp4_file = make_file("file1", RecordingFileType::MP4, "https://example.com/video.mp4");
+        let mp4_file = make_file(
+            "file1",
+            RecordingFileType::MP4,
+            "https://example.com/video.mp4",
+        );
 
         let meeting = make_meeting("uuid-1", vec![mp4_file, summary_file]);
         let recordings = RecordingSearchResponse {
@@ -572,7 +757,11 @@ mod tests {
     #[test]
     fn test_resolve_selected_files_individual_summary() {
         let summary_file = make_file("", RecordingFileType::Summary, "");
-        let mp4_file = make_file("file1", RecordingFileType::MP4, "https://example.com/video.mp4");
+        let mp4_file = make_file(
+            "file1",
+            RecordingFileType::MP4,
+            "https://example.com/video.mp4",
+        );
 
         let meeting = make_meeting("uuid-1", vec![mp4_file, summary_file]);
         let recordings = RecordingSearchResponse {
