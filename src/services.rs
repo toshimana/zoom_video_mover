@@ -3,10 +3,10 @@
 //! 外部依存を抽象化し、テスト時にMock化可能にするためのtrait群。
 //! GUI層はこれらのtraitを通じて外部システムにアクセスする。
 
-use std::sync::mpsc;
-use crate::Config;
 use crate::components::api::RecordingSearchResponse;
 use crate::gui::AppMessage;
+use crate::Config;
+use std::sync::mpsc;
 
 #[cfg(feature = "test-support")]
 use mockall::automock;

@@ -2,7 +2,6 @@
 ///
 /// egui::Context + egui_wgpu::Renderer でオフスクリーンレンダリングし、
 /// PNG画像として保存する。ウィンドウ不要でCI環境でも動作する。
-
 use egui::epaint::ClippedPrimitive;
 use std::path::Path;
 use zoom_video_mover_lib::gui::{setup_gui_appearance, ZoomDownloaderApp};
@@ -159,7 +158,10 @@ pub fn render_app_to_png(app: &mut ZoomDownloaderApp, output_path: &Path) {
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.97, g: 0.97, b: 0.97, a: 1.0,
+                        r: 0.97,
+                        g: 0.97,
+                        b: 0.97,
+                        a: 1.0,
                     }),
                     store: wgpu::StoreOp::Store,
                 },

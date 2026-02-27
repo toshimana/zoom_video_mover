@@ -1,5 +1,5 @@
 /// エラーハンドリング基盤 - thiserrorポリシー準拠
-/// 
+///
 /// # 目的
 /// - 統一エラー型による一貫したエラー処理
 /// - thiserrorを使用したエラー定義
@@ -7,7 +7,7 @@
 use thiserror::Error;
 
 /// Zoom Video Moverアプリケーションの統一エラー型
-/// 
+///
 /// # 設計方針
 /// - すべてのコンポーネントで使用する統一エラー型
 /// - 適切なエラー分類とコンテキスト情報
@@ -16,71 +16,69 @@ use thiserror::Error;
 pub enum AppError {
     /// ネットワーク関連エラー
     #[error("Network error: {message}")]
-    Network { 
+    Network {
         message: String,
-        #[source] 
-        source: Option<Box<dyn std::error::Error + Send + Sync>> 
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
     /// 認証関連エラー
     #[error("Authentication error: {message}")]
-    Authentication { 
+    Authentication {
         message: String,
-        #[source] 
-        source: Option<Box<dyn std::error::Error + Send + Sync>> 
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
     /// ファイルシステム関連エラー
     #[error("File system error: {message}")]
-    FileSystem { 
+    FileSystem {
         message: String,
-        #[source] 
-        source: Option<Box<dyn std::error::Error + Send + Sync>> 
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
     /// 設定関連エラー
     #[error("Configuration error: {message}")]
-    Configuration { 
+    Configuration {
         message: String,
-        #[source] 
-        source: Option<Box<dyn std::error::Error + Send + Sync>> 
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
     /// レート制限エラー
     #[error("Rate limit exceeded: {message}")]
-    RateLimit { 
+    RateLimit {
         message: String,
-        retry_after: Option<u64> 
+        retry_after: Option<u64>,
     },
 
     /// 無効なトークンエラー
     #[error("Invalid token: {message}")]
-    InvalidToken { 
-        message: String 
-    },
+    InvalidToken { message: String },
 
     /// API関連エラー
     #[error("API error ({code}): {message}")]
-    Api { 
-        code: u16, 
+    Api {
+        code: u16,
         message: String,
-        #[source] 
-        source: Option<Box<dyn std::error::Error + Send + Sync>> 
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
     /// バリデーションエラー
     #[error("Validation error: {message}")]
-    Validation { 
+    Validation {
         message: String,
-        field: Option<String> 
+        field: Option<String>,
     },
 
     /// シリアライゼーション/デシリアライゼーションエラー
     #[error("Serialization error: {message}")]
-    Serialization { 
+    Serialization {
         message: String,
-        #[source] 
-        source: Option<Box<dyn std::error::Error + Send + Sync>> 
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 }
 
@@ -89,9 +87,9 @@ pub type AppResult<T> = Result<T, AppError>;
 
 impl AppError {
     /// ネットワークエラーを作成
-    pub fn network<E>(message: impl Into<String>, source: Option<E>) -> Self 
-    where 
-        E: std::error::Error + Send + Sync + 'static 
+    pub fn network<E>(message: impl Into<String>, source: Option<E>) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
     {
         Self::Network {
             message: message.into(),
@@ -100,9 +98,9 @@ impl AppError {
     }
 
     /// 認証エラーを作成
-    pub fn authentication<E>(message: impl Into<String>, source: Option<E>) -> Self 
-    where 
-        E: std::error::Error + Send + Sync + 'static 
+    pub fn authentication<E>(message: impl Into<String>, source: Option<E>) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
     {
         Self::Authentication {
             message: message.into(),
@@ -111,9 +109,9 @@ impl AppError {
     }
 
     /// ファイルシステムエラーを作成
-    pub fn file_system<E>(message: impl Into<String>, source: Option<E>) -> Self 
-    where 
-        E: std::error::Error + Send + Sync + 'static 
+    pub fn file_system<E>(message: impl Into<String>, source: Option<E>) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
     {
         Self::FileSystem {
             message: message.into(),
@@ -122,9 +120,9 @@ impl AppError {
     }
 
     /// 設定エラーを作成
-    pub fn configuration<E>(message: impl Into<String>, source: Option<E>) -> Self 
-    where 
-        E: std::error::Error + Send + Sync + 'static 
+    pub fn configuration<E>(message: impl Into<String>, source: Option<E>) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
     {
         Self::Configuration {
             message: message.into(),
@@ -133,9 +131,9 @@ impl AppError {
     }
 
     /// APIエラーを作成
-    pub fn api<E>(code: u16, message: impl Into<String>, source: Option<E>) -> Self 
-    where 
-        E: std::error::Error + Send + Sync + 'static 
+    pub fn api<E>(code: u16, message: impl Into<String>, source: Option<E>) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
     {
         Self::Api {
             code,
@@ -145,14 +143,14 @@ impl AppError {
     }
 
     /// バリデーションエラーを作成
-    /// 
+    ///
     /// # 事前条件
     /// - message は空でない有効なエラーメッセージである
-    /// 
+    ///
     /// # 事後条件
     /// - バリデーションエラーのAppErrorインスタンスが生成される
     /// - field が指定された場合は対象フィールド名が設定される
-    /// 
+    ///
     /// # 不変条件
     /// - message の内容は変更されない
     /// - field の内容は変更されない
@@ -164,16 +162,16 @@ impl AppError {
     }
 
     /// シリアライゼーションエラーを作成
-    pub fn serialization<E>(message: impl Into<String>, source: Option<E>) -> Self 
-    where 
-        E: std::error::Error + Send + Sync + 'static 
+    pub fn serialization<E>(message: impl Into<String>, source: Option<E>) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
     {
         Self::Serialization {
             message: message.into(),
             source: source.map(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>),
         }
     }
-    
+
     /// レート制限エラーを作成
     pub fn rate_limit(message: impl Into<String>) -> Self {
         Self::RateLimit {
@@ -189,7 +187,7 @@ impl AppError {
             retry_after,
         }
     }
-    
+
     /// リソースが見つからないエラーを作成
     pub fn not_found(message: impl Into<String>) -> Self {
         Self::Validation {
@@ -197,42 +195,42 @@ impl AppError {
             field: None,
         }
     }
-    
+
     /// IOエラーを作成（file_systemのエイリアス）
-    pub fn io<E>(message: impl Into<String>, source: Option<E>) -> Self 
-    where 
-        E: std::error::Error + Send + Sync + 'static 
+    pub fn io<E>(message: impl Into<String>, source: Option<E>) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
     {
         Self::file_system(message, source)
     }
-    
+
     /// データ形式エラーを作成
-    pub fn data_format<E>(message: impl Into<String>, source: Option<E>) -> Self 
-    where 
-        E: std::error::Error + Send + Sync + 'static 
+    pub fn data_format<E>(message: impl Into<String>, source: Option<E>) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
     {
         Self::serialization(message, source)
     }
-    
+
     /// 外部サービスエラーを作成
     pub fn external_service(message: impl Into<String>) -> Self {
         Self::api(503, message, None::<std::io::Error>)
     }
-    
+
     /// データ整合性エラーを作成
     pub fn data_integrity(message: impl Into<String>) -> Self {
         Self::validation(message, None)
     }
 
     /// エラーが回復可能かどうかを判定
-    /// 
+    ///
     /// # 事前条件
     /// - self は有効なAppErrorインスタンスである
-    /// 
+    ///
     /// # 事後条件
     /// - 回復可能な場合は true を返す
     /// - 回復不可能な場合は false を返す
-    /// 
+    ///
     /// # 不変条件
     /// - self の状態は変更されない
     /// - 判定ロジックは一貫している
@@ -246,14 +244,14 @@ impl AppError {
     }
 
     /// リトライ推奨待機時間を取得（秒）
-    /// 
+    ///
     /// # 事前条件
     /// - self は有効なAppErrorインスタンスである
-    /// 
+    ///
     /// # 事後条件
     /// - リトライ推奨時間がある場合は Some(秒数) を返す
     /// - リトライ推奨時間がない場合は None を返す
-    /// 
+    ///
     /// # 不変条件
     /// - self の状態は変更されない
     /// - 返される時間は0以上の妥当な値である
@@ -334,7 +332,13 @@ mod tests {
     #[test]
     fn test_rate_limit_with_retry() {
         let err = AppError::rate_limit_with_retry("Rate limited", Some(30));
-        assert!(matches!(err, AppError::RateLimit { retry_after: Some(30), .. }));
+        assert!(matches!(
+            err,
+            AppError::RateLimit {
+                retry_after: Some(30),
+                ..
+            }
+        ));
         assert_eq!(err.retry_after(), Some(30));
         assert!(err.is_recoverable());
 

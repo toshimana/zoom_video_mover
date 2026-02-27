@@ -1,16 +1,17 @@
+use super::helpers::create_test_app;
+use super::screenshot::render_app_to_png;
 /// 各画面のスクリーンショット生成テスト
 ///
 /// `cargo test --features test-support --test gui_tests screenshot -- --nocapture`
 /// で実行し、tests/snapshots/ にPNG画像を出力する。
-
 use std::path::PathBuf;
 use zoom_video_mover_lib::gui::AppScreen;
-use super::helpers::create_test_app;
-use super::screenshot::render_app_to_png;
 
 /// スナップショット出力ディレクトリ
 fn snapshots_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("snapshots")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("snapshots")
 }
 
 #[test]

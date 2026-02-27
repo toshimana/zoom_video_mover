@@ -6,32 +6,35 @@
 //! - gui: プレゼンテーション層
 //! - windows_console: プラットフォーム固有処理層
 
-pub mod errors;
 pub mod components;
+pub mod errors;
+pub mod gui;
 pub mod services;
 pub mod services_impl;
-pub mod gui;
 pub mod windows_console;
 
 // 公開API
-pub use components::config::{AppConfig, OAuthConfig};
+pub use components::api::{
+    MeetingRecording, MeetingSummaryResponse, RecordingFile, RecordingFileType,
+    RecordingSearchResponse, SummaryDetail,
+};
 pub use components::auth::AuthToken;
-pub use components::api::{RecordingSearchResponse, MeetingRecording, RecordingFile, RecordingFileType, MeetingSummaryResponse, SummaryDetail};
+pub use components::config::{AppConfig, OAuthConfig};
 pub use errors::{AppError, AppResult};
-pub use gui::{ZoomDownloaderApp, AppMessage};
+pub use gui::{AppMessage, ZoomDownloaderApp};
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 /// ファイル名のサニタイズ
-/// 
+///
 /// # 事前条件
 /// - なし（空文字列も許可）
-/// 
+///
 /// # 事後条件
 /// - Windows/Linux/macOSで使用可能なファイル名が返される
 /// - 特殊文字が適切に置換される
-/// 
+///
 /// # 不変条件
 /// - 入力文字列の意味は可能な限り保たれる
 pub fn sanitize_filename(input: &str) -> String {
@@ -39,24 +42,30 @@ pub fn sanitize_filename(input: &str) -> String {
     if input.is_empty() {
         return "unnamed".to_string();
     }
-    
+
     let mut result = input
         .replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_")
         .replace("  ", " ")
         .trim()
         .to_string();
-    
+
     // Windows予約名の回避
-    let reserved_names = ["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"];
-    if reserved_names.iter().any(|&name| result.to_uppercase() == name) {
+    let reserved_names = [
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+        "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+    if reserved_names
+        .iter()
+        .any(|&name| result.to_uppercase() == name)
+    {
         result = format!("_{}", result);
     }
-    
+
     // 空の場合のフォールバック
     if result.is_empty() {
         result = "unnamed".to_string();
     }
-    
+
     // 長すぎる場合の切り詰め（文字境界を考慮）
     if result.len() > 200 {
         // 文字境界を考慮した切り詰め
@@ -66,16 +75,19 @@ pub fn sanitize_filename(input: &str) -> String {
         }
         result.truncate(end);
         result = result.trim_end().to_string();
-        
+
         // 切り詰め後に空になった場合の処理
         if result.is_empty() {
             result = "unnamed".to_string();
         }
     }
-    
+
     debug_assert!(!result.is_empty(), "sanitized filename must not be empty");
-    debug_assert!(!result.contains('/'), "sanitized filename must not contain /");
-    
+    debug_assert!(
+        !result.contains('/'),
+        "sanitized filename must not contain /"
+    );
+
     result
 }
 
@@ -98,38 +110,44 @@ pub fn generate_file_path(meeting: &MeetingRecording, recording_file: &Recording
     };
 
     // start_timeからHH-MMを抽出
-    let time_str = meeting.start_time
-        .split('T').nth(1).unwrap_or("00:00:00");
+    let time_str = meeting.start_time.split('T').nth(1).unwrap_or("00:00:00");
     let time_clean = time_str
-        .split('Z').next().unwrap_or(time_str)
-        .split('+').next().unwrap_or(time_str);
+        .split('Z')
+        .next()
+        .unwrap_or(time_str)
+        .split('+')
+        .next()
+        .unwrap_or(time_str);
     let time_parts: Vec<&str> = time_clean.split(':').collect();
-    let time_hhmm = format!("{}-{}",
+    let time_hhmm = format!(
+        "{}-{}",
         time_parts.first().unwrap_or(&"00"),
         time_parts.get(1).unwrap_or(&"00")
     );
 
     let folder_name = date_str.to_string();
-    let file_name = format!("{}_{}_{}_{}.{}",
-        date_str, time_hhmm, topic_safe, file_type_label, extension);
+    let file_name = format!(
+        "{}_{}_{}_{}.{}",
+        date_str, time_hhmm, topic_safe, file_type_label, extension
+    );
 
     format!("{}/{}", folder_name, file_name)
 }
 
 /// 日時文字列をパース
-/// 
+///
 /// # 事前条件
 /// - datetime_str は空でない文字列である
-/// 
+///
 /// # 事後条件
 /// - 有効なDateTime<Utc>が返される
 /// - パース失敗時はデフォルト値が返される
-/// 
+///
 /// # 不変条件
 /// - 入力文字列は変更されない
 pub fn parse_datetime(datetime_str: &str) -> DateTime<Utc> {
     assert!(!datetime_str.is_empty(), "datetime_str must not be empty");
-    
+
     chrono::DateTime::parse_from_rfc3339(datetime_str)
         .unwrap_or_else(|_| {
             // フォールバック: 2025年1月1日のUTC時刻
@@ -154,7 +172,7 @@ impl Config {
         let config: Config = toml::from_str(&content)?;
         Ok(config)
     }
-    
+
     pub fn create_sample_file(path: &str) -> Result<(), Box<dyn std::error::Error>> {
         use std::fs;
         let sample_config = Config {
@@ -166,7 +184,7 @@ impl Config {
         fs::write(path, content)?;
         Ok(())
     }
-    
+
     pub fn save_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
         use std::fs;
         let content = toml::to_string_pretty(self)?;
@@ -186,7 +204,7 @@ mod tests {
         assert_eq!(sanitize_filename("test/file"), "test_file");
         assert_eq!(sanitize_filename("CON"), "_CON");
     }
-    
+
     #[test]
     fn test_parse_datetime() {
         let dt = parse_datetime("2025-01-01T00:00:00Z");
@@ -231,7 +249,10 @@ mod tests {
         let meeting = make_test_meeting("2025-02-24T10:30:00Z", "Project Discussion");
         let file = make_test_file(RecordingFileType::MP4, "MP4");
         let path = generate_file_path(&meeting, &file);
-        assert_eq!(path, "2025-02-24/2025-02-24_10-30_Project Discussion_mp4.mp4");
+        assert_eq!(
+            path,
+            "2025-02-24/2025-02-24_10-30_Project Discussion_mp4.mp4"
+        );
     }
 
     #[test]
@@ -239,7 +260,10 @@ mod tests {
         let meeting = make_test_meeting("2025-02-24T10:30:00Z", "Project Discussion");
         let file = make_test_file(RecordingFileType::Summary, "");
         let path = generate_file_path(&meeting, &file);
-        assert_eq!(path, "2025-02-24/2025-02-24_10-30_Project Discussion_summary.json");
+        assert_eq!(
+            path,
+            "2025-02-24/2025-02-24_10-30_Project Discussion_summary.json"
+        );
     }
 
     #[test]

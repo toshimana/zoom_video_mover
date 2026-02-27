@@ -1,12 +1,11 @@
 /// テスト用ヘルパー・Mock設定
-
 use std::sync::Arc;
+use zoom_video_mover_lib::gui::ZoomDownloaderApp;
 use zoom_video_mover_lib::services::{
-    MockAuthService, MockBrowserLauncher, MockConfigService,
-    MockDownloadService, MockRecordingService,
+    MockAuthService, MockBrowserLauncher, MockConfigService, MockDownloadService,
+    MockRecordingService,
 };
 use zoom_video_mover_lib::services_impl::AppServices;
-use zoom_video_mover_lib::gui::ZoomDownloaderApp;
 
 /// デフォルトMockサービスを構築する
 /// 各Mockは何も呼ばれないことを期待する

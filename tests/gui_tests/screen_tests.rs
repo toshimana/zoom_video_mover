@@ -1,13 +1,12 @@
+use super::helpers::{create_test_app, mock_services};
 /// egui headless UIテスト
 ///
 /// egui::Context::default() + ctx.run() + app.update_ui(ctx) パターンで
 /// 各画面のレンダリングがパニックしないことを検証する。
-
 use zoom_video_mover_lib::gui::AppScreen;
+use zoom_video_mover_lib::gui::ZoomDownloaderApp;
 use zoom_video_mover_lib::services::MockConfigService;
 use zoom_video_mover_lib::Config;
-use super::helpers::{create_test_app, mock_services};
-use zoom_video_mover_lib::gui::ZoomDownloaderApp;
 
 /// headless contextでupdate_uiを実行するヘルパー
 fn run_update_ui(app: &mut ZoomDownloaderApp) {
@@ -117,9 +116,7 @@ fn ui008_load_config_uses_mock_service() {
             })
         });
     // update_uiで他のconfigメソッドが呼ばれる可能性に備える
-    mock_config
-        .expect_save_config()
-        .returning(|_, _| Ok(()));
+    mock_config.expect_save_config().returning(|_, _| Ok(()));
     mock_config
         .expect_create_sample_config()
         .returning(|_| Ok(()));
@@ -146,17 +143,13 @@ fn ui009_save_config_does_not_panic_with_mock() {
     let mut services = mock_services();
 
     let mut mock_config = MockConfigService::new();
-    mock_config
-        .expect_save_config()
-        .returning(|_, _| Ok(()));
-    mock_config
-        .expect_load_config()
-        .returning(|_| {
-            Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "not found",
-            )) as Box<dyn std::error::Error>)
-        });
+    mock_config.expect_save_config().returning(|_, _| Ok(()));
+    mock_config.expect_load_config().returning(|_| {
+        Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "not found",
+        )) as Box<dyn std::error::Error>)
+    });
     mock_config
         .expect_create_sample_config()
         .returning(|_| Ok(()));

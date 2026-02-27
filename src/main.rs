@@ -1,9 +1,8 @@
 use eframe::egui;
-use zoom_video_mover_lib::windows_console;
 use zoom_video_mover_lib::gui::setup_gui_appearance;
+use zoom_video_mover_lib::windows_console;
 
 use zoom_video_mover_lib::ZoomDownloaderApp;
-
 
 /// GUIアプリケーションのエントリーポイント
 ///
@@ -29,7 +28,7 @@ fn main() -> Result<(), eframe::Error> {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([820.0, 650.0])  // Optimized size for GUI display
+            .with_inner_size([820.0, 650.0]) // Optimized size for GUI display
             .with_title("Zoom Recording Downloader"),
         ..Default::default()
     };
@@ -41,7 +40,9 @@ fn main() -> Result<(), eframe::Error> {
             windows_console::println_japanese("Setting up GUI appearance...");
             // GUI appearance configuration for better visibility
             setup_gui_appearance(&cc.egui_ctx);
-            windows_console::println_japanese("GUI appearance setup completed - using default fonts with enhanced visibility");
+            windows_console::println_japanese(
+                "GUI appearance setup completed - using default fonts with enhanced visibility",
+            );
 
             Ok(Box::new(ZoomDownloaderApp::default()))
         }),

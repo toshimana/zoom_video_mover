@@ -1,44 +1,44 @@
+use crate::components::api::RecordingSearchResponse;
+use crate::services_impl::AppServices;
+use crate::Config;
+use chrono::{Datelike, Local};
 use eframe::egui;
 use egui::Color32;
 use std::sync::{mpsc, Arc};
 use std::thread;
-use chrono::{Datelike, Local};
-use crate::Config;
-use crate::components::api::RecordingSearchResponse;
-use crate::services_impl::AppServices;
 
 // === Modern Color Palette ===
 // Primary
-const PRIMARY: Color32 = Color32::from_rgb(59, 130, 246);        // Blue-500
-const PRIMARY_HOVER: Color32 = Color32::from_rgb(37, 99, 235);   // Blue-600
+const PRIMARY: Color32 = Color32::from_rgb(59, 130, 246); // Blue-500
+const PRIMARY_HOVER: Color32 = Color32::from_rgb(37, 99, 235); // Blue-600
 
 // Semantic
-const SUCCESS_BG: Color32 = Color32::from_rgb(220, 252, 231);    // Green-100
-const SUCCESS_TEXT: Color32 = Color32::from_rgb(22, 101, 52);     // Green-800
-const WARNING_BG: Color32 = Color32::from_rgb(254, 243, 199);    // Amber-100
-const WARNING_TEXT: Color32 = Color32::from_rgb(146, 64, 14);     // Amber-800
-const ERROR: Color32 = Color32::from_rgb(239, 68, 68);           // Red-500
-const ERROR_BG: Color32 = Color32::from_rgb(254, 226, 226);      // Red-100
-const ERROR_TEXT: Color32 = Color32::from_rgb(153, 27, 27);       // Red-800
+const SUCCESS_BG: Color32 = Color32::from_rgb(220, 252, 231); // Green-100
+const SUCCESS_TEXT: Color32 = Color32::from_rgb(22, 101, 52); // Green-800
+const WARNING_BG: Color32 = Color32::from_rgb(254, 243, 199); // Amber-100
+const WARNING_TEXT: Color32 = Color32::from_rgb(146, 64, 14); // Amber-800
+const ERROR: Color32 = Color32::from_rgb(239, 68, 68); // Red-500
+const ERROR_BG: Color32 = Color32::from_rgb(254, 226, 226); // Red-100
+const ERROR_TEXT: Color32 = Color32::from_rgb(153, 27, 27); // Red-800
 
 // Button
-const BTN_SAVE: Color32 = Color32::from_rgb(34, 197, 94);        // Green
-const BTN_LOAD: Color32 = Color32::from_rgb(59, 130, 246);       // Blue
-const BTN_PAUSE: Color32 = Color32::from_rgb(245, 158, 11);      // Amber
-const BTN_CANCEL: Color32 = Color32::from_rgb(239, 68, 68);      // Red
+const BTN_SAVE: Color32 = Color32::from_rgb(34, 197, 94); // Green
+const BTN_LOAD: Color32 = Color32::from_rgb(59, 130, 246); // Blue
+const BTN_PAUSE: Color32 = Color32::from_rgb(245, 158, 11); // Amber
+const BTN_CANCEL: Color32 = Color32::from_rgb(239, 68, 68); // Red
 
 // Neutral / Background
-const BG_BASE: Color32 = Color32::from_rgb(241, 245, 249);       // Slate-100
-const BG_CARD: Color32 = Color32::from_rgb(255, 255, 255);       // White
+const BG_BASE: Color32 = Color32::from_rgb(241, 245, 249); // Slate-100
+const BG_CARD: Color32 = Color32::from_rgb(255, 255, 255); // White
 const BORDER_DEFAULT: Color32 = Color32::from_rgb(226, 232, 240); // Slate-200
 
 // Text
-const TEXT_PRIMARY: Color32 = Color32::from_rgb(15, 23, 42);      // Slate-900
+const TEXT_PRIMARY: Color32 = Color32::from_rgb(15, 23, 42); // Slate-900
 const TEXT_SECONDARY: Color32 = Color32::from_rgb(100, 116, 139); // Slate-500
 const TEXT_ON_PRIMARY: Color32 = Color32::from_rgb(255, 255, 255); // White
 
 // Progress
-const PROGRESS_FILL: Color32 = Color32::from_rgb(59, 130, 246);  // Blue
+const PROGRESS_FILL: Color32 = Color32::from_rgb(59, 130, 246); // Blue
 
 /// GUI表示設定（フォント・テーマ・スタイル）
 /// テストのスクリーンショット生成でも使用
@@ -57,11 +57,13 @@ pub fn setup_gui_appearance(ctx: &egui::Context) {
         "NotoSansJP".to_owned(),
         egui::FontData::from_static(include_bytes!("../assets/fonts/NotoSansJP-Regular.ttf")),
     );
-    fonts.families
+    fonts
+        .families
         .get_mut(&egui::FontFamily::Proportional)
         .unwrap()
         .insert(0, "NotoSansJP".to_owned());
-    fonts.families
+    fonts
+        .families
         .get_mut(&egui::FontFamily::Monospace)
         .unwrap()
         .insert(1, "NotoSansJP".to_owned());
@@ -166,11 +168,11 @@ pub enum AppMessage {
 
 #[derive(Debug, PartialEq)]
 pub enum AppScreen {
-    Config,      // SC002: 設定画面
-    Auth,        // SC003: 認証画面
-    Recordings,  // SC004: 録画リスト画面
-    Progress,    // SC005: ダウンロード進捗画面
-    Error,       // SC006: エラー表示画面
+    Config,     // SC002: 設定画面
+    Auth,       // SC003: 認証画面
+    Recordings, // SC004: 録画リスト画面
+    Progress,   // SC005: ダウンロード進捗画面
+    Error,      // SC006: エラー表示画面
 }
 
 pub struct ZoomDownloaderApp {
@@ -321,7 +323,10 @@ impl ZoomDownloaderApp {
 
         let mut log_content = String::new();
         log_content.push_str("=== Zoom Video Mover Log Export ===\n");
-        log_content.push_str(&format!("Export Time: {}\n", chrono::Local::now().format("%Y-%m-%d %H:%M:%S")));
+        log_content.push_str(&format!(
+            "Export Time: {}\n",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+        ));
         log_content.push_str(&format!("Total Entries: {}\n", self.log_entries.len()));
         log_content.push_str("=====================================\n\n");
 
@@ -350,9 +355,18 @@ impl ZoomDownloaderApp {
         log_content.push_str(&format!("Config Loaded: {}\n", self.config_loaded));
         log_content.push_str(&format!("Is Authenticating: {}\n", self.is_authenticating));
         log_content.push_str(&format!("Is Downloading: {}\n", self.is_downloading));
-        log_content.push_str(&format!("Is Download Paused: {}\n", self.is_download_paused));
-        log_content.push_str(&format!("Access Token Present: {}\n", self.access_token.is_some()));
-        log_content.push_str(&format!("Selected Recordings: {}\n", self.selected_recordings.len()));
+        log_content.push_str(&format!(
+            "Is Download Paused: {}\n",
+            self.is_download_paused
+        ));
+        log_content.push_str(&format!(
+            "Access Token Present: {}\n",
+            self.access_token.is_some()
+        ));
+        log_content.push_str(&format!(
+            "Selected Recordings: {}\n",
+            self.selected_recordings.len()
+        ));
         log_content.push_str(&format!("Progress: {:.1}%\n", self.progress_percentage));
 
         match std::fs::write(&filepath, log_content) {
@@ -367,7 +381,11 @@ impl ZoomDownloaderApp {
             self.is_download_paused = true;
             self.download_can_resume = true;
             self.status_message = "Download paused by user".to_string();
-            self.add_log_entry(LogLevel::Info, "Download paused".to_string(), Some("User requested pause".to_string()));
+            self.add_log_entry(
+                LogLevel::Info,
+                "Download paused".to_string(),
+                Some("User requested pause".to_string()),
+            );
 
             let _ = self.sender.send(AppMessage::DownloadPaused);
         }
@@ -378,7 +396,11 @@ impl ZoomDownloaderApp {
         if self.is_download_paused && self.download_can_resume {
             self.is_download_paused = false;
             self.status_message = "Download resumed".to_string();
-            self.add_log_entry(LogLevel::Info, "Download resumed".to_string(), Some("User requested resume".to_string()));
+            self.add_log_entry(
+                LogLevel::Info,
+                "Download resumed".to_string(),
+                Some("User requested resume".to_string()),
+            );
 
             let _ = self.sender.send(AppMessage::DownloadResumed);
         }
@@ -393,7 +415,11 @@ impl ZoomDownloaderApp {
             self.progress_percentage = 0.0;
             self.current_screen = AppScreen::Recordings;
             self.status_message = "Download cancelled by user".to_string();
-            self.add_log_entry(LogLevel::Warning, "Download cancelled".to_string(), Some("User requested cancellation".to_string()));
+            self.add_log_entry(
+                LogLevel::Warning,
+                "Download cancelled".to_string(),
+                Some("User requested cancellation".to_string()),
+            );
 
             let _ = self.sender.send(AppMessage::DownloadCancelled);
         }
@@ -406,7 +432,9 @@ impl ZoomDownloaderApp {
                 AppMessage::AuthUrlGenerated(url) => {
                     self.auth_url = Some(url);
                     self.is_authenticating = true;
-                    self.status_message = "Auth URL generated. Please complete authentication in browser.".to_string();
+                    self.status_message =
+                        "Auth URL generated. Please complete authentication in browser."
+                            .to_string();
                 }
                 AppMessage::AuthComplete(token) => {
                     self.access_token = Some(token);
@@ -427,36 +455,60 @@ impl ZoomDownloaderApp {
                     self.is_downloading = false;
                     self.current_screen = AppScreen::Recordings;
                     self.status_message = format!("Download completed: {} files", files.len());
-                    self.download_progress.push(format!("Completed: Downloaded {} files", files.len()));
+                    self.download_progress
+                        .push(format!("Completed: Downloaded {} files", files.len()));
                 }
                 AppMessage::DownloadPaused => {
                     self.is_download_paused = true;
                     self.download_can_resume = true;
-                    self.add_log_entry(LogLevel::Info, "Download paused by background task".to_string(), None);
+                    self.add_log_entry(
+                        LogLevel::Info,
+                        "Download paused by background task".to_string(),
+                        None,
+                    );
                 }
                 AppMessage::DownloadResumed => {
                     self.is_download_paused = false;
-                    self.add_log_entry(LogLevel::Info, "Download resumed by background task".to_string(), None);
+                    self.add_log_entry(
+                        LogLevel::Info,
+                        "Download resumed by background task".to_string(),
+                        None,
+                    );
                 }
                 AppMessage::DownloadCancelled => {
                     self.is_downloading = false;
                     self.is_download_paused = false;
                     self.download_can_resume = false;
                     self.current_screen = AppScreen::Recordings;
-                    self.add_log_entry(LogLevel::Warning, "Download cancelled by background task".to_string(), None);
+                    self.add_log_entry(
+                        LogLevel::Warning,
+                        "Download cancelled by background task".to_string(),
+                        None,
+                    );
                 }
                 AppMessage::LogExported(filepath) => {
-                    self.add_log_entry(LogLevel::Info, format!("Log exported to: {}", filepath), None);
+                    self.add_log_entry(
+                        LogLevel::Info,
+                        format!("Log exported to: {}", filepath),
+                        None,
+                    );
                     self.status_message = format!("Log exported successfully: {}", filepath);
                 }
                 AppMessage::Error(err) => {
                     self.is_authenticating = false;
                     self.is_downloading = false;
                     self.error_message = err.clone();
-                    self.error_details = format!("Timestamp: {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
+                    self.error_details = format!(
+                        "Timestamp: {}",
+                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+                    );
                     self.current_screen = AppScreen::Error;
                     self.status_message = format!("Error: {}", err);
-                    self.add_log_entry(LogLevel::Error, err, Some("Application error occurred".to_string()));
+                    self.add_log_entry(
+                        LogLevel::Error,
+                        err,
+                        Some("Application error occurred".to_string()),
+                    );
                 }
             }
         }
@@ -470,80 +522,97 @@ impl ZoomDownloaderApp {
             .fill(BG_BASE)
             .inner_margin(egui::Margin::same(24.0));
 
-        egui::CentralPanel::default().frame(panel_frame).show(ctx, |ui| {
-            // ヘッダー
-            ui.add(egui::Label::new(
-                egui::RichText::new("Zoom Video Mover")
-                    .size(28.0)
-                    .strong()
-                    .color(TEXT_PRIMARY),
-            ));
-            ui.add_space(4.0);
+        egui::CentralPanel::default()
+            .frame(panel_frame)
+            .show(ctx, |ui| {
+                // ヘッダー
+                ui.add(egui::Label::new(
+                    egui::RichText::new("Zoom Video Mover")
+                        .size(28.0)
+                        .strong()
+                        .color(TEXT_PRIMARY),
+                ));
+                ui.add_space(4.0);
 
-            // SC001: メイン画面 - タブコンテナ（ピル型）
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 8.0;
+                // SC001: メイン画面 - タブコンテナ（ピル型）
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
 
-                let tabs: Vec<(&str, AppScreen, bool)> = vec![
-                    ("設定", AppScreen::Config, true),
-                    ("認証", AppScreen::Auth, self.config_loaded),
-                    ("録画リスト", AppScreen::Recordings, self.access_token.is_some()),
-                    ("ダウンロード", AppScreen::Progress, self.is_downloading),
-                ];
+                    let tabs: Vec<(&str, AppScreen, bool)> = vec![
+                        ("設定", AppScreen::Config, true),
+                        ("認証", AppScreen::Auth, self.config_loaded),
+                        (
+                            "録画リスト",
+                            AppScreen::Recordings,
+                            self.access_token.is_some(),
+                        ),
+                        ("ダウンロード", AppScreen::Progress, self.is_downloading),
+                    ];
 
-                for (label, screen, visible) in tabs {
-                    if !visible {
-                        continue;
+                    for (label, screen, visible) in tabs {
+                        if !visible {
+                            continue;
+                        }
+                        let is_active = self.current_screen == screen;
+                        let btn =
+                            egui::Button::new(egui::RichText::new(label).color(if is_active {
+                                TEXT_ON_PRIMARY
+                            } else {
+                                TEXT_PRIMARY
+                            }))
+                            .rounding(egui::Rounding::same(20.0))
+                            .fill(if is_active {
+                                PRIMARY
+                            } else {
+                                Color32::TRANSPARENT
+                            });
+                        if ui.add_sized([100.0, 36.0], btn).clicked() {
+                            self.current_screen = screen;
+                        }
                     }
-                    let is_active = self.current_screen == screen;
-                    let btn = egui::Button::new(
-                        egui::RichText::new(label).color(if is_active { TEXT_ON_PRIMARY } else { TEXT_PRIMARY }),
-                    )
-                    .rounding(egui::Rounding::same(20.0))
-                    .fill(if is_active { PRIMARY } else { Color32::TRANSPARENT });
-                    if ui.add_sized([100.0, 36.0], btn).clicked() {
-                        self.current_screen = screen;
+                });
+
+                ui.add_space(8.0);
+
+                // 現在のタブコンテンツ表示エリア
+                match self.current_screen {
+                    AppScreen::Config => self.render_config(ui),
+                    AppScreen::Auth => self.render_auth(ui),
+                    AppScreen::Recordings => self.render_recordings(ui),
+                    AppScreen::Progress => self.render_progress(ui),
+                    AppScreen::Error => {
+                        self.render_error(ui);
                     }
                 }
-            });
 
-            ui.add_space(8.0);
+                ui.add_space(8.0);
 
-            // 現在のタブコンテンツ表示エリア
-            match self.current_screen {
-                AppScreen::Config => self.render_config(ui),
-                AppScreen::Auth => self.render_auth(ui),
-                AppScreen::Recordings => self.render_recordings(ui),
-                AppScreen::Progress => self.render_progress(ui),
-                AppScreen::Error => {
-                    self.render_error(ui);
-                },
-            }
-
-            ui.add_space(8.0);
-
-            // MC003: ステータスバー
-            egui::Frame::none()
-                .fill(BG_CARD)
-                .rounding(egui::Rounding::same(8.0))
-                .stroke(egui::Stroke::new(1.0, BORDER_DEFAULT))
-                .inner_margin(egui::Margin::same(10.0))
-                .show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.add(egui::Label::new(
-                            egui::RichText::new("Status:").size(14.0).color(TEXT_SECONDARY),
-                        ));
-                        let status_color = if self.error_message.is_empty() {
-                            SUCCESS_TEXT
-                        } else {
-                            ERROR_TEXT
-                        };
-                        ui.add(egui::Label::new(
-                            egui::RichText::new(&self.status_message).size(14.0).color(status_color),
-                        ));
+                // MC003: ステータスバー
+                egui::Frame::none()
+                    .fill(BG_CARD)
+                    .rounding(egui::Rounding::same(8.0))
+                    .stroke(egui::Stroke::new(1.0, BORDER_DEFAULT))
+                    .inner_margin(egui::Margin::same(10.0))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.add(egui::Label::new(
+                                egui::RichText::new("Status:")
+                                    .size(14.0)
+                                    .color(TEXT_SECONDARY),
+                            ));
+                            let status_color = if self.error_message.is_empty() {
+                                SUCCESS_TEXT
+                            } else {
+                                ERROR_TEXT
+                            };
+                            ui.add(egui::Label::new(
+                                egui::RichText::new(&self.status_message)
+                                    .size(14.0)
+                                    .color(status_color),
+                            ));
+                        });
                     });
-                });
-        });
+            });
 
         ctx.request_repaint();
     }
@@ -551,10 +620,15 @@ impl ZoomDownloaderApp {
     /// SC002: 設定画面をレンダリングする
     fn render_config(&mut self, ui: &mut egui::Ui) {
         ui.add(egui::Label::new(
-            egui::RichText::new("設定").size(26.0).strong().color(TEXT_PRIMARY),
+            egui::RichText::new("設定")
+                .size(26.0)
+                .strong()
+                .color(TEXT_PRIMARY),
         ));
         ui.add(egui::Label::new(
-            egui::RichText::new("Zoom API接続の設定を行います").size(14.0).color(TEXT_SECONDARY),
+            egui::RichText::new("Zoom API接続の設定を行います")
+                .size(14.0)
+                .color(TEXT_SECONDARY),
         ));
         ui.add_space(8.0);
 
@@ -569,14 +643,20 @@ impl ZoomDownloaderApp {
                     ui.add(egui::Label::new(
                         egui::RichText::new("Client ID").color(TEXT_SECONDARY),
                     ));
-                    ui.add_sized([field_width, 30.0], egui::TextEdit::singleline(&mut self.client_id));
+                    ui.add_sized(
+                        [field_width, 30.0],
+                        egui::TextEdit::singleline(&mut self.client_id),
+                    );
                     ui.end_row();
 
                     // CF002: Client Secret入力 (パスワード形式)
                     ui.add(egui::Label::new(
                         egui::RichText::new("Client Secret").color(TEXT_SECONDARY),
                     ));
-                    ui.add_sized([field_width, 30.0], egui::TextEdit::singleline(&mut self.client_secret).password(true));
+                    ui.add_sized(
+                        [field_width, 30.0],
+                        egui::TextEdit::singleline(&mut self.client_secret).password(true),
+                    );
                     ui.end_row();
 
                     // CF003: 出力ディレクトリ入力
@@ -586,7 +666,10 @@ impl ZoomDownloaderApp {
                     if self.output_dir.is_empty() {
                         self.output_dir = self.get_default_downloads_dir();
                     }
-                    ui.add_sized([field_width, 30.0], egui::TextEdit::singleline(&mut self.output_dir));
+                    ui.add_sized(
+                        [field_width, 30.0],
+                        egui::TextEdit::singleline(&mut self.output_dir),
+                    );
                     ui.end_row();
                 });
         });
@@ -595,22 +678,20 @@ impl ZoomDownloaderApp {
 
         // CF004 & CF005: 設定保存・読込ボタン
         ui.horizontal(|ui| {
-            let save_button = egui::Button::new(
-                egui::RichText::new("設定を保存").color(TEXT_ON_PRIMARY),
-            )
-            .fill(BTN_SAVE)
-            .rounding(egui::Rounding::same(8.0));
+            let save_button =
+                egui::Button::new(egui::RichText::new("設定を保存").color(TEXT_ON_PRIMARY))
+                    .fill(BTN_SAVE)
+                    .rounding(egui::Rounding::same(8.0));
             if ui.add_sized([140.0, 40.0], save_button).clicked() {
                 self.save_config();
             }
 
             ui.add_space(12.0);
 
-            let load_button = egui::Button::new(
-                egui::RichText::new("設定を読込").color(TEXT_ON_PRIMARY),
-            )
-            .fill(BTN_LOAD)
-            .rounding(egui::Rounding::same(8.0));
+            let load_button =
+                egui::Button::new(egui::RichText::new("設定を読込").color(TEXT_ON_PRIMARY))
+                    .fill(BTN_LOAD)
+                    .rounding(egui::Rounding::same(8.0));
             if ui.add_sized([140.0, 40.0], load_button).clicked() {
                 self.load_config();
             }
@@ -655,7 +736,6 @@ impl ZoomDownloaderApp {
             self.config_loaded = true;
         }
     }
-
 }
 
 impl eframe::App for ZoomDownloaderApp {
@@ -669,10 +749,15 @@ impl ZoomDownloaderApp {
     /// SC003: 認証画面をレンダリングする
     fn render_auth(&mut self, ui: &mut egui::Ui) {
         ui.add(egui::Label::new(
-            egui::RichText::new("認証").size(26.0).strong().color(TEXT_PRIMARY),
+            egui::RichText::new("認証")
+                .size(26.0)
+                .strong()
+                .color(TEXT_PRIMARY),
         ));
         ui.add(egui::Label::new(
-            egui::RichText::new("Zoom OAuthで接続します").size(14.0).color(TEXT_SECONDARY),
+            egui::RichText::new("Zoom OAuthで接続します")
+                .size(14.0)
+                .color(TEXT_SECONDARY),
         ));
         ui.add_space(8.0);
 
@@ -703,11 +788,10 @@ impl ZoomDownloaderApp {
             if self.access_token.is_none() {
                 if !self.is_authenticating {
                     // AU001: 認証開始ボタン
-                    let btn = egui::Button::new(
-                        egui::RichText::new("認証開始").color(TEXT_ON_PRIMARY),
-                    )
-                    .fill(PRIMARY)
-                    .rounding(egui::Rounding::same(8.0));
+                    let btn =
+                        egui::Button::new(egui::RichText::new("認証開始").color(TEXT_ON_PRIMARY))
+                            .fill(PRIMARY)
+                            .rounding(egui::Rounding::same(8.0));
                     if ui.add_sized([140.0, 40.0], btn).clicked() {
                         self.start_authentication();
                     }
@@ -718,8 +802,8 @@ impl ZoomDownloaderApp {
                 ui.add(egui::Label::new(
                     egui::RichText::new("Authenticated").color(SUCCESS_TEXT),
                 ));
-                let btn = egui::Button::new("Reset Authentication")
-                    .rounding(egui::Rounding::same(8.0));
+                let btn =
+                    egui::Button::new("Reset Authentication").rounding(egui::Rounding::same(8.0));
                 if ui.add(btn).clicked() {
                     self.access_token = None;
                     self.auth_url = None;
@@ -738,7 +822,10 @@ impl ZoomDownloaderApp {
                 egui::RichText::new("Auth URL").color(TEXT_SECONDARY),
             ));
             let mut url_display = url.clone();
-            ui.add_sized([ui.available_width(), 60.0], egui::TextEdit::multiline(&mut url_display));
+            ui.add_sized(
+                [ui.available_width(), 60.0],
+                egui::TextEdit::multiline(&mut url_display),
+            );
 
             let url_for_open = url.clone();
             ui.horizontal(|ui| {
@@ -749,11 +836,10 @@ impl ZoomDownloaderApp {
                 }
 
                 // AU004: ブラウザ起動ボタン（サービス経由）
-                let open_btn = egui::Button::new(
-                    egui::RichText::new("ブラウザで開く").color(TEXT_ON_PRIMARY),
-                )
-                .fill(PRIMARY)
-                .rounding(egui::Rounding::same(8.0));
+                let open_btn =
+                    egui::Button::new(egui::RichText::new("ブラウザで開く").color(TEXT_ON_PRIMARY))
+                        .fill(PRIMARY)
+                        .rounding(egui::Rounding::same(8.0));
                 if ui.add(open_btn).clicked() {
                     let _ = self.services.browser_launcher.open_url(&url_for_open);
                 }
@@ -765,17 +851,22 @@ impl ZoomDownloaderApp {
             ui.add(egui::Label::new(
                 egui::RichText::new("Authorization Code").color(TEXT_SECONDARY),
             ));
-            ui.add_sized([ui.available_width(), 30.0], egui::TextEdit::singleline(&mut self.auth_code));
+            ui.add_sized(
+                [ui.available_width(), 30.0],
+                egui::TextEdit::singleline(&mut self.auth_code),
+            );
 
             ui.add_space(10.0);
 
             // AU006: 認証完了ボタン
-            let complete_btn = egui::Button::new(
-                egui::RichText::new("認証完了").color(TEXT_ON_PRIMARY),
-            )
-            .fill(PRIMARY)
-            .rounding(egui::Rounding::same(8.0));
-            if ui.add_enabled(!self.auth_code.is_empty(), complete_btn).clicked() {
+            let complete_btn =
+                egui::Button::new(egui::RichText::new("認証完了").color(TEXT_ON_PRIMARY))
+                    .fill(PRIMARY)
+                    .rounding(egui::Rounding::same(8.0));
+            if ui
+                .add_enabled(!self.auth_code.is_empty(), complete_btn)
+                .clicked()
+            {
                 self.complete_authentication();
             }
         }
@@ -784,7 +875,10 @@ impl ZoomDownloaderApp {
     /// SC004: 録画リスト画面をレンダリングする
     fn render_recordings(&mut self, ui: &mut egui::Ui) {
         ui.add(egui::Label::new(
-            egui::RichText::new("録画リスト").size(26.0).strong().color(TEXT_PRIMARY),
+            egui::RichText::new("録画リスト")
+                .size(26.0)
+                .strong()
+                .color(TEXT_PRIMARY),
         ));
         ui.add_space(8.0);
 
@@ -794,26 +888,32 @@ impl ZoomDownloaderApp {
                 egui::RichText::new("検索期間").color(TEXT_SECONDARY),
             ));
             ui.horizontal(|ui| {
-                ui.add(egui::Label::new(egui::RichText::new("From").color(TEXT_SECONDARY)));
+                ui.add(egui::Label::new(
+                    egui::RichText::new("From").color(TEXT_SECONDARY),
+                ));
                 if self.from_date.is_empty() {
                     let today = Local::now().date_naive();
                     let month_start = today.with_day(1).unwrap();
                     self.from_date = month_start.format("%Y-%m-%d").to_string();
                 }
-                ui.add_sized([150.0, 30.0], egui::TextEdit::singleline(&mut self.from_date));
+                ui.add_sized(
+                    [150.0, 30.0],
+                    egui::TextEdit::singleline(&mut self.from_date),
+                );
 
-                ui.add(egui::Label::new(egui::RichText::new("To").color(TEXT_SECONDARY)));
+                ui.add(egui::Label::new(
+                    egui::RichText::new("To").color(TEXT_SECONDARY),
+                ));
                 if self.to_date.is_empty() {
                     self.to_date = Local::now().date_naive().format("%Y-%m-%d").to_string();
                 }
                 ui.add_sized([150.0, 30.0], egui::TextEdit::singleline(&mut self.to_date));
 
                 // RL003: 検索実行ボタン
-                let search_btn = egui::Button::new(
-                    egui::RichText::new("検索実行").color(TEXT_ON_PRIMARY),
-                )
-                .fill(PRIMARY)
-                .rounding(egui::Rounding::same(8.0));
+                let search_btn =
+                    egui::Button::new(egui::RichText::new("検索実行").color(TEXT_ON_PRIMARY))
+                        .fill(PRIMARY)
+                        .rounding(egui::Rounding::same(8.0));
                 if ui.add_sized([120.0, 36.0], search_btn).clicked() {
                     self.fetch_recordings();
                 }
@@ -822,9 +922,8 @@ impl ZoomDownloaderApp {
 
         // 録画リスト表示
         if let Some(recordings) = &self.recordings {
-            let meeting_uuids: Vec<String> = recordings.meetings.iter()
-                .map(|m| m.uuid.clone())
-                .collect();
+            let meeting_uuids: Vec<String> =
+                recordings.meetings.iter().map(|m| m.uuid.clone()).collect();
 
             card_frame().show(ui, |ui| {
                 // ヘッダー行: 選択数バッジ + 全選択/全解除
@@ -847,11 +946,13 @@ impl ZoomDownloaderApp {
                         });
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let deselect_btn = egui::Button::new("全解除").rounding(egui::Rounding::same(8.0));
+                        let deselect_btn =
+                            egui::Button::new("全解除").rounding(egui::Rounding::same(8.0));
                         if ui.add(deselect_btn).clicked() {
                             self.selected_recordings.clear();
                         }
-                        let select_btn = egui::Button::new("全選択").rounding(egui::Rounding::same(8.0));
+                        let select_btn =
+                            egui::Button::new("全選択").rounding(egui::Rounding::same(8.0));
                         if ui.add(select_btn).clicked() {
                             for uuid in &meeting_uuids {
                                 self.selected_recordings.insert(uuid.clone());
@@ -863,43 +964,62 @@ impl ZoomDownloaderApp {
                 ui.add_space(6.0);
 
                 // 録画リスト
-                egui::ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
-                    for meeting in &recordings.meetings {
-                        ui.horizontal(|ui| {
-                            let mut meeting_selected = self.selected_recordings.contains(&meeting.uuid);
-                            if ui.checkbox(&mut meeting_selected, format!("Meeting - {}", meeting.topic)).changed() {
-                                if meeting_selected {
-                                    self.selected_recordings.insert(meeting.uuid.clone());
-                                } else {
-                                    self.selected_recordings.remove(&meeting.uuid);
-                                }
-                            }
-                        });
-
-                        for file in &meeting.recording_files {
+                egui::ScrollArea::vertical()
+                    .max_height(300.0)
+                    .show(ui, |ui| {
+                        for meeting in &recordings.meetings {
                             ui.horizontal(|ui| {
-                                ui.add_space(20.0);
-                                let file_id = format!("{}-{}", meeting.uuid, file.stable_id());
-                                let mut file_selected = self.selected_recordings.contains(&file_id);
-                                let ext_display = if file.file_extension.is_empty() {
-                                    file.file_type.to_string()
-                                } else {
-                                    file.file_extension.clone()
-                                };
-                                if ui.checkbox(&mut file_selected, format!("{} ({}) - {}MB",
-                                    file.file_type, ext_display,
-                                    file.file_size / 1024 / 1024)).changed() {
-                                    if file_selected {
-                                        self.selected_recordings.insert(file_id);
+                                let mut meeting_selected =
+                                    self.selected_recordings.contains(&meeting.uuid);
+                                if ui
+                                    .checkbox(
+                                        &mut meeting_selected,
+                                        format!("Meeting - {}", meeting.topic),
+                                    )
+                                    .changed()
+                                {
+                                    if meeting_selected {
+                                        self.selected_recordings.insert(meeting.uuid.clone());
                                     } else {
-                                        self.selected_recordings.remove(&file_id);
+                                        self.selected_recordings.remove(&meeting.uuid);
                                     }
                                 }
                             });
+
+                            for file in &meeting.recording_files {
+                                ui.horizontal(|ui| {
+                                    ui.add_space(20.0);
+                                    let file_id = format!("{}-{}", meeting.uuid, file.stable_id());
+                                    let mut file_selected =
+                                        self.selected_recordings.contains(&file_id);
+                                    let ext_display = if file.file_extension.is_empty() {
+                                        file.file_type.to_string()
+                                    } else {
+                                        file.file_extension.clone()
+                                    };
+                                    if ui
+                                        .checkbox(
+                                            &mut file_selected,
+                                            format!(
+                                                "{} ({}) - {}MB",
+                                                file.file_type,
+                                                ext_display,
+                                                file.file_size / 1024 / 1024
+                                            ),
+                                        )
+                                        .changed()
+                                    {
+                                        if file_selected {
+                                            self.selected_recordings.insert(file_id);
+                                        } else {
+                                            self.selected_recordings.remove(&file_id);
+                                        }
+                                    }
+                                });
+                            }
+                            ui.add_space(5.0);
                         }
-                        ui.add_space(5.0);
-                    }
-                });
+                    });
             });
 
             ui.add_space(8.0);
@@ -907,8 +1027,11 @@ impl ZoomDownloaderApp {
             // ダウンロードボタン
             ui.horizontal(|ui| {
                 ui.add(egui::Label::new(
-                    egui::RichText::new(format!("Selected: {} items", self.selected_recordings.len()))
-                        .color(TEXT_SECONDARY),
+                    egui::RichText::new(format!(
+                        "Selected: {} items",
+                        self.selected_recordings.len()
+                    ))
+                    .color(TEXT_SECONDARY),
                 ));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let dl_btn = egui::Button::new(
@@ -916,10 +1039,13 @@ impl ZoomDownloaderApp {
                     )
                     .fill(PRIMARY)
                     .rounding(egui::Rounding::same(8.0));
-                    if ui.add_enabled(
-                        !self.selected_recordings.is_empty() && !self.is_downloading,
-                        dl_btn,
-                    ).clicked() {
+                    if ui
+                        .add_enabled(
+                            !self.selected_recordings.is_empty() && !self.is_downloading,
+                            dl_btn,
+                        )
+                        .clicked()
+                    {
                         self.start_download();
                     }
                 });
@@ -928,8 +1054,10 @@ impl ZoomDownloaderApp {
             // 空状態
             card_frame().show(ui, |ui| {
                 ui.add(egui::Label::new(
-                    egui::RichText::new("録画データを読み込むには検索実行ボタンをクリックしてください。")
-                        .color(TEXT_SECONDARY),
+                    egui::RichText::new(
+                        "録画データを読み込むには検索実行ボタンをクリックしてください。",
+                    )
+                    .color(TEXT_SECONDARY),
                 ));
             });
         }
@@ -938,7 +1066,10 @@ impl ZoomDownloaderApp {
     /// SC005: ダウンロード進捗画面をレンダリングする
     fn render_progress(&mut self, ui: &mut egui::Ui) {
         ui.add(egui::Label::new(
-            egui::RichText::new("ダウンロード進捗").size(26.0).strong().color(TEXT_PRIMARY),
+            egui::RichText::new("ダウンロード進捗")
+                .size(26.0)
+                .strong()
+                .color(TEXT_PRIMARY),
         ));
         ui.add_space(8.0);
 
@@ -961,7 +1092,8 @@ impl ZoomDownloaderApp {
             // PR002: 現在ファイル名
             if !self.current_file.is_empty() {
                 ui.add(egui::Label::new(
-                    egui::RichText::new(format!("Current: {}", self.current_file)).color(TEXT_PRIMARY),
+                    egui::RichText::new(format!("Current: {}", self.current_file))
+                        .color(TEXT_PRIMARY),
                 ));
 
                 // PR003: ファイル進捗バー
@@ -979,20 +1111,18 @@ impl ZoomDownloaderApp {
             // PR004 & PR005: 制御ボタン
             ui.horizontal(|ui| {
                 if self.is_download_paused {
-                    let resume_button = egui::Button::new(
-                        egui::RichText::new("再開").color(TEXT_ON_PRIMARY),
-                    )
-                    .fill(BTN_SAVE)
-                    .rounding(egui::Rounding::same(8.0));
+                    let resume_button =
+                        egui::Button::new(egui::RichText::new("再開").color(TEXT_ON_PRIMARY))
+                            .fill(BTN_SAVE)
+                            .rounding(egui::Rounding::same(8.0));
                     if ui.add_sized([120.0, 40.0], resume_button).clicked() {
                         self.resume_download();
                     }
                 } else {
-                    let pause_button = egui::Button::new(
-                        egui::RichText::new("一時停止").color(TEXT_ON_PRIMARY),
-                    )
-                    .fill(BTN_PAUSE)
-                    .rounding(egui::Rounding::same(8.0));
+                    let pause_button =
+                        egui::Button::new(egui::RichText::new("一時停止").color(TEXT_ON_PRIMARY))
+                            .fill(BTN_PAUSE)
+                            .rounding(egui::Rounding::same(8.0));
                     if ui.add_sized([120.0, 40.0], pause_button).clicked() {
                         self.pause_download();
                     }
@@ -1000,11 +1130,10 @@ impl ZoomDownloaderApp {
 
                 ui.add_space(8.0);
 
-                let cancel_button = egui::Button::new(
-                    egui::RichText::new("キャンセル").color(TEXT_ON_PRIMARY),
-                )
-                .fill(BTN_CANCEL)
-                .rounding(egui::Rounding::same(8.0));
+                let cancel_button =
+                    egui::Button::new(egui::RichText::new("キャンセル").color(TEXT_ON_PRIMARY))
+                        .fill(BTN_CANCEL)
+                        .rounding(egui::Rounding::same(8.0));
                 if ui.add_sized([120.0, 40.0], cancel_button).clicked() {
                     self.cancel_download();
                 }
@@ -1014,16 +1143,20 @@ impl ZoomDownloaderApp {
         // ログカード
         card_frame().show(ui, |ui| {
             ui.add(egui::Label::new(
-                egui::RichText::new("Download Log").strong().color(TEXT_PRIMARY),
+                egui::RichText::new("Download Log")
+                    .strong()
+                    .color(TEXT_PRIMARY),
             ));
             ui.add_space(4.0);
-            egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-                for msg in &self.download_progress {
-                    ui.add(egui::Label::new(
-                        egui::RichText::new(msg).size(13.0).color(TEXT_SECONDARY),
-                    ));
-                }
-            });
+            egui::ScrollArea::vertical()
+                .max_height(200.0)
+                .show(ui, |ui| {
+                    for msg in &self.download_progress {
+                        ui.add(egui::Label::new(
+                            egui::RichText::new(msg).size(13.0).color(TEXT_SECONDARY),
+                        ));
+                    }
+                });
         });
 
         ui.add_space(6.0);
@@ -1039,15 +1172,22 @@ impl ZoomDownloaderApp {
     /// SC006: エラー表示画面をレンダリングする
     fn render_error(&mut self, ui: &mut egui::Ui) {
         ui.add(egui::Label::new(
-            egui::RichText::new("エラー").size(26.0).strong().color(ERROR_TEXT),
+            egui::RichText::new("エラー")
+                .size(26.0)
+                .strong()
+                .color(ERROR_TEXT),
         ));
         ui.add_space(8.0);
 
         egui::ScrollArea::vertical().show(ui, |ui| {
             // エラー種別自動判定
-            let error_type = if self.error_message.contains("auth") || self.error_message.contains("401") {
+            let error_type = if self.error_message.contains("auth")
+                || self.error_message.contains("401")
+            {
                 "認証エラー"
-            } else if self.error_message.contains("network") || self.error_message.contains("timeout") {
+            } else if self.error_message.contains("network")
+                || self.error_message.contains("timeout")
+            {
                 "ネットワークエラー"
             } else if self.error_message.contains("file") || self.error_message.contains("disk") {
                 "ファイルエラー"
@@ -1064,7 +1204,9 @@ impl ZoomDownloaderApp {
                     .inner_margin(egui::Margin::symmetric(10.0, 4.0))
                     .show(ui, |ui| {
                         ui.add(egui::Label::new(
-                            egui::RichText::new(error_type).color(TEXT_ON_PRIMARY).size(13.0),
+                            egui::RichText::new(error_type)
+                                .color(TEXT_ON_PRIMARY)
+                                .size(13.0),
                         ));
                     });
 
@@ -1072,11 +1214,16 @@ impl ZoomDownloaderApp {
 
                 // エラーメッセージ
                 ui.add(egui::Label::new(
-                    egui::RichText::new("エラーメッセージ").color(ERROR_TEXT).size(14.0),
+                    egui::RichText::new("エラーメッセージ")
+                        .color(ERROR_TEXT)
+                        .size(14.0),
                 ));
                 let error_width = ui.available_width();
-                ui.add_sized([error_width, 40.0],
-                    egui::TextEdit::multiline(&mut self.error_message.clone()).desired_width(f32::INFINITY));
+                ui.add_sized(
+                    [error_width, 40.0],
+                    egui::TextEdit::multiline(&mut self.error_message.clone())
+                        .desired_width(f32::INFINITY),
+                );
 
                 ui.add_space(6.0);
 
@@ -1084,14 +1231,19 @@ impl ZoomDownloaderApp {
                 ui.add(egui::Label::new(
                     egui::RichText::new("詳細情報").color(ERROR_TEXT).size(14.0),
                 ));
-                ui.add_sized([error_width, 50.0],
-                    egui::TextEdit::multiline(&mut self.error_details.clone()).desired_width(f32::INFINITY));
+                ui.add_sized(
+                    [error_width, 50.0],
+                    egui::TextEdit::multiline(&mut self.error_details.clone())
+                        .desired_width(f32::INFINITY),
+                );
             });
 
             // 推奨アクション（通常カード）
             card_frame().show(ui, |ui| {
                 ui.add(egui::Label::new(
-                    egui::RichText::new("推奨アクション").strong().color(TEXT_PRIMARY),
+                    egui::RichText::new("推奨アクション")
+                        .strong()
+                        .color(TEXT_PRIMARY),
                 ));
                 ui.add_space(4.0);
                 match error_type {
@@ -1117,11 +1269,10 @@ impl ZoomDownloaderApp {
 
             // アクションボタン
             ui.horizontal(|ui| {
-                let retry_btn = egui::Button::new(
-                    egui::RichText::new("リトライ").color(TEXT_ON_PRIMARY),
-                )
-                .fill(PRIMARY)
-                .rounding(egui::Rounding::same(8.0));
+                let retry_btn =
+                    egui::Button::new(egui::RichText::new("リトライ").color(TEXT_ON_PRIMARY))
+                        .fill(PRIMARY)
+                        .rounding(egui::Rounding::same(8.0));
                 if ui.add_sized([120.0, 40.0], retry_btn).clicked() {
                     self.error_message.clear();
                     self.error_details.clear();
@@ -1137,18 +1288,20 @@ impl ZoomDownloaderApp {
                     self.current_screen = AppScreen::Config;
                 }
 
-                let log_button = egui::Button::new(
-                    egui::RichText::new("ログ出力").color(TEXT_ON_PRIMARY),
-                )
-                .fill(BTN_LOAD)
-                .rounding(egui::Rounding::same(8.0));
+                let log_button =
+                    egui::Button::new(egui::RichText::new("ログ出力").color(TEXT_ON_PRIMARY))
+                        .fill(BTN_LOAD)
+                        .rounding(egui::Rounding::same(8.0));
                 if ui.add_sized([120.0, 40.0], log_button).clicked() {
                     match self.export_logs() {
                         Ok(filepath) => {
                             let _ = self.sender.send(AppMessage::LogExported(filepath));
                         }
                         Err(error_msg) => {
-                            let _ = self.sender.send(AppMessage::Error(format!("Failed to export log: {}", error_msg)));
+                            let _ = self.sender.send(AppMessage::Error(format!(
+                                "Failed to export log: {}",
+                                error_msg
+                            )));
                         }
                     }
                 }
@@ -1191,7 +1344,10 @@ impl ZoomDownloaderApp {
                         let _ = sender.send(AppMessage::RecordingsLoaded(recordings));
                     }
                     Err(e) => {
-                        let _ = sender.send(AppMessage::Error(format!("Failed to fetch recordings: {}", e)));
+                        let _ = sender.send(AppMessage::Error(format!(
+                            "Failed to fetch recordings: {}",
+                            e
+                        )));
                     }
                 }
             });
@@ -1208,8 +1364,12 @@ impl ZoomDownloaderApp {
                 self.status_message = "Configuration loaded".to_string();
             }
             Err(_) => {
-                let _ = self.services.config_service.create_sample_config("config.toml");
-                self.status_message = "Configuration file not found. Created config.toml.".to_string();
+                let _ = self
+                    .services
+                    .config_service
+                    .create_sample_config("config.toml");
+                self.status_message =
+                    "Configuration file not found. Created config.toml.".to_string();
             }
         }
     }
@@ -1222,7 +1382,11 @@ impl ZoomDownloaderApp {
             redirect_uri: Some("http://localhost:8080/callback".to_string()),
         };
 
-        match self.services.config_service.save_config(&config, "config.toml") {
+        match self
+            .services
+            .config_service
+            .save_config(&config, "config.toml")
+        {
             Ok(_) => {
                 self.status_message = "Configuration saved".to_string();
             }
@@ -1250,16 +1414,19 @@ impl ZoomDownloaderApp {
         let sender = self.sender.clone();
         let auth_service = Arc::clone(&self.services.auth_service);
 
-        thread::spawn(move || {
-            match auth_service.generate_auth_url(&client_id, &client_secret) {
+        thread::spawn(
+            move || match auth_service.generate_auth_url(&client_id, &client_secret) {
                 Ok(url) => {
                     let _ = sender.send(AppMessage::AuthUrlGenerated(url));
                 }
                 Err(e) => {
-                    let _ = sender.send(AppMessage::Error(format!("Auth URL generation error: {}", e)));
+                    let _ = sender.send(AppMessage::Error(format!(
+                        "Auth URL generation error: {}",
+                        e
+                    )));
                 }
-            }
-        });
+            },
+        );
     }
 
     /// 認証完了（サービス経由）
@@ -1276,7 +1443,8 @@ impl ZoomDownloaderApp {
                     let _ = sender.send(AppMessage::AuthComplete(token));
                 }
                 Err(e) => {
-                    let _ = sender.send(AppMessage::Error(format!("Token acquisition error: {}", e)));
+                    let _ =
+                        sender.send(AppMessage::Error(format!("Token acquisition error: {}", e)));
                 }
             }
         });
@@ -1296,7 +1464,13 @@ impl ZoomDownloaderApp {
             let download_service = Arc::clone(&self.services.download_service);
 
             thread::spawn(move || {
-                match download_service.download_files(&access_token, &recordings, &selected, &output_dir, sender.clone()) {
+                match download_service.download_files(
+                    &access_token,
+                    &recordings,
+                    &selected,
+                    &output_dir,
+                    sender.clone(),
+                ) {
                     Ok(_) => {}
                     Err(e) => {
                         let _ = sender.send(AppMessage::Error(format!("Download error: {}", e)));
@@ -1308,8 +1482,14 @@ impl ZoomDownloaderApp {
 }
 
 /// 認証URL生成の非同期実装（services_implから呼ばれる）
-pub(crate) async fn generate_auth_url_async(client_id: &str, client_secret: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    use oauth2::{basic::BasicClient, AuthUrl, ClientId, ClientSecret, RedirectUrl, Scope, CsrfToken, PkceCodeChallenge, TokenUrl};
+pub(crate) async fn generate_auth_url_async(
+    client_id: &str,
+    client_secret: &str,
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    use oauth2::{
+        basic::BasicClient, AuthUrl, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge,
+        RedirectUrl, Scope, TokenUrl,
+    };
 
     let oauth_client = BasicClient::new(
         ClientId::new(client_id.to_string()),
@@ -1317,7 +1497,9 @@ pub(crate) async fn generate_auth_url_async(client_id: &str, client_secret: &str
         AuthUrl::new("https://zoom.us/oauth/authorize".to_string())?,
         Some(TokenUrl::new("https://zoom.us/oauth/token".to_string())?),
     )
-    .set_redirect_uri(RedirectUrl::new("http://localhost:8080/callback".to_string())?);
+    .set_redirect_uri(RedirectUrl::new(
+        "http://localhost:8080/callback".to_string(),
+    )?);
 
     let (pkce_challenge, _pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
@@ -1332,8 +1514,15 @@ pub(crate) async fn generate_auth_url_async(client_id: &str, client_secret: &str
 }
 
 /// トークン交換の非同期実装（services_implから呼ばれる）
-pub(crate) async fn exchange_code_for_token_async(client_id: &str, client_secret: &str, auth_code: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    use oauth2::{basic::BasicClient, AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl, AuthorizationCode, TokenResponse};
+pub(crate) async fn exchange_code_for_token_async(
+    client_id: &str,
+    client_secret: &str,
+    auth_code: &str,
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    use oauth2::{
+        basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, ClientSecret, RedirectUrl,
+        TokenResponse, TokenUrl,
+    };
 
     let oauth_client = BasicClient::new(
         ClientId::new(client_id.to_string()),
@@ -1341,7 +1530,9 @@ pub(crate) async fn exchange_code_for_token_async(client_id: &str, client_secret
         AuthUrl::new("https://zoom.us/oauth/authorize".to_string())?,
         Some(TokenUrl::new("https://zoom.us/oauth/token".to_string())?),
     )
-    .set_redirect_uri(RedirectUrl::new("http://localhost:8080/callback".to_string())?);
+    .set_redirect_uri(RedirectUrl::new(
+        "http://localhost:8080/callback".to_string(),
+    )?);
 
     let (_, pkce_verifier) = oauth2::PkceCodeChallenge::new_random_sha256();
 
