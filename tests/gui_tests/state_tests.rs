@@ -184,9 +184,64 @@ fn st011_error_resets_both_auth_and_download() {
     assert!(!app.is_downloading());
 }
 
-/// ST-012: 連続メッセージ処理
+/// ST-012: SearchProgress処理
 #[test]
-fn st012_sequential_messages_maintain_consistency() {
+fn st012_search_progress_updates_status() {
+    let mut app = create_test_app();
+    app.set_is_searching(true);
+
+    let msg = "録画データを取得中... (1/3)".to_string();
+    app.sender()
+        .send(AppMessage::SearchProgress(msg.clone()))
+        .unwrap();
+    app.process_messages_for_test();
+
+    assert!(app.is_searching()); // 検索中フラグは維持される
+    assert_eq!(app.status_message(), msg);
+}
+
+/// ST-013: SearchProgress後にRecordingsLoadedでis_searchingがリセットされる
+#[test]
+fn st013_recordings_loaded_resets_is_searching() {
+    let mut app = create_test_app();
+    app.set_is_searching(true);
+
+    let recordings = RecordingSearchResponse {
+        from: "2025-01-01".to_string(),
+        to: "2025-01-31".to_string(),
+        page_count: 1,
+        page_size: 30,
+        total_records: 0,
+        next_page_token: None,
+        meetings: vec![],
+    };
+
+    app.sender()
+        .send(AppMessage::RecordingsLoaded(recordings))
+        .unwrap();
+    app.process_messages_for_test();
+
+    assert!(!app.is_searching()); // 検索完了でリセット
+    assert!(app.recordings().is_some());
+}
+
+/// ST-014: Error時にis_searchingがリセットされる
+#[test]
+fn st014_error_resets_is_searching() {
+    let mut app = create_test_app();
+    app.set_is_searching(true);
+
+    app.sender()
+        .send(AppMessage::Error("search failed".to_string()))
+        .unwrap();
+    app.process_messages_for_test();
+
+    assert!(!app.is_searching()); // エラー時もリセット
+}
+
+/// ST-015: 連続メッセージ処理
+#[test]
+fn st015_sequential_messages_maintain_consistency() {
     let mut app = create_test_app();
 
     // 認証完了 → 録画ロード → ダウンロード開始 → ダウンロード完了

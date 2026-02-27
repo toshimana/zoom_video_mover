@@ -45,6 +45,7 @@ pub trait RecordingService: Send + Sync + 'static {
         user_id: &str,
         from_date: &str,
         to_date: &str,
+        progress_sender: mpsc::Sender<AppMessage>,
     ) -> Result<RecordingSearchResponse, Box<dyn std::error::Error + Send + Sync>>;
 }
 

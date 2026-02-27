@@ -109,6 +109,7 @@ impl RecordingService for RealRecordingService {
         user_id: &str,
         from_date: &str,
         to_date: &str,
+        progress_sender: mpsc::Sender<AppMessage>,
     ) -> Result<RecordingSearchResponse, Box<dyn std::error::Error + Send + Sync>> {
         let rt = tokio::runtime::Runtime::new()
             .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
@@ -143,7 +144,11 @@ impl RecordingService for RealRecordingService {
             log::info!("Fetching recordings: from={} to={}, split into {} chunk(s)", from, to, chunks.len());
 
             let mut all_meetings: Vec<MeetingRecording> = Vec::new();
-            for (chunk_from, chunk_to) in &chunks {
+            let total_chunks = chunks.len();
+            for (chunk_idx, (chunk_from, chunk_to)) in chunks.iter().enumerate() {
+                let _ = progress_sender.send(AppMessage::SearchProgress(
+                    format!("録画データを取得中... ({}/{})", chunk_idx + 1, total_chunks),
+                ));
                 log::info!("Fetching chunk: from={} to={}", chunk_from, chunk_to);
                 let request = RecordingSearchRequest {
                     user_id: Some(user_id.clone()),
@@ -173,7 +178,11 @@ impl RecordingService for RealRecordingService {
 
             // 各ミーティングのrecording_filesにSUMMARYが含まれない場合、
             // Meeting Summary APIで自動チェックし、仮想エントリを追加
-            for meeting in &mut recordings.meetings {
+            let total_meetings = recordings.meetings.len();
+            for (meeting_idx, meeting) in recordings.meetings.iter_mut().enumerate() {
+                let _ = progress_sender.send(AppMessage::SearchProgress(
+                    format!("AI要約をチェック中... ({}/{})", meeting_idx + 1, total_meetings),
+                ));
                 let has_summary = meeting.recording_files.iter()
                     .any(|f| f.file_type == RecordingFileType::Summary);
                 if !has_summary {

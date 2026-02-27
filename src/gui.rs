@@ -163,6 +163,7 @@ pub enum AppMessage {
     DownloadResumed,
     DownloadCancelled,
     LogExported(String),
+    SearchProgress(String),
     Error(String),
 }
 
@@ -190,6 +191,7 @@ pub struct ZoomDownloaderApp {
     auth_url: Option<String>,
     is_authenticating: bool,
     is_downloading: bool,
+    is_searching: bool,
     is_download_paused: bool,
     download_can_resume: bool,
     access_token: Option<String>,
@@ -260,6 +262,7 @@ impl Default for ZoomDownloaderApp {
             auth_url: None,
             is_authenticating: false,
             is_downloading: false,
+            is_searching: false,
             is_download_paused: false,
             download_can_resume: false,
             access_token: None,
@@ -444,7 +447,11 @@ impl ZoomDownloaderApp {
                 }
                 AppMessage::RecordingsLoaded(recordings) => {
                     self.recordings = Some(recordings);
+                    self.is_searching = false;
                     self.status_message = "Recordings loaded.".to_string();
+                }
+                AppMessage::SearchProgress(msg) => {
+                    self.status_message = msg;
                 }
                 AppMessage::DownloadProgress(msg) => {
                     self.download_progress.push(msg.clone());
@@ -497,6 +504,7 @@ impl ZoomDownloaderApp {
                 AppMessage::Error(err) => {
                     self.is_authenticating = false;
                     self.is_downloading = false;
+                    self.is_searching = false;
                     self.error_message = err.clone();
                     self.error_details = format!(
                         "Timestamp: {}",
@@ -910,12 +918,21 @@ impl ZoomDownloaderApp {
                 ui.add_sized([150.0, 30.0], egui::TextEdit::singleline(&mut self.to_date));
 
                 // RL003: 検索実行ボタン
-                let search_btn =
-                    egui::Button::new(egui::RichText::new("検索実行").color(TEXT_ON_PRIMARY))
-                        .fill(PRIMARY)
-                        .rounding(egui::Rounding::same(8.0));
-                if ui.add_sized([120.0, 36.0], search_btn).clicked() {
-                    self.fetch_recordings();
+                if self.is_searching {
+                    ui.add(egui::Spinner::new().size(20.0));
+                    let disabled_btn =
+                        egui::Button::new(egui::RichText::new("検索中...").color(TEXT_SECONDARY))
+                            .fill(BORDER_DEFAULT)
+                            .rounding(egui::Rounding::same(8.0));
+                    ui.add_sized([120.0, 36.0], disabled_btn);
+                } else {
+                    let search_btn =
+                        egui::Button::new(egui::RichText::new("検索実行").color(TEXT_ON_PRIMARY))
+                            .fill(PRIMARY)
+                            .rounding(egui::Rounding::same(8.0));
+                    if ui.add_sized([120.0, 36.0], search_btn).clicked() {
+                        self.fetch_recordings();
+                    }
                 }
             });
         });
@@ -1332,6 +1349,9 @@ impl ZoomDownloaderApp {
         }
 
         if let Some(access_token) = &self.access_token {
+            self.is_searching = true;
+            self.status_message = "録画を検索中...".to_string();
+
             let access_token = access_token.clone();
             let from_date = self.from_date.clone();
             let to_date = self.to_date.clone();
@@ -1339,7 +1359,13 @@ impl ZoomDownloaderApp {
             let recording_service = Arc::clone(&self.services.recording_service);
 
             thread::spawn(move || {
-                match recording_service.get_recordings(&access_token, "me", &from_date, &to_date) {
+                match recording_service.get_recordings(
+                    &access_token,
+                    "me",
+                    &from_date,
+                    &to_date,
+                    sender.clone(),
+                ) {
                     Ok(recordings) => {
                         let _ = sender.send(AppMessage::RecordingsLoaded(recordings));
                     }
@@ -1562,6 +1588,7 @@ impl ZoomDownloaderApp {
             auth_url: None,
             is_authenticating: false,
             is_downloading: false,
+            is_searching: false,
             is_download_paused: false,
             download_can_resume: false,
             access_token: None,
@@ -1594,6 +1621,10 @@ impl ZoomDownloaderApp {
 
     pub fn is_downloading(&self) -> bool {
         self.is_downloading
+    }
+
+    pub fn is_searching(&self) -> bool {
+        self.is_searching
     }
 
     pub fn is_download_paused(&self) -> bool {
@@ -1639,6 +1670,10 @@ impl ZoomDownloaderApp {
 
     pub fn set_is_downloading(&mut self, v: bool) {
         self.is_downloading = v;
+    }
+
+    pub fn set_is_searching(&mut self, v: bool) {
+        self.is_searching = v;
     }
 
     pub fn set_is_authenticating(&mut self, v: bool) {
