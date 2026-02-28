@@ -659,20 +659,21 @@ impl ApiComponent {
             all_meetings.extend(response.meetings);
             total_pages += 1;
 
-            // 次ページの確認
-            if let Some(next_token) = response.next_page_token {
-                current_request.next_page_token = Some(next_token);
+            // 次ページの確認（空文字列もページネーション終了として扱う）
+            match response.next_page_token {
+                Some(ref next_token) if !next_token.is_empty() => {
+                    current_request.next_page_token = Some(next_token.clone());
 
-                // 最大ページ数制限チェック（安全のため）
-                if total_pages >= self.config.max_pages {
-                    log::warn!("Reached maximum page limit ({})", self.config.max_pages);
-                    break;
+                    // 最大ページ数制限チェック（安全のため）
+                    if total_pages >= self.config.max_pages {
+                        log::warn!("Reached maximum page limit ({})", self.config.max_pages);
+                        break;
+                    }
+
+                    // ページ間隔制御（レート制限対策）
+                    tokio::time::sleep(Duration::from_millis(self.config.page_interval_ms)).await;
                 }
-
-                // ページ間隔制御（レート制限対策）
-                tokio::time::sleep(Duration::from_millis(self.config.page_interval_ms)).await;
-            } else {
-                break;
+                _ => break,
             }
         }
 
