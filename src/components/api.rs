@@ -469,57 +469,111 @@ impl ApiComponent {
             query_params.push(("next_page_token", next_page_token.clone()));
         }
 
-        // HTTPリクエスト実行
-        let start_time = Instant::now();
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token.access_token)
-            .query(&query_params)
-            .send()
-            .await
-            .map_err(|e| AppError::network("Failed to send API request", Some(e)))?;
+        // HTTPリクエスト実行（サーバーエラー時のリトライ付き）
+        let max_retries = self.config.max_retries;
+        let mut last_error: Option<AppError> = None;
 
-        let duration = start_time.elapsed();
+        let response_text = 'retry: {
+            for attempt in 0..=max_retries {
+                let start_time = Instant::now();
+                let response = match self
+                    .http_client
+                    .get(&url)
+                    .bearer_auth(&token.access_token)
+                    .query(&query_params)
+                    .send()
+                    .await
+                {
+                    Ok(resp) => resp,
+                    Err(e) => {
+                        let duration = start_time.elapsed();
+                        self.record_api_call(duration, false).await;
+                        if attempt < max_retries {
+                            let wait = 5 * 2u64.pow(attempt);
+                            log::warn!(
+                                "API request failed (attempt {}/{}), retrying in {}s: {}",
+                                attempt + 1,
+                                max_retries + 1,
+                                wait,
+                                e
+                            );
+                            tokio::time::sleep(Duration::from_secs(wait)).await;
+                            continue;
+                        }
+                        return Err(AppError::network("Failed to send API request", Some(e)));
+                    }
+                };
 
-        // ステータスコードチェック
-        let status = response.status();
-        if !status.is_success() {
-            self.record_api_call(duration, false).await;
+                let duration = start_time.elapsed();
 
-            return match status {
-                StatusCode::UNAUTHORIZED => Err(AppError::authentication(
-                    "Unauthorized API access",
-                    None::<std::io::Error>,
-                )),
-                StatusCode::TOO_MANY_REQUESTS => {
-                    self.record_rate_limit_error().await;
-                    let retry_after = response
-                        .headers()
-                        .get(reqwest::header::RETRY_AFTER)
-                        .and_then(|v| v.to_str().ok())
-                        .and_then(|v| v.parse::<u64>().ok());
-                    Err(AppError::rate_limit_with_retry(
-                        "API rate limit exceeded",
-                        retry_after,
-                    ))
+                // ステータスコードチェック
+                let status = response.status();
+                if !status.is_success() {
+                    self.record_api_call(duration, false).await;
+
+                    match status {
+                        StatusCode::UNAUTHORIZED => {
+                            return Err(AppError::authentication(
+                                "Unauthorized API access",
+                                None::<std::io::Error>,
+                            ));
+                        }
+                        StatusCode::TOO_MANY_REQUESTS => {
+                            self.record_rate_limit_error().await;
+                            let retry_after = response
+                                .headers()
+                                .get(reqwest::header::RETRY_AFTER)
+                                .and_then(|v| v.to_str().ok())
+                                .and_then(|v| v.parse::<u64>().ok());
+                            return Err(AppError::rate_limit_with_retry(
+                                "API rate limit exceeded",
+                                retry_after,
+                            ));
+                        }
+                        StatusCode::NOT_FOUND => {
+                            return Err(AppError::not_found("User or resource not found"));
+                        }
+                        _ if status.as_u16() >= 500 && attempt < max_retries => {
+                            let wait = 10 * 2u64.pow(attempt);
+                            log::warn!(
+                                "Server error {} (attempt {}/{}), retrying in {}s",
+                                status,
+                                attempt + 1,
+                                max_retries + 1,
+                                wait
+                            );
+                            last_error =
+                                Some(AppError::external_service(format!("API error: {}", status)));
+                            tokio::time::sleep(Duration::from_secs(wait)).await;
+                            continue;
+                        }
+                        _ => {
+                            let error_body = response.text().await.unwrap_or_default();
+                            return Err(AppError::external_service(format!(
+                                "API error: {} - {}",
+                                status, error_body
+                            )));
+                        }
+                    }
                 }
-                StatusCode::NOT_FOUND => Err(AppError::not_found("User or resource not found")),
-                _ => {
-                    let error_body = response.text().await.unwrap_or_default();
-                    Err(AppError::external_service(format!(
-                        "API error: {} - {}",
-                        status, error_body
-                    )))
-                }
-            };
-        }
+
+                self.record_api_call(duration, true).await;
+
+                // 成功: レスポンスボディ読み取り
+                let text = response
+                    .text()
+                    .await
+                    .map_err(|e| AppError::network("Failed to read API response body", Some(e)))?;
+                break 'retry text;
+            }
+
+            // すべてのリトライが失敗した場合
+            return Err(last_error.unwrap_or_else(|| {
+                AppError::external_service("API request failed after all retries")
+            }));
+        };
 
         // レスポンス解析（raw JSONをログ出力してからパース）
-        let response_text = response
-            .text()
-            .await
-            .map_err(|e| AppError::network("Failed to read API response body", Some(e)))?;
 
         log::debug!(
             "[DL-DIAG] API raw response (truncated): {}",
@@ -554,8 +608,6 @@ impl ApiComponent {
 
         let response_body: RecordingSearchResponse = serde_json::from_str(&response_text)
             .map_err(|e| AppError::data_format("Failed to parse API response", Some(e)))?;
-
-        self.record_api_call(duration, true).await;
 
         // 事後条件の検証: page_sizeは録画0件時に0を返すため非負で検証
         debug_assert!(
