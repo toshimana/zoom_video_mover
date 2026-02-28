@@ -148,14 +148,17 @@ impl RecordingService for RealRecordingService {
             let api = Arc::new(api);
             let mut all_meetings: Vec<MeetingRecording> = Vec::new();
 
+            let chunk_semaphore = Arc::new(Semaphore::new(3));
             let mut handles = Vec::new();
             for (chunk_idx, (chunk_from, chunk_to)) in chunks.iter().enumerate() {
                 let api = Arc::clone(&api);
+                let sem = Arc::clone(&chunk_semaphore);
                 let user_id = user_id.clone();
                 let progress_sender = progress_sender.clone();
                 let chunk_from = *chunk_from;
                 let chunk_to = *chunk_to;
                 handles.push(tokio::spawn(async move {
+                    let _permit = sem.acquire().await.unwrap();
                     let _ = progress_sender.send(AppMessage::SearchProgress(
                         format!("録画データを取得中... ({}/{})", chunk_idx + 1, total_chunks),
                     ));

@@ -520,14 +520,25 @@ impl ApiComponent {
                         }
                         StatusCode::TOO_MANY_REQUESTS => {
                             self.record_rate_limit_error().await;
-                            let retry_after = response
+                            let retry_after_secs = response
                                 .headers()
                                 .get(reqwest::header::RETRY_AFTER)
                                 .and_then(|v| v.to_str().ok())
-                                .and_then(|v| v.parse::<u64>().ok());
+                                .and_then(|v| v.parse::<u64>().ok())
+                                .unwrap_or(10);
+                            if attempt < max_retries {
+                                log::warn!(
+                                    "Rate limited 429 (attempt {}/{}), retrying in {}s",
+                                    attempt + 1,
+                                    max_retries + 1,
+                                    retry_after_secs
+                                );
+                                tokio::time::sleep(Duration::from_secs(retry_after_secs)).await;
+                                continue;
+                            }
                             return Err(AppError::rate_limit_with_retry(
                                 "API rate limit exceeded",
-                                retry_after,
+                                Some(retry_after_secs),
                             ));
                         }
                         StatusCode::NOT_FOUND => {
